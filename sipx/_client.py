@@ -157,7 +157,7 @@ class Client:
         self._via_host = host
         self._local_uri = f"sip:{self.identity}@{host}:{bound[1]}"
         self._started = True
-        logger.debug("Client started on %s via %s", bound, self._local_uri)
+        logger.debug(f"Client started on {bound} via {self._local_uri}")
 
     async def close(self) -> None:
         if not self._started:
@@ -193,7 +193,7 @@ class Client:
             try:
                 result = handler(event)
             except Exception:  # pragma: no cover - defensive logging
-                logger.exception("Handler for %s raised", name)
+                logger.exception(f"Handler for {name} raised")
                 continue
             if inspect.isawaitable(result):
                 awaitables.append(result)  # type: ignore[arg-type]
@@ -201,7 +201,7 @@ class Client:
             results = await asyncio.gather(*awaitables, return_exceptions=True)
             for outcome in results:
                 if isinstance(outcome, Exception):
-                    logger.error("Async handler for %s raised", name, exc_info=outcome)
+                    logger.error(f"Async handler for {name} raised", exc_info=outcome)
 
     # ------------------------------------------------------------------
     # Properties
@@ -248,15 +248,97 @@ class Client:
             response.response_raw
             or f"SIP/2.0 {response.status_code or 0} {response.status_text or ''}\r\n\r\n"
         )
-        await self._emit_event(
-            "OptionResponse",
-            OptionResponseEvent(
-                name="OptionResponse",
-                client=self,
-                message=parse_sip_message(raw),
-                response=response,
-            ),
+        try:
+            parsed = parse_sip_message(raw)
+        except ValueError:
+            logger.warning("Failed to parse OPTIONS response; skipping event dispatch")
+        else:
+            await self._emit_event(
+                "OptionResponse",
+                OptionResponseEvent(
+                    name="OptionResponse",
+                    client=self,
+                    message=parsed,
+                    response=response,
+                ),
+            )
+        return response
+
+    async def register(
+        self,
+        *,
+        username: Optional[str] = None,
+        domain: Optional[str] = None,
+        expires: int = 300,
+        timeout: Optional[float] = 5.0,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> TransportResponse:
+        self._ensure_started()
+        user = username or (self.credentials.username if self.credentials else self.identity)
+        if not user:
+            raise ValueError("username required for REGISTER")
+        host = domain or self.addr[0]
+        request_uri = f"sip:{host}"
+        to_uri = f"sip:{user}@{host}"
+        call_id = self._generate_call_id()
+        from_tag = self._generate_tag()
+        cseq = self._next_cseq()
+        branch = self._generate_branch()
+
+        base_headers = self._base_headers(
+            method="REGISTER",
+            uri=request_uri,
+            call_id=call_id,
+            from_tag=from_tag,
+            cseq=cseq,
+            branch=branch,
+            to_override=f"<{to_uri}>",
         )
+        contact = f"<sip:{user}@{self._assert_via_host()}:{self.local_address[1]}>"
+        base_headers["Contact"] = contact
+        base_headers["Expires"] = str(expires)
+        if headers:
+            base_headers.update(headers.items())
+
+        request = build_request("REGISTER", request_uri, base_headers)
+        response = await self._send(request, wait_response=True, timeout=timeout)
+        if response.status_code in {401, 407} and self.credentials and response.response_raw:
+            message = parse_sip_message(response.response_raw)
+            www_auth = message.get("WWW-Authenticate")
+            proxy_auth = message.get("Proxy-Authenticate")
+            auth_header = www_auth or proxy_auth
+            if auth_header:
+                challenge = parse_challenge(auth_header)
+                key = f"{call_id}:REGISTER"
+                nc = self._nonce_counts.get(key, 0) + 1
+                self._nonce_counts[key] = nc
+                header_value = build_authorization_header(
+                    "REGISTER",
+                    request_uri,
+                    challenge,
+                    self.credentials,
+                    nonce_count=nc,
+                    qop=challenge.get("qop", "auth"),
+                )
+                header_name = "Authorization" if www_auth else "Proxy-Authorization"
+                base_headers = self._base_headers(
+                    method="REGISTER",
+                    uri=request_uri,
+                    call_id=call_id,
+                    from_tag=from_tag,
+                    cseq=cseq,
+                    branch=self._generate_branch(),
+                    to_override=f"<{to_uri}>",
+                )
+                base_headers["Contact"] = contact
+                base_headers["Expires"] = str(expires)
+                base_headers[header_name] = header_value
+                if headers:
+                    base_headers.update(headers.items())
+                request = build_request("REGISTER", request_uri, base_headers)
+                response = await self._send(
+                    request, wait_response=True, timeout=timeout
+                )
         return response
 
     async def message(
@@ -264,13 +346,16 @@ class Client:
         content: str,
         uri: Optional[str] = None,
         *,
-        content_type: str = "text/plain",
-        wait_response: bool = False,
-        timeout: Optional[float] = None,
+    content_type: str = "text/plain",
+    wait_response: bool = False,
+    timeout: Optional[float] = 10.0,
         headers: Optional[Dict[str, str]] = None,
     ) -> Optional[TransportResponse]:
         self._ensure_started()
         target_uri = uri or self.remote_uri
+        effective_timeout = (
+            timeout if timeout is not None else (10.0 if wait_response else None)
+        )
         call_id = self._generate_call_id()
         from_tag = self._generate_tag()
         cseq = self._next_cseq()
@@ -286,8 +371,49 @@ class Client:
             base_headers.update(headers.items())
         request = build_request("MESSAGE", target_uri, base_headers, body=content)
         response = await self._send(
-            request, wait_response=wait_response, timeout=timeout
+            request, wait_response=wait_response, timeout=effective_timeout
         )
+        if (
+            wait_response
+            and response.status_code in {401, 407}
+            and self.credentials
+            and response.response_raw
+        ):
+            auth_message = parse_sip_message(response.response_raw)
+            www_auth = auth_message.get("WWW-Authenticate")
+            proxy_auth = auth_message.get("Proxy-Authenticate")
+            auth_header = www_auth or proxy_auth
+            if auth_header:
+                challenge = parse_challenge(auth_header)
+                key = f"{call_id}:MESSAGE"
+                nc = self._nonce_counts.get(key, 0) + 1
+                self._nonce_counts[key] = nc
+                header_value = build_authorization_header(
+                    "MESSAGE",
+                    target_uri,
+                    challenge,
+                    self.credentials,
+                    nonce_count=nc,
+                    qop=challenge.get("qop", "auth"),
+                )
+                header_name = "Authorization" if www_auth else "Proxy-Authorization"
+                retry_headers = self._base_headers(
+                    method="MESSAGE",
+                    uri=target_uri,
+                    call_id=call_id,
+                    from_tag=from_tag,
+                    cseq=cseq,
+                )
+                retry_headers["Content-Type"] = content_type
+                retry_headers[header_name] = header_value
+                if headers:
+                    retry_headers.update(headers.items())
+                retry_request = build_request(
+                    "MESSAGE", target_uri, retry_headers, body=content
+                )
+                response = await self._send(
+                    retry_request, wait_response=True, timeout=effective_timeout
+                )
         return response if wait_response else None
 
     async def invite(
@@ -408,7 +534,8 @@ class Client:
     ) -> TransportResponse:
         if not self._transport:
             raise RuntimeError("Client not started")
-        logger.debug("Sending message:%s%s", "\n" if len(data) < 4000 else "", data)
+        snippet_prefix = "\n" if len(data) < 4000 else ""
+        logger.debug(f"Sending message:{snippet_prefix}{data}")
         response = await self._transport.send(
             data,
             self.addr,
@@ -416,14 +543,11 @@ class Client:
             timeout=timeout,
         )
         if response.response_raw:
+            prefix = "\n" if len(response.response_raw) < 4000 else ""
+            logger.debug(f"Received response:{prefix}{response.response_raw}")
+        elif response.status_code is not None:
             logger.debug(
-                "Received response:%s%s",
-                "\n" if len(response.response_raw) < 4000 else "",
-                response.response_raw,
-            )
-        elif response.status_code:
-            logger.debug(
-                "Response status: %s %s", response.status_code, response.status_text
+                f"Response status: {response.status_code} {response.status_text}"
             )
         return response
 
@@ -431,7 +555,7 @@ class Client:
         try:
             message = parse_sip_message(raw)
         except ValueError:
-            logger.warning("Failed to parse SIP message from %s", addr)
+            logger.warning(f"Failed to parse SIP message from {addr}")
             return
         if message.is_request:
             await self._handle_request(message, addr)
@@ -496,6 +620,21 @@ class Client:
             elif cseq_method == "BYE":
                 await self._finalize_call(call, message, by_remote=False)
         else:
+            if call.state == CallState.TERMINATED:
+                logger.debug(
+                    f"Ignoring final response {status_code} for terminated call {call_id}"
+                )
+                return
+            if call.state == CallState.FAILED:
+                logger.debug(
+                    f"Ignoring final response {status_code} for failed call {call_id}"
+                )
+                return
+            if call.state == CallState.CONNECTED and cseq_method == "INVITE":
+                logger.debug(
+                    f"Ignoring non-success INVITE response {status_code} for connected call {call_id}"
+                )
+                return
             call.fsm.advance_to(CallState.FAILED, reason=str(status_code))
             await self._finalize_call(call, message, by_remote=False)
 
@@ -520,15 +659,18 @@ class Client:
             nonce_count=nc,
             qop=challenge.get("qop", "auth"),
         )
+        new_cseq = call.next_cseq()
+        new_branch = self._generate_branch()
         headers = self._base_headers(
             method="INVITE",
             uri=call.target_uri,
             call_id=call.call_id,
             from_tag=call.from_tag,
-            cseq=call.next_cseq(),
-            branch=self._generate_branch(),
-            override_via=self._via_header(self._generate_branch()),
+            cseq=new_cseq,
+            branch=new_branch,
+            override_via=self._via_header(new_branch),
         )
+        call.invite_cseq = new_cseq
         headers[
             "Authorization"
             if "www-authenticate" in auth_header.lower()
@@ -539,6 +681,7 @@ class Client:
             {"authorization": header_value, "raw": request}
         )
         response = await self._send(request, wait_response=True, timeout=10.0)
+        call.last_response = response
         if response.response_raw:
             await self._handle_response(parse_sip_message(response.response_raw))
 
@@ -601,19 +744,22 @@ class Client:
         call_id = message.get("Call-ID")
         call = self._calls.get(call_id, None) if call_id else None
         if call:
-            call.fsm.advance_to(CallState.TERMINATED)
-            call.terminated_at = _now()
+            if call.state != CallState.TERMINATED:
+                call.fsm.advance_to(CallState.TERMINATED)
+            call.terminated_at = call.terminated_at or _now()
+            already_remote = call.terminated_by == "remote"
             call.terminated_by = "remote"
-            await self._emit_event(
-                "CallHangup",
-                CallHangupEvent(
-                    name="CallHangup",
-                    client=self,
-                    message=message,
-                    call=call,
-                    by_remote=True,
-                ),
-            )
+            if not already_remote:
+                await self._emit_event(
+                    "CallHangup",
+                    CallHangupEvent(
+                        name="CallHangup",
+                        client=self,
+                        message=message,
+                        call=call,
+                        by_remote=True,
+                    ),
+                )
         await self._respond_simple(message, addr, 200, "OK")
 
     async def _respond_simple(

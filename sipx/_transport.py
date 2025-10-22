@@ -513,24 +513,59 @@ class SIPTransport:
         response_raw: str | None = None
         response_at: datetime | None = None
         timed_out = False
+        status_code: int | None = None
+        status_text: str | None = None
 
         if wait_response and error is None:
             assert future is not None
-            try:
-                if timeout is not None:
-                    response_raw, response_at = await asyncio.wait_for(future, timeout)
-                else:
-                    response_raw, response_at = await future
-            except asyncio.TimeoutError:
-                self._discard_future(resolved, future)
-                logger.debug("UDP response timed out; returning None")
-                timed_out = True
-            except Exception:
-                self._discard_future(resolved, future)
-                raise
+            remaining_timeout = timeout
+            while True:
+                try:
+                    if remaining_timeout is not None:
+                        start_wait = datetime.now(timezone.utc)
+                        response_raw_candidate, response_at_candidate = await asyncio.wait_for(
+                            future, remaining_timeout
+                        )
+                        elapsed = (datetime.now(timezone.utc) - start_wait).total_seconds()
+                        remaining_timeout = max(0.0, remaining_timeout - elapsed)
+                    else:
+                        response_raw_candidate, response_at_candidate = await future
+                except asyncio.TimeoutError:
+                    self._discard_future(resolved, future)
+                    logger.debug(f"UDP response timed out for {addr}")
+                    timed_out = True
+                    break
+                except Exception:
+                    self._discard_future(resolved, future)
+                    raise
+
+                response_raw = response_raw_candidate
+                response_at = response_at_candidate
+                status_code, status_text = _parse_status_line(response_raw)
+
+                if status_code is None:
+                    if (response_raw or "").strip():
+                        break
+                    response_raw = None
+                    response_at = None
+                    status_text = None
+                    if remaining_timeout is not None and remaining_timeout <= 0:
+                        timed_out = True
+                        break
+                    future = self._loop.create_future()
+                    self._pending.setdefault(resolved, deque()).append(future)
+                    continue
+
+                if 100 <= status_code < 200:
+                    if remaining_timeout is not None and remaining_timeout <= 0:
+                        timed_out = True
+                        break
+                    future = self._loop.create_future()
+                    self._pending.setdefault(resolved, deque()).append(future)
+                    continue
+                break
 
         response_length = len(response_raw) if response_raw is not None else None
-        status_code, status_text = _parse_status_line(response_raw)
         if response_at is not None:
             duration = (response_at - send_at).total_seconds()
         elif timed_out and timeout is not None:
