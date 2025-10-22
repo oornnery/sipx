@@ -3,16 +3,16 @@ name = "sipx"
 version = "0.2.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "rich>=14.1.0",
-    "textual>=6.1.0",
-    "textual-dev>=1.8.0",
     "typer>=0.17.4",
+    "textual>=6.1.0",
 ]
 
 [dependency-groups]
 dev = [
+    "textual-dev>=1.8.0",
     "pre-commit>=4.3.0",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.1.0",
