@@ -13,6 +13,7 @@ CRLFCRLF = b"\r\n\r\n"
 
 SIP_URI_RE = re.compile(r"^sip:(?:(?P<user>[^@]+)@)?(?P<hostport>[^;>]+)")
 
+
 @dataclass
 class SipMessage:
     is_request: bool
@@ -62,7 +63,9 @@ def determine_outbound_ip(preferred: str, remote_host: str, remote_port: int) ->
         return preferred
     target_host = remote_host
     try:
-        addrinfo = socket.getaddrinfo(remote_host, remote_port, socket.AF_INET, socket.SOCK_DGRAM)
+        addrinfo = socket.getaddrinfo(
+            remote_host, remote_port, socket.AF_INET, socket.SOCK_DGRAM
+        )
         if addrinfo:
             target_host = addrinfo[0][4][0]
     except socket.gaierror:
@@ -92,9 +95,12 @@ def format_sip_message(msg: "SipMessage") -> str:
     return f"{start}\n{headers}{body}" if headers else f"{start}{body}"
 
 
-def log_sip(direction: str, msg: "SipMessage", addr: Tuple[str, int], proto: str) -> None:
+def log_sip(
+    direction: str, msg: "SipMessage", addr: Tuple[str, int], proto: str
+) -> None:
     formatted = format_sip_message(msg)
     print(f"[{direction}] {proto} {addr[0]}:{addr[1]}\n{formatted}\n")
+
 
 def parse_sip_message(data: bytes) -> SipMessage:
     try:
@@ -118,22 +124,30 @@ def parse_sip_message(data: bytes) -> SipMessage:
         parts = start_line.split(" ", 2)
         code = int(parts[1])
         reason = parts[2] if len(parts) > 2 else ""
-        return SipMessage(False, status_code=code, reason=reason, headers=headers, body=body)
+        return SipMessage(
+            False, status_code=code, reason=reason, headers=headers, body=body
+        )
     else:
         parts = start_line.split(" ", 2)
         method = parts[0]
         uri = parts[1] if len(parts) > 1 else ""
-        return SipMessage(True, method=method, request_uri=uri, headers=headers, body=body)
+        return SipMessage(
+            True, method=method, request_uri=uri, headers=headers, body=body
+        )
+
 
 def gen_branch() -> str:
-    return f"z9hG4bK{random.randint(10**7, 10**8-1)}"
+    return f"z9hG4bK{random.randint(10**7, 10**8 - 1)}"
+
 
 def gen_tag() -> str:
-    return f"{random.randint(10**7, 10**8-1)}"
+    return f"{random.randint(10**7, 10**8 - 1)}"
+
 
 def next_cseq(h: str) -> str:
     num, meth = h.split()
-    return f"{int(num)+1} {meth}"
+    return f"{int(num) + 1} {meth}"
+
 
 def ensure_req_basics(
     msg: SipMessage,
@@ -159,9 +173,7 @@ def ensure_req_basics(
     msg.headers.setdefault("Max-Forwards", "70")
     if "CSeq" not in msg.headers:
         msg.headers["CSeq"] = f"1 {msg.method}"
-    msg.headers.setdefault(
-        "Call-ID", f"{random.randint(1, 2**31-1)}@{local_ip}"
-    )
+    msg.headers.setdefault("Call-ID", f"{random.randint(1, 2**31 - 1)}@{local_ip}")
     usr = msg.headers.get("Authorization-User") or "alice"
     from_header = msg.headers.get("From")
     if not from_header:
@@ -187,24 +199,37 @@ def ensure_req_basics(
         msg.headers["Content-Type"] = "application/sdp"
     msg.headers["Content-Length"] = str(len(msg.body or b""))
 
-def make_request(method: str, uri: str, headers: Dict[str, str], body: bytes = b"") -> SipMessage:
-    msg = SipMessage(True, method=method, request_uri=uri, headers=dict(headers), body=body)
+
+def make_request(
+    method: str, uri: str, headers: Dict[str, str], body: bytes = b""
+) -> SipMessage:
+    msg = SipMessage(
+        True, method=method, request_uri=uri, headers=dict(headers), body=body
+    )
     return msg
 
-def make_response(req: SipMessage, code: int, reason: str, headers: Optional[Dict[str,str]] = None, body: bytes = b"") -> SipMessage:
+
+def make_response(
+    req: SipMessage,
+    code: int,
+    reason: str,
+    headers: Optional[Dict[str, str]] = None,
+    body: bytes = b"",
+) -> SipMessage:
     h = dict(headers or {})
-    h["Via"] = req.headers.get("Via","")
-    h["From"] = req.headers.get("From","")
-    to_val = req.headers.get("To","")
+    h["Via"] = req.headers.get("Via", "")
+    h["From"] = req.headers.get("From", "")
+    to_val = req.headers.get("To", "")
     if "tag=" not in to_val:
         to_val = to_val.rstrip(">") + f">;tag={gen_tag()}"
     h["To"] = to_val
-    h["Call-ID"] = req.headers.get("Call-ID","")
-    h["CSeq"] = req.headers.get("CSeq","")
+    h["Call-ID"] = req.headers.get("Call-ID", "")
+    h["CSeq"] = req.headers.get("CSeq", "")
     if body:
         h["Content-Type"] = "application/sdp"
     h["Content-Length"] = str(len(body))
     return SipMessage(False, status_code=code, reason=reason, headers=h, body=body)
+
 
 def build_sdp(local_ip: str, rtp_port: int, payload=0, clock=8000) -> bytes:
     s = []
@@ -217,20 +242,22 @@ def build_sdp(local_ip: str, rtp_port: int, payload=0, clock=8000) -> bytes:
     s.append(f"a=rtpmap:{payload} PCMU/{clock}")
     return ("\r\n".join(s) + "\r\n").encode()
 
+
 class SipTransport:
     def __init__(self):
         self.on_message: Optional[Callable[[bytes, Tuple[str, int], str], None]] = None
         self._udp_transport: Optional[asyncio.transports.DatagramTransport] = None
 
-    async def sendto(self, data: bytes, addr: Tuple[str, int], proto: str = "UDP", writer=None):
+    async def sendto(
+        self, data: bytes, addr: Tuple[str, int], proto: str = "UDP", writer=None
+    ):
         if proto == "UDP":
             if self._udp_transport:
                 self._udp_transport.sendto(data, addr)
                 return
             loop = asyncio.get_running_loop()
             transport, protocol = await loop.create_datagram_endpoint(
-                lambda: asyncio.DatagramProtocol(),
-                remote_addr=addr
+                lambda: asyncio.DatagramProtocol(), remote_addr=addr
             )
             transport.sendto(data)
             transport.close()
@@ -238,12 +265,15 @@ class SipTransport:
             writer.write(data)
             await writer.drain()
 
+
 class SipUDPProtocol(asyncio.DatagramProtocol):
     def __init__(self, on_message):
         self.on_message = on_message
+
     def datagram_received(self, data: bytes, addr):
         if self.on_message:
             self.on_message(data, addr, "UDP")
+
 
 async def serve_udp(transport: SipTransport, host="0.0.0.0", port=5060):
     loop = asyncio.get_running_loop()
@@ -252,6 +282,7 @@ async def serve_udp(transport: SipTransport, host="0.0.0.0", port=5060):
     )
     transport._udp_transport = udp_transport
     return udp_transport
+
 
 async def serve_tcp(transport: SipTransport, host="0.0.0.0", port=5060):
     async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
@@ -276,30 +307,42 @@ async def serve_tcp(transport: SipTransport, host="0.0.0.0", port=5060):
                 buf = buf[total_len:]
                 if transport.on_message:
                     transport.on_message(msg, peer, "TCP")
+
     return await asyncio.start_server(handle, host, port)
 
-def parse_auth_challenge(hval: str) -> Dict[str,str]:
-    params: Dict[str,str] = {}
+
+def parse_auth_challenge(hval: str) -> Dict[str, str]:
+    params: Dict[str, str] = {}
     # strip "Digest " prefix if present
     v = hval.strip()
     if v.lower().startswith("digest"):
-        v = v[len("digest"):].strip()
-    for part in re.split(r',\s*', v):
+        v = v[len("digest") :].strip()
+    for part in re.split(r",\s*", v):
         if "=" in part:
             k, vv = part.split("=", 1)
             params[k.strip()] = vv.strip().strip('"')
     return params
 
+
 def md5_hex(x: str) -> str:
     return hashlib.md5(x.encode()).hexdigest()
 
-def build_digest_authorization(method: str, uri: str, username: str, password: str, chal: Dict[str,str], is_proxy=False, cseq_nc=1) -> Tuple[str,str]:
-    realm = chal.get("realm","")
-    nonce = chal.get("nonce","")
-    qop = chal.get("qop","auth")
-    algorithm = chal.get("algorithm","MD5")
+
+def build_digest_authorization(
+    method: str,
+    uri: str,
+    username: str,
+    password: str,
+    chal: Dict[str, str],
+    is_proxy=False,
+    cseq_nc=1,
+) -> Tuple[str, str]:
+    realm = chal.get("realm", "")
+    nonce = chal.get("nonce", "")
+    qop = chal.get("qop", "auth")
+    algorithm = chal.get("algorithm", "MD5")
     opaque = chal.get("opaque")
-    cnonce = f"{random.randint(10**7, 10**8-1)}"
+    cnonce = f"{random.randint(10**7, 10**8 - 1)}"
     nc = f"{cseq_nc:08x}"
     # Only MD5 for MVP
     ha1 = md5_hex(f"{username}:{realm}:{password}")
@@ -314,16 +357,17 @@ def build_digest_authorization(method: str, uri: str, username: str, password: s
         f'nonce="{nonce}"',
         f'uri="{uri}"',
         f'response="{response}"',
-        f'algorithm={algorithm}',
+        f"algorithm={algorithm}",
     ]
     if opaque:
         auth_params.append(f'opaque="{opaque}"')
     if qop:
         auth_params.append(f"qop={qop}")
-        auth_params.append(f'nc={nc}')
+        auth_params.append(f"nc={nc}")
         auth_params.append(f'cnonce="{cnonce}"')
     header_name = "Proxy-Authorization" if is_proxy else "Authorization"
     return header_name, "Digest " + ", ".join(auth_params)
+
 
 class ClientTransaction:
     def __init__(self, transport, key, request, addr, proto, writer):
@@ -352,12 +396,22 @@ class ClientTransaction:
         method_req = cseq_req.split()[1] if len(cseq_req.split()) > 1 else ""
         cseq_resp = resp.headers.get("CSeq", "")
         method_resp = cseq_resp.split()[1] if len(cseq_resp.split()) > 1 else ""
-        return cid_eq and method_req == method_resp and (branch_req and branch_resp and branch_req.group(1) == branch_resp.group(1))
+        return (
+            cid_eq
+            and method_req == method_resp
+            and (
+                branch_req
+                and branch_resp
+                and branch_req.group(1) == branch_resp.group(1)
+            )
+        )
 
     def is_terminated(self) -> bool:
         return self.state in ("terminated",)
 
-    async def wait_for_response(self, timeout: Optional[float] = None) -> Optional[SipMessage]:
+    async def wait_for_response(
+        self, timeout: Optional[float] = None
+    ) -> Optional[SipMessage]:
         if self.response is not None:
             return self.response
         if timeout is None:
@@ -368,9 +422,11 @@ class ClientTransaction:
 
     def build_ack(self) -> SipMessage:
         # Minimal ACK mirrors route/To/From/Call-ID and increments CSeq method to ACK
-        ack = SipMessage(True, method="ACK", request_uri=self.request.request_uri, headers={})
+        ack = SipMessage(
+            True, method="ACK", request_uri=self.request.request_uri, headers={}
+        )
         # Copy dialog-identifying headers
-        for k in ("From","To","Call-ID","Via","Contact"):
+        for k in ("From", "To", "Call-ID", "Via", "Contact"):
             if k in self.request.headers:
                 ack.headers[k] = self.request.headers[k]
         # ACK CSeq must use same number as INVITE but method "ACK"
@@ -383,6 +439,7 @@ class ClientTransaction:
         ack.headers["Content-Length"] = "0"
         return ack
 
+
 class NonInviteClientTransaction(ClientTransaction):
     async def start(self):
         self.state = "trying"
@@ -393,7 +450,9 @@ class NonInviteClientTransaction(ClientTransaction):
         interval = t1
         deadline = time.monotonic() + 32.0
         while time.monotonic() < deadline and self.state == "trying":
-            await self.transport.sendto(self.request.to_bytes(), self.addr, self.proto, self.writer)
+            await self.transport.sendto(
+                self.request.to_bytes(), self.addr, self.proto, self.writer
+            )
             await asyncio.sleep(interval)
             interval = min(interval * 2, 4.0)
         if self.response is None and self.state == "trying":
@@ -407,6 +466,7 @@ class NonInviteClientTransaction(ClientTransaction):
         if not self._response_event.is_set():
             self._response_event.set()
 
+
 class InviteClientTransaction(ClientTransaction):
     async def start(self):
         self.state = "calling"
@@ -417,7 +477,9 @@ class InviteClientTransaction(ClientTransaction):
         interval = t1
         deadline = time.monotonic() + 64 * t1
         while time.monotonic() < deadline and self.state == "calling":
-            await self.transport.sendto(self.request.to_bytes(), self.addr, self.proto, self.writer)
+            await self.transport.sendto(
+                self.request.to_bytes(), self.addr, self.proto, self.writer
+            )
             await asyncio.sleep(interval)
             interval = min(interval * 2, 4.0)
 
@@ -428,7 +490,11 @@ class InviteClientTransaction(ClientTransaction):
         if 100 < code < 200:
             self.provisional = resp
             rseq = resp.headers.get("RSeq")
-            require = (resp.headers.get("Require","") + "," + resp.headers.get("Supported","")).lower()
+            require = (
+                resp.headers.get("Require", "")
+                + ","
+                + resp.headers.get("Supported", "")
+            ).lower()
             if rseq and "100rel" in require:
                 await self._send_prack(resp)
             self.state = "proceeding"
@@ -436,7 +502,9 @@ class InviteClientTransaction(ClientTransaction):
         # For final responses, send ACK (even on 401/407/4xx/5xx/6xx) per INVITE rules
         if code >= 200:
             ack = self.build_ack()
-            await self.transport.sendto(ack.to_bytes(), self.addr, self.proto, self.writer)
+            await self.transport.sendto(
+                ack.to_bytes(), self.addr, self.proto, self.writer
+            )
         if code in (401, 407) and not self.auth_tried:
             # Build Authorization/Proxy-Authorization and resend INVITE with incremented CSeq
             chal_hdr = "WWW-Authenticate" if code == 401 else "Proxy-Authenticate"
@@ -447,21 +515,31 @@ class InviteClientTransaction(ClientTransaction):
                 header_name, authv = build_digest_authorization(
                     method=self.request.method or "INVITE",
                     uri=self.request.request_uri or "",
-                    username=self.request.headers.get("Authorization-User","alice"),
-                    password=self.request.headers.get("Authorization-Pass","alice"),
+                    username=self.request.headers.get("Authorization-User", "alice"),
+                    password=self.request.headers.get("Authorization-Pass", "alice"),
                     chal=params,
                     is_proxy=(code == 407),
-                    cseq_nc=self.nc
+                    cseq_nc=self.nc,
                 )
-                new_req = SipMessage(True, method=self.request.method, request_uri=self.request.request_uri, headers=dict(self.request.headers), body=self.request.body)
+                new_req = SipMessage(
+                    True,
+                    method=self.request.method,
+                    request_uri=self.request.request_uri,
+                    headers=dict(self.request.headers),
+                    body=self.request.body,
+                )
                 # Increment CSeq number for re-INVITE
                 if "CSeq" in new_req.headers:
                     n, m = new_req.headers["CSeq"].split()
-                    new_req.headers["CSeq"] = f"{int(n)+1} {m}"
+                    new_req.headers["CSeq"] = f"{int(n) + 1} {m}"
                 new_req.headers[header_name] = authv
                 # New branch for a new client transaction
-                via = new_req.headers.get("Via","")
-                new_req.headers["Via"] = re.sub(r"branch=[^;]+", f"branch={gen_branch()}", via) if "branch=" in via else (via + f";branch={gen_branch()}")
+                via = new_req.headers.get("Via", "")
+                new_req.headers["Via"] = (
+                    re.sub(r"branch=[^;]+", f"branch={gen_branch()}", via)
+                    if "branch=" in via
+                    else (via + f";branch={gen_branch()}")
+                )
                 # Mark tried
                 self.auth_tried = True
                 # Start a fresh transaction by delegating back to TM (handled outside)
@@ -476,22 +554,29 @@ class InviteClientTransaction(ClientTransaction):
 
     async def _send_prack(self, prov: SipMessage):
         # RAck: RSeq CSeq Method (of original INVITE)
-        rseq = prov.headers.get("RSeq","")
-        cseq = self.request.headers.get("CSeq","")
+        rseq = prov.headers.get("RSeq", "")
+        cseq = self.request.headers.get("CSeq", "")
         method = cseq.split()[1] if len(cseq.split()) > 1 else "INVITE"
         rack = f"{rseq} {cseq.split()[0]} {method}"
-        prack = SipMessage(True, method="PRACK", request_uri=self.request.request_uri, headers={})
+        prack = SipMessage(
+            True, method="PRACK", request_uri=self.request.request_uri, headers={}
+        )
         # Copy dialog-identifying headers
-        for k in ("From","To","Call-ID","Contact"):
+        for k in ("From", "To", "Call-ID", "Contact"):
             if k in prov.headers:
                 prack.headers[k] = prov.headers[k] if k != "To" else prov.headers["To"]
         # New Via/branch
         prack.headers["Via"] = f"SIP/2.0/UDP 127.0.0.1:5060;branch={gen_branch()}"
         prack.headers["Max-Forwards"] = "70"
-        prack.headers["CSeq"] = f"{int(self.request.headers.get('CSeq','1 INVITE').split()[0])+1} PRACK"
+        prack.headers["CSeq"] = (
+            f"{int(self.request.headers.get('CSeq', '1 INVITE').split()[0]) + 1} PRACK"
+        )
         prack.headers["RAck"] = rack
         prack.headers["Content-Length"] = "0"
-        await self.transport.sendto(prack.to_bytes(), self.addr, self.proto, self.writer)
+        await self.transport.sendto(
+            prack.to_bytes(), self.addr, self.proto, self.writer
+        )
+
 
 class ServerTransaction:
     def __init__(self, transport, key, request, addr, proto):
@@ -504,7 +589,7 @@ class ServerTransaction:
 
     async def start(self):
         # Default handling for REGISTER/OPTIONS
-        if self.request.method in ("REGISTER","OPTIONS","PRACK","CANCEL","BYE"):
+        if self.request.method in ("REGISTER", "OPTIONS", "PRACK", "CANCEL", "BYE"):
             if self.request.method == "CANCEL":
                 # 200 OK to CANCEL; INVITE will be answered 487 by UAS core
                 resp = make_response(self.request, 200, "OK")
@@ -519,14 +604,24 @@ class ServerTransaction:
                 resp = make_response(self.request, 200, "OK")
                 await self.transport.sendto(resp.to_bytes(), self.addr, self.proto)
 
+
 class NonInviteServerTransaction(ServerTransaction):
     pass
+
 
 class InviteServerTransaction(ServerTransaction):
     pass
 
+
 class TransactionManager:
-    def __init__(self, transport: SipTransport, local_addr: Tuple[str, int], host: str, sip_port: int, ua_ref=None):
+    def __init__(
+        self,
+        transport: SipTransport,
+        local_addr: Tuple[str, int],
+        host: str,
+        sip_port: int,
+        ua_ref=None,
+    ):
         self.transport = transport
         self.local_addr = local_addr
         self.client_tx: Dict[str, ClientTransaction] = {}
@@ -543,7 +638,9 @@ class TransactionManager:
         method = cseq.split()[1] if len(cseq.split()) > 1 else msg.method or ""
         return f"{branch.group(1) if branch else ''}:{call_id}:{method}"
 
-    async def send_request(self, msg: SipMessage, addr: Tuple[str, int], proto="UDP", writer=None):
+    async def send_request(
+        self, msg: SipMessage, addr: Tuple[str, int], proto="UDP", writer=None
+    ):
         uri_host = addr[0]
         uri_port = addr[1]
         if msg.request_uri:
@@ -562,9 +659,13 @@ class TransactionManager:
         log_sip("SEND", msg, resolved_addr, proto)
         key = self._key_from_msg(msg)
         if msg.method == "INVITE":
-            tx = InviteClientTransaction(self.transport, key, msg, resolved_addr, proto, writer)
+            tx = InviteClientTransaction(
+                self.transport, key, msg, resolved_addr, proto, writer
+            )
         else:
-            tx = NonInviteClientTransaction(self.transport, key, msg, resolved_addr, proto, writer)
+            tx = NonInviteClientTransaction(
+                self.transport, key, msg, resolved_addr, proto, writer
+            )
         self.client_tx[key] = tx
         await tx.start()
         response: Optional[SipMessage] = None
@@ -576,8 +677,17 @@ class TransactionManager:
         if response is not None:
             return response
         # If INVITE needed authenticated retry
-        if isinstance(tx, InviteClientTransaction) and tx.state == "authenticated-retry":
-            new_req = SipMessage(True, method=tx.request.method, request_uri=tx.request.request_uri, headers=dict(tx.request.headers), body=tx.request.body)
+        if (
+            isinstance(tx, InviteClientTransaction)
+            and tx.state == "authenticated-retry"
+        ):
+            new_req = SipMessage(
+                True,
+                method=tx.request.method,
+                request_uri=tx.request.request_uri,
+                headers=dict(tx.request.headers),
+                body=tx.request.body,
+            )
             # Apply Authorization from tx.request headers (they were set there)
             # The tx.request was already updated; send it as a fresh transaction
             await self.send_request(new_req, addr, proto, writer)
@@ -605,24 +715,33 @@ class TransactionManager:
                     await tx.on_response(msg)
                     if self.ua_ref:
                         await self.ua_ref.on_response(tx, msg)
-                    if tx.is_terminated() or tx.state in ("accepted","completed"):
+                    if tx.is_terminated() or tx.state in ("accepted", "completed"):
                         self.client_tx.pop(k, None)
                     handled = True
                     break
             if not handled and self.ua_ref:
                 await self.ua_ref.on_response(None, msg)
 
+
 class RtpSession:
-    def __init__(self, local_ip: str, local_port: int, remote_ip: str, remote_port: int, payload_type=0, clock=8000):
+    def __init__(
+        self,
+        local_ip: str,
+        local_port: int,
+        remote_ip: str,
+        remote_port: int,
+        payload_type=0,
+        clock=8000,
+    ):
         self.local_ip = local_ip
         self.local_port = local_port
         self.remote_ip = remote_ip
         self.remote_port = remote_port
         self.payload_type = payload_type
         self.clock = clock
-        self.ssrc = random.randint(1, 2**32-1)
+        self.ssrc = random.randint(1, 2**32 - 1)
         self.seq = random.randint(0, 65535)
-        self.ts = random.randint(0, 2**32-1)
+        self.ts = random.randint(0, 2**32 - 1)
         self._transport = None
         self._task = None
 
@@ -630,7 +749,7 @@ class RtpSession:
         loop = asyncio.get_running_loop()
         self._transport, _ = await loop.create_datagram_endpoint(
             lambda: asyncio.DatagramProtocol(),
-            local_addr=(self.local_ip, self.local_port)
+            local_addr=(self.local_ip, self.local_port),
         )
         self._task = asyncio.create_task(self._send_loop())
 
@@ -642,7 +761,7 @@ class RtpSession:
 
     async def _send_loop(self):
         ptime = 0.02
-        payload = b"\xFF" * 160
+        payload = b"\xff" * 160
         while True:
             pkt = self._build_rtp(payload)
             self._transport.sendto(pkt, (self.remote_ip, self.remote_port))
@@ -653,16 +772,34 @@ class RtpSession:
     def _build_rtp(self, payload: bytes) -> bytes:
         v_p_x_cc = 0x80
         m_pt = 0x80 | (self.payload_type & 0x7F)
-        header = bytes([
-            v_p_x_cc, m_pt,
-            (self.seq >> 8) & 0xFF, self.seq & 0xFF,
-            (self.ts >> 24) & 0xFF, (self.ts >> 16) & 0xFF, (self.ts >> 8) & 0xFF, self.ts & 0xFF,
-            (self.ssrc >> 24) & 0xFF, (self.ssrc >> 16) & 0xFF, (self.ssrc >> 8) & 0xFF, self.ssrc & 0xFF
-        ])
+        header = bytes(
+            [
+                v_p_x_cc,
+                m_pt,
+                (self.seq >> 8) & 0xFF,
+                self.seq & 0xFF,
+                (self.ts >> 24) & 0xFF,
+                (self.ts >> 16) & 0xFF,
+                (self.ts >> 8) & 0xFF,
+                self.ts & 0xFF,
+                (self.ssrc >> 24) & 0xFF,
+                (self.ssrc >> 16) & 0xFF,
+                (self.ssrc >> 8) & 0xFF,
+                self.ssrc & 0xFF,
+            ]
+        )
         return header + payload
 
+
 class Dialog:
-    def __init__(self, call_id: str, local_tag: str, remote_tag: str = "", route_set: Optional[List[str]] = None, remote_target: Optional[str] = None):
+    def __init__(
+        self,
+        call_id: str,
+        local_tag: str,
+        remote_tag: str = "",
+        route_set: Optional[List[str]] = None,
+        remote_target: Optional[str] = None,
+    ):
         self.call_id = call_id
         self.local_tag = local_tag
         self.remote_tag = remote_tag
@@ -671,35 +808,44 @@ class Dialog:
         self.local_cseq = 1
         self.early = True
 
+
 class UserAgent:
-    def __init__(self, transport: SipTransport, txm: TransactionManager, local_ip="127.0.0.1", sip_port=5060):
+    def __init__(
+        self,
+        transport: SipTransport,
+        txm: TransactionManager,
+        local_ip="127.0.0.1",
+        sip_port=5060,
+    ):
         self.transport = transport
         self.txm = txm
         self.local_ip = local_ip
         self.sip_port = sip_port
         self.dialogs: Dict[str, Dialog] = {}
-        self.credentials = {"user":"alice","pass":"alice"}
+        self.credentials = {"user": "alice", "pass": "alice"}
         self.default_headers = {
             "Host": f"{local_ip}",
             "Contact": f"<sip:alice@{local_ip}:{sip_port}>",
             "From": f"<sip:alice@local>;tag={gen_tag()}",
         }
-        self.active_rtp: Dict[str,RtpSession] = {}
+        self.active_rtp: Dict[str, RtpSession] = {}
 
     def _dialog_key(self, call_id: str, local_tag: str, remote_tag: str) -> str:
         return f"{call_id}|{local_tag}|{remote_tag}"
 
     def _update_uac_dialog_from_2xx(self, req: SipMessage, resp: SipMessage):
-        call_id = resp.headers.get("Call-ID","")
-        from_tag = req.headers.get("From","")
-        from_tag = re.search(r"tag=([^;>]+)", from_tag).group(1) if "tag=" in from_tag else ""
-        to_tag = resp.headers.get("To","")
+        call_id = resp.headers.get("Call-ID", "")
+        from_tag = req.headers.get("From", "")
+        from_tag = (
+            re.search(r"tag=([^;>]+)", from_tag).group(1) if "tag=" in from_tag else ""
+        )
+        to_tag = resp.headers.get("To", "")
         to_tag = re.search(r"tag=([^;>]+)", to_tag).group(1) if "tag=" in to_tag else ""
         # RFC3261: route-set from Record-Route in 2xx to INVITE (reverse order)
-        rr = [v.strip() for k,v in resp.headers.items() if k.lower()=="record-route"]
+        rr = [v.strip() for k, v in resp.headers.items() if k.lower() == "record-route"]
         route_set = list(reversed(rr)) if rr else []
         # remote target from Contact
-        remote_target = resp.headers.get("Contact","").strip("<>")
+        remote_target = resp.headers.get("Contact", "").strip("<>")
         dlg = Dialog(call_id, from_tag, to_tag, route_set, remote_target)
         dlg.early = False
         key = self._dialog_key(call_id, from_tag, to_tag)
@@ -710,56 +856,93 @@ class UserAgent:
         if not m:
             return
         remote_port = int(m.group(1))
-        rtp_port = 40000 + random.randint(0,1000)
+        rtp_port = 40000 + random.randint(0, 1000)
         rtp = RtpSession(self.local_ip, rtp_port, peer_ip, remote_port)
         await rtp.start()
         self.active_rtp[call_key] = rtp
 
-    async def register(self, registrar: Tuple[str,int], domain="local"):
+    async def register(self, registrar: Tuple[str, int], domain="local"):
         uri = f"sip:{domain}"
-        req = make_request("REGISTER", uri, {**self.default_headers, "To": f"<sip:{self.credentials['user']}@{domain}>", "Authorization-User": self.credentials["user"], "Authorization-Pass": self.credentials["pass"]})
+        req = make_request(
+            "REGISTER",
+            uri,
+            {
+                **self.default_headers,
+                "To": f"<sip:{self.credentials['user']}@{domain}>",
+                "Authorization-User": self.credentials["user"],
+                "Authorization-Pass": self.credentials["pass"],
+            },
+        )
         await self.txm.send_request(req, registrar, "UDP")
 
-    async def options(self, target_uri: str, dest: Tuple[str,int]):
+    async def options(self, target_uri: str, dest: Tuple[str, int]):
         req = make_request("OPTIONS", target_uri, self.default_headers)
         return await self.txm.send_request(req, dest, "UDP")
 
-    async def invite(self, target_uri: str, dest: Tuple[str,int], rtp_local_port=40000):
+    async def invite(
+        self, target_uri: str, dest: Tuple[str, int], rtp_local_port=40000
+    ):
         sdp = build_sdp(self.local_ip, rtp_local_port)
-        req = make_request("INVITE", target_uri, {**self.default_headers, "To": f"<{target_uri}>", "Authorization-User": self.credentials["user"], "Authorization-Pass": self.credentials["pass"], "Supported": "100rel"}, body=sdp)
+        req = make_request(
+            "INVITE",
+            target_uri,
+            {
+                **self.default_headers,
+                "To": f"<{target_uri}>",
+                "Authorization-User": self.credentials["user"],
+                "Authorization-Pass": self.credentials["pass"],
+                "Supported": "100rel",
+            },
+            body=sdp,
+        )
         req.headers["Content-Type"] = "application/sdp"
         await self.txm.send_request(req, dest, "UDP")
 
     async def cancel(self, original_tx: InviteClientTransaction):
         # CANCEL must use same R-URI and route to same destination as INVITE
-        cancel = SipMessage(True, method="CANCEL", request_uri=original_tx.request.request_uri, headers={})
+        cancel = SipMessage(
+            True,
+            method="CANCEL",
+            request_uri=original_tx.request.request_uri,
+            headers={},
+        )
         # Copy headers with same CSeq number but method CANCEL
-        for k in ("From","To","Call-ID","Via"):
-            cancel.headers[k] = original_tx.request.headers.get(k,"")
-        num = original_tx.request.headers.get("CSeq","1 INVITE").split()[0]
+        for k in ("From", "To", "Call-ID", "Via"):
+            cancel.headers[k] = original_tx.request.headers.get(k, "")
+        num = original_tx.request.headers.get("CSeq", "1 INVITE").split()[0]
         cancel.headers["CSeq"] = f"{num} CANCEL"
         cancel.headers["Max-Forwards"] = "70"
         cancel.headers["Content-Length"] = "0"
-        await self.transport.sendto(cancel.to_bytes(), original_tx.addr, original_tx.proto, original_tx.writer)
+        await self.transport.sendto(
+            cancel.to_bytes(), original_tx.addr, original_tx.proto, original_tx.writer
+        )
 
-    async def bye(self, dlg: Dialog, dest: Tuple[str,int], proto="UDP"):
-        bye = SipMessage(True, method="BYE", request_uri=dlg.remote_target or "", headers={})
+    async def bye(self, dlg: Dialog, dest: Tuple[str, int], proto="UDP"):
+        bye = SipMessage(
+            True, method="BYE", request_uri=dlg.remote_target or "", headers={}
+        )
         bye.headers["From"] = f"<sip:alice@{self.local_ip}>;tag={dlg.local_tag}"
         bye.headers["To"] = f"<{dlg.remote_target or ''}>;tag={dlg.remote_tag}"
         bye.headers["Call-ID"] = dlg.call_id
-        bye.headers["CSeq"] = f"{dlg.local_cseq+1} BYE"
+        bye.headers["CSeq"] = f"{dlg.local_cseq + 1} BYE"
         bye.headers["Max-Forwards"] = "70"
-        bye.headers["Via"] = f"SIP/2.0/UDP {self.local_ip}:{self.sip_port};branch={gen_branch()}"
+        bye.headers["Via"] = (
+            f"SIP/2.0/UDP {self.local_ip}:{self.sip_port};branch={gen_branch()}"
+        )
         bye.headers["Content-Length"] = "0"
         await self.transport.sendto(bye.to_bytes(), dest, proto)
 
-    async def on_request(self, req: SipMessage, addr: Tuple[str,int], proto: str):
+    async def on_request(self, req: SipMessage, addr: Tuple[str, int], proto: str):
         # Minimal UAS for INVITE: send 180 with 100rel + RSeq, then 200 with SDP
         if req.method == "INVITE":
             # Send reliable provisional (180) if Supported/Require allows
-            supported = (req.headers.get("Supported","") + "," + req.headers.get("Require","")).lower()
+            supported = (
+                req.headers.get("Supported", "") + "," + req.headers.get("Require", "")
+            ).lower()
             if "100rel" in supported:
-                prov = make_response(req, 180, "Ringing", headers={"Require": "100rel", "RSeq": "1"})
+                prov = make_response(
+                    req, 180, "Ringing", headers={"Require": "100rel", "RSeq": "1"}
+                )
                 await self.transport.sendto(prov.to_bytes(), addr, proto)
             # Answer with 200 OK + SDP
             local_rtp_port = 40100
@@ -785,12 +968,21 @@ class UserAgent:
             # Handle 2xx to INVITE: establish dialog, start RTP, send ACK (already sent)
             if 200 <= code < 300:
                 self._update_uac_dialog_from_2xx(tx.request, resp)
-                key = self._dialog_key(resp.headers.get("Call-ID",""),
-                                       re.search(r"tag=([^;>]+)", tx.request.headers.get("From","")).group(1),
-                                       re.search(r"tag=([^;>]+)", resp.headers.get("To","")).group(1))
+                key = self._dialog_key(
+                    resp.headers.get("Call-ID", ""),
+                    re.search(
+                        r"tag=([^;>]+)", tx.request.headers.get("From", "")
+                    ).group(1),
+                    re.search(r"tag=([^;>]+)", resp.headers.get("To", "")).group(1),
+                )
                 await self._start_rtp_from_sdp(key, tx.addr[0], resp.body or b"")
         # Handle 401/407 for REGISTER/OPTIONS (non-INVITE): build auth and retry
-        if tx and isinstance(tx, NonInviteClientTransaction) and code in (401,407) and not tx.auth_tried:
+        if (
+            tx
+            and isinstance(tx, NonInviteClientTransaction)
+            and code in (401, 407)
+            and not tx.auth_tried
+        ):
             chal_hdr = "WWW-Authenticate" if code == 401 else "Proxy-Authenticate"
             chal = resp.headers.get(chal_hdr)
             if chal:
@@ -799,19 +991,30 @@ class UserAgent:
                 header_name, authv = build_digest_authorization(
                     method=tx.request.method or "",
                     uri=tx.request.request_uri or "",
-                    username=tx.request.headers.get("Authorization-User", self.credentials["user"]),
-                    password=tx.request.headers.get("Authorization-Pass", self.credentials["pass"]),
+                    username=tx.request.headers.get(
+                        "Authorization-User", self.credentials["user"]
+                    ),
+                    password=tx.request.headers.get(
+                        "Authorization-Pass", self.credentials["pass"]
+                    ),
                     chal=params,
                     is_proxy=(code == 407),
-                    cseq_nc=tx.nc
+                    cseq_nc=tx.nc,
                 )
-                new_req = SipMessage(True, method=tx.request.method, request_uri=tx.request.request_uri, headers=dict(tx.request.headers), body=tx.request.body)
+                new_req = SipMessage(
+                    True,
+                    method=tx.request.method,
+                    request_uri=tx.request.request_uri,
+                    headers=dict(tx.request.headers),
+                    body=tx.request.body,
+                )
                 # increment CSeq
                 if "CSeq" in new_req.headers:
                     n, m = new_req.headers["CSeq"].split()
-                    new_req.headers["CSeq"] = f"{int(n)+1} {m}"
+                    new_req.headers["CSeq"] = f"{int(n) + 1} {m}"
                 new_req.headers[header_name] = authv
                 await self.txm.send_request(new_req, tx.addr, tx.proto, tx.writer)
+
 
 async def main():
     local_ip = "0.0.0.0"
@@ -821,8 +1024,9 @@ async def main():
     ua = UserAgent(transport, txm, local_ip, sip_port)
     txm.ua_ref = ua
 
-    def on_message(data: bytes, addr: Tuple[str,int], proto: str):
+    def on_message(data: bytes, addr: Tuple[str, int], proto: str):
         asyncio.create_task(txm.handle_incoming(data, addr, proto))
+
     transport.on_message = on_message
 
     udp_transport = await serve_udp(transport, host=local_ip, port=sip_port)
@@ -831,7 +1035,9 @@ async def main():
     # Exemplo: discar
     # await ua.invite("sip:bob@127.0.0.1", ("127.0.0.1", 5062))
     try:
-        resp = await ua.options("sip:1111@demo.mizu-voip.com:37075", ("demo.mizu-voip.com", 37075))
+        resp = await ua.options(
+            "sip:1111@demo.mizu-voip.com:37075", ("demo.mizu-voip.com", 37075)
+        )
         if resp:
             print("[FINAL] Received response:")
             print(format_sip_message(resp))
@@ -844,6 +1050,7 @@ async def main():
         await tcp_server.wait_closed()
 
     # await asyncio.Event().wait()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

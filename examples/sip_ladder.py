@@ -31,6 +31,7 @@ class SipEvent:
     info: str = ""
     raw: Optional[str] = None
 
+
 TIME_COLUMN_WIDTH = 24
 MIN_COLUMN_WIDTH = 18
 COLUMN_GAP = 6
@@ -216,7 +217,11 @@ def _event_badges(event: SipEvent) -> str:
         badges.append("DTMF")
     if _is_rtp(event):
         badges.append("RTP")
-    if event.info and event.info.strip() and event.info.strip().upper() not in {"SDP", "DTMF"}:
+    if (
+        event.info
+        and event.info.strip()
+        and event.info.strip().upper() not in {"SDP", "DTMF"}
+    ):
         badges.append(event.info.strip())
     return "[" + " | ".join(badges) + "]" if badges else ""
 
@@ -256,7 +261,9 @@ class LadderWidget(Static):
 
     selected: int = reactive(0)
 
-    def __init__(self, actors: List[str], events: List[SipEvent], **kwargs: Any) -> None:
+    def __init__(
+        self, actors: List[str], events: List[SipEvent], **kwargs: Any
+    ) -> None:
         super().__init__(**kwargs)
         self.actors = actors
         self.events = events
@@ -351,13 +358,17 @@ class LadderWidget(Static):
             if summary:
                 info_row = _base_row(total_width, centers)
                 summary_label = summary
-                for offset, char in enumerate(summary_label[: total_width - TIME_COLUMN_WIDTH]):
+                for offset, char in enumerate(
+                    summary_label[: total_width - TIME_COLUMN_WIDTH]
+                ):
                     pos = TIME_COLUMN_WIDTH + offset
                     if pos < total_width:
                         info_row[pos] = char
                 info_text = Text("".join(info_row))
                 info_end = TIME_COLUMN_WIDTH + len(summary_label)
-                info_text.stylize(info_style, TIME_COLUMN_WIDTH, min(info_end, total_width))
+                info_text.stylize(
+                    info_style, TIME_COLUMN_WIDTH, min(info_end, total_width)
+                )
                 for x in centers.values():
                     if 0 <= x < len(info_text):
                         info_text.stylize(lifeline_style, x, x + 1)
@@ -381,8 +392,12 @@ class LadderWidget(Static):
                     label_text = f"{label_text} {badge_text}"
                 label_length = len(label_text)
                 span = max(1, end - start)
-                label_start = max(TIME_COLUMN_WIDTH, start + 1 + max(0, (span - label_length) // 2))
-                label_start = min(label_start, max(TIME_COLUMN_WIDTH, total_width - label_length - 1))
+                label_start = max(
+                    TIME_COLUMN_WIDTH, start + 1 + max(0, (span - label_length) // 2)
+                )
+                label_start = min(
+                    label_start, max(TIME_COLUMN_WIDTH, total_width - label_length - 1)
+                )
                 for offset, char in enumerate(label_text):
                     pos = label_start + offset
                     if TIME_COLUMN_WIDTH <= pos < total_width:
@@ -397,7 +412,13 @@ class LadderWidget(Static):
             if x1 is not None and x2 is not None:
                 segment_start = max(TIME_COLUMN_WIDTH, min(x1, x2))
                 segment_end = min(total_width, max(x1, x2) + 1)
-                segment_style = dtmf_style if dtmf_event else rtp_style if rtp_event else arrow_style
+                segment_style = (
+                    dtmf_style
+                    if dtmf_event
+                    else rtp_style
+                    if rtp_event
+                    else arrow_style
+                )
                 arrow_text.stylize(segment_style, segment_start, segment_end)
 
                 label_text = event.method.strip() or "(?)"
@@ -406,8 +427,16 @@ class LadderWidget(Static):
                     label_text = f"{label_text} {badge_text}"
                 label_index = arrow_text.plain.find(label_text, TIME_COLUMN_WIDTH)
                 if label_index != -1:
-                    method_style = dtmf_style if dtmf_event else rtp_style if rtp_event else _method_style(event.method)
-                    arrow_text.stylize(method_style, label_index, label_index + len(label_text))
+                    method_style = (
+                        dtmf_style
+                        if dtmf_event
+                        else rtp_style
+                        if rtp_event
+                        else _method_style(event.method)
+                    )
+                    arrow_text.stylize(
+                        method_style, label_index, label_index + len(label_text)
+                    )
 
             lines.append(arrow_text)
             line_no += 1
@@ -611,7 +640,9 @@ class SIPLadder(Container):
     }
     """
 
-    def __init__(self, actors: List[str], events: List[SipEvent], **kwargs: Any) -> None:
+    def __init__(
+        self, actors: List[str], events: List[SipEvent], **kwargs: Any
+    ) -> None:
         super().__init__(**kwargs)
         self._actors = actors
         self._events = events
@@ -677,7 +708,7 @@ def load_data(path: str | None) -> Dict[str, Any]:
                 "raw": (
                     "INVITE sip:100@192.168.56.101 SIP/2.0\r\n"
                     "Via: SIP/2.0/UDP 192.168.56.1:5060;branch=z9hG4bK-1234\r\n"
-                    "From: \"Phone A\" <sip:100@192.168.56.1>;tag=9f47a\r\n"
+                    'From: "Phone A" <sip:100@192.168.56.1>;tag=9f47a\r\n'
                     "To: <sip:100@192.168.56.101>\r\n"
                     "Call-ID: 00BE3708-805D-EB11-A91D-2F392F4E5BD8@192.168.56.1_in2out\r\n"
                     "CSeq: 1 INVITE\r\n"
@@ -718,7 +749,7 @@ def load_data(path: str | None) -> Dict[str, Any]:
                 "raw": (
                     "SIP/2.0 200 OK\r\n"
                     "Via: SIP/2.0/UDP 192.168.56.1:5060;branch=z9hG4bK-1234\r\n"
-                    "From: \"Phone A\" <sip:100@192.168.56.1>;tag=9f47a\r\n"
+                    'From: "Phone A" <sip:100@192.168.56.1>;tag=9f47a\r\n'
                     "To: <sip:100@192.168.56.101>;tag=281d3\r\n"
                     "Call-ID: 00BE3708-805D-EB11-A91D-2F392F4E5BD8@192.168.56.1_in2out\r\n"
                     "CSeq: 1 INVITE\r\n"
@@ -749,7 +780,7 @@ def load_data(path: str | None) -> Dict[str, Any]:
                 "raw": (
                     "ACK sip:100@192.168.11.102:5060 SIP/2.0\r\n"
                     "Via: SIP/2.0/UDP 192.168.56.1:5060;branch=z9hG4bK-1234\r\n"
-                    "From: \"Phone A\" <sip:100@192.168.56.1>;tag=9f47a\r\n"
+                    'From: "Phone A" <sip:100@192.168.56.1>;tag=9f47a\r\n'
                     "To: <sip:100@192.168.56.101>;tag=281d3\r\n"
                     "Call-ID: 00BE3708-805D-EB11-A91D-2F392F4E5BD8@192.168.56.1_in2out\r\n"
                     "CSeq: 1 ACK\r\n"
@@ -768,7 +799,7 @@ def load_data(path: str | None) -> Dict[str, Any]:
                 "raw": (
                     "INFO sip:100@192.168.11.102:5060 SIP/2.0\r\n"
                     "Via: SIP/2.0/UDP 192.168.56.1:5060;branch=z9hG4bK-5678\r\n"
-                    "From: \"Phone A\" <sip:100@192.168.56.1>;tag=9f47a\r\n"
+                    'From: "Phone A" <sip:100@192.168.56.1>;tag=9f47a\r\n'
                     "To: <sip:100@192.168.56.101>;tag=281d3\r\n"
                     "Call-ID: 00BE3708-805D-EB11-A91D-2F392F4E5BD8@192.168.56.1_in2out\r\n"
                     "CSeq: 2 INFO\r\n"
@@ -790,7 +821,7 @@ def load_data(path: str | None) -> Dict[str, Any]:
                 "raw": (
                     "SIP/2.0 200 OK\r\n"
                     "Via: SIP/2.0/UDP 192.168.56.1:5060;branch=z9hG4bK-5678\r\n"
-                    "From: \"Phone A\" <sip:100@192.168.56.1>;tag=9f47a\r\n"
+                    'From: "Phone A" <sip:100@192.168.56.1>;tag=9f47a\r\n'
                     "To: <sip:100@192.168.56.101>;tag=281d3\r\n"
                     "Call-ID: 00BE3708-805D-EB11-A91D-2F392F4E5BD8@192.168.56.1_in2out\r\n"
                     "CSeq: 2 INFO\r\n"
@@ -807,7 +838,7 @@ def load_data(path: str | None) -> Dict[str, Any]:
                 "raw": (
                     "BYE sip:100@192.168.11.102:5060 SIP/2.0\r\n"
                     "Via: SIP/2.0/UDP 192.168.56.1:5060;branch=z9hG4bK-9abc\r\n"
-                    "From: \"Phone A\" <sip:100@192.168.56.1>;tag=9f47a\r\n"
+                    'From: "Phone A" <sip:100@192.168.56.1>;tag=9f47a\r\n'
                     "To: <sip:100@192.168.56.101>;tag=281d3\r\n"
                     "Call-ID: 00BE3708-805D-EB11-A91D-2F392F4E5BD8@192.168.56.1_in2out\r\n"
                     "CSeq: 3 BYE\r\n"
@@ -825,7 +856,7 @@ def load_data(path: str | None) -> Dict[str, Any]:
                 "raw": (
                     "SIP/2.0 200 OK\r\n"
                     "Via: SIP/2.0/UDP 192.168.56.1:5060;branch=z9hG4bK-9abc\r\n"
-                    "From: \"Phone A\" <sip:100@192.168.56.1>;tag=9f47a\r\n"
+                    'From: "Phone A" <sip:100@192.168.56.1>;tag=9f47a\r\n'
                     "To: <sip:100@192.168.56.101>;tag=281d3\r\n"
                     "Call-ID: 00BE3708-805D-EB11-A91D-2F392F4E5BD8@192.168.56.1_in2out\r\n"
                     "CSeq: 3 BYE\r\n"

@@ -6,7 +6,7 @@ Parsing e geração simplificada de SDP (Session Description Protocol).
 class SDP:
     def __init__(self, sdp_string: str):
         self.lines = sdp_string.strip().splitlines()
-        self.media = [l for l in self.lines if l.startswith("m=")]
+        self.media = [_ for _ in self.lines if _.startswith("m=")]
 
     def __str__(self) -> str:
         return "\r\n".join(self.lines) + "\r\n"

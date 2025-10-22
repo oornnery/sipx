@@ -36,9 +36,11 @@ logging.basicConfig(
     level="NOTSET",  # Set the lowest level to capture all messages
     format=FORMAT,
     datefmt="[%X]",  # Format for the timestamp
-    handlers=[RichHandler(
-        console=console,
-        )],  # Use RichHandler for colorful output
+    handlers=[
+        RichHandler(
+            console=console,
+        )
+    ],  # Use RichHandler for colorful output
 )
 
 # Get a logger instance
@@ -595,7 +597,7 @@ class SIPDialog:
     """Gerenciamento de diálogo SIP conforme RFC 3261"""
 
     def __init__(
-        self, dialog_id: str, call_id: str, local_tag: str, remote_tag: str = ''
+        self, dialog_id: str, call_id: str, local_tag: str, remote_tag: str = ""
     ):
         self.dialog_id = dialog_id
         self.call_id = call_id
@@ -904,11 +906,11 @@ class SIPTransactionManager:
     def _generate_transaction_id(self, message: Union[SIPRequest, SIPResponse]) -> str:
         """Gera ID de transação baseado na mensagem"""
         if hasattr(message, "method"):  # SIPRequest
-            via = message.headers.get("via", '')
+            via = message.headers.get("via", "")
             method = message.method
         else:  # SIPResponse
-            via = message.headers.get("via", '')
-            cseq = message.headers.get("cseq", '')
+            via = message.headers.get("via", "")
+            cseq = message.headers.get("cseq", "")
             method = cseq.split()[-1] if cseq else "UNKNOWN"
 
         # Extrai branch do Via header
@@ -980,7 +982,9 @@ class SIPTransactionManager:
 
         return self.event_handler.handle_request(request, context)
 
-    def process_response(self, response: SIPResponse, request: Optional[SIPRequest] = None):
+    def process_response(
+        self, response: SIPResponse, request: Optional[SIPRequest] = None
+    ):
         """Processa resposta recebida"""
         transaction = self.find_transaction(response)
 
@@ -1075,7 +1079,7 @@ class SIPClient:
         target_host: str,
         contact_uri: Optional[str] = None,
         expires: int = 3600,
-    target_port: int = 5060,
+        target_port: int = 5060,
     ) -> str:
         """REGISTER com suporte automático a autenticação digest"""
 
@@ -1279,8 +1283,7 @@ def exemplo_uso_completo():
 
     # Exemplo options
     console.rule("--- EXEMPLO 3: OPTIONS Simples ---")
-    
-    
+
     # Para o cliente
     client.stop()
 
