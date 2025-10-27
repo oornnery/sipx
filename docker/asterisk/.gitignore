@@ -1,0 +1,50 @@
+# Volumes e dados do Docker
+asterisk-data/
+asterisk-spool/
+asterisk-log/
+
+# Logs locais
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.old
+temp/
+
+# Docker
+.dockerignore
+
+# Secrets (se houver)
+secrets/
+*.key
+*.pem
+*.crt

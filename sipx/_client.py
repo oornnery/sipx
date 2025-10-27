@@ -1,880 +1,1780 @@
+"""
+SIP Client implementation with simplified Events and Auth API.
+
+This module provides a high-level SIP client with:
+- Declarative event handling via Events class
+- Simple authentication via Auth.Digest()
+- Automatic transaction and dialog state management
+- Multiple transport protocols (UDP, TCP, TLS)
+"""
+
 from __future__ import annotations
 
 import asyncio
-import inspect
-import logging
-import socket
+import threading
 import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Optional, Union, Callable
+from urllib.parse import urlparse
 
-from ._auth import DigestCredentials, build_authorization_header, parse_challenge
-from ._fsm import CallFSM, CallState
-from ._sdp import build_audio_sdp
-from ._sip import (
-    SIPHeaders,
-    SIPMessage,
-    build_request,
-    build_response,
-    header_params,
-    parse_sip_message,
+from ._utils import console, logger
+from ._models._auth import SipAuthCredentials, DigestCredentials, DigestAuth
+from ._events import Events, EventContext
+from ._fsm import StateManager
+from ._models._message import Request, Response, MessageParser
+from ._transports import (
+    TransportAddress,
+    TransportConfig,
+    UDPTransport,
+    TCPTransport,
+    TLSTransport,
 )
-from ._transport import Addr, SIPTransport, TransportResponse
-
-logger = logging.getLogger(__name__)
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-@dataclass(slots=True)
-class Call:
-    client: "Client"
-    call_id: str
-    target_uri: str
-    from_uri: str
-    from_tag: str
-    branch: str
-    invite_cseq: int
-    cseq: int
-    fsm: CallFSM = field(default_factory=CallFSM)
-    remote_tag: Optional[str] = None
-    sdp: Optional[str] = None
-    created_at: datetime = field(default_factory=_now)
-    connected_at: Optional[datetime] = None
-    terminated_at: Optional[datetime] = None
-    terminated_by: Optional[str] = None
-    details: Dict[str, Any] = field(default_factory=dict)
-    last_response: Optional[TransportResponse] = None
-
-    @property
-    def state(self) -> CallState:
-        return self.fsm.state
-
-    def next_cseq(self) -> int:
-        self.cseq += 1
-        return self.cseq
-
-    @property
-    def duration(self) -> float:
-        if not self.connected_at:
-            return 0.0
-        reference = self.terminated_at or _now()
-        return max(0.0, (reference - self.connected_at).total_seconds())
-
-    async def bye(self, timeout: Optional[float] = None) -> TransportResponse:
-        return await self.client._send_bye(self, timeout=timeout)
-
-
-@dataclass(slots=True)
-class Event:
-    name: str
-    client: "Client"
-    message: SIPMessage
-
-
-@dataclass(slots=True)
-class CallEvent(Event):
-    call: Call
-
-
-@dataclass(slots=True)
-class CallHangupEvent(CallEvent):
-    by_remote: bool
-
-
-@dataclass(slots=True)
-class SDPNegotiatedEvent(CallEvent):
-    sdp: str
-
-
-@dataclass(slots=True)
-class OptionResponseEvent(Event):
-    response: TransportResponse
 
 
 class Client:
-    """High-level SIP client orchestrating transport, parsing, and events."""
+    """
+    Synchronous SIP client with simplified API.
 
-    _event_handlers: Dict[str, List[Callable[[Event], Any]]] = {}
+    This client provides a clean, intuitive interface for SIP communication:
+    - Set event handlers with `client.events = MyEvents()`
+    - Set authentication with `client.auth = Auth.Digest('user', 'pass')`
+    - Simple method signatures: `invite(to_uri, from_uri, body=sdp)`
+
+    Example:
+        >>> class MyEvents(Events):
+        ...     @event_handler('INVITE', status=200)
+        ...     def on_invite_ok(self, request, response, context):
+        ...         print("Call accepted!")
+        ...
+        >>> with Client() as client:
+        ...     client.events = MyEvents()
+        ...     client.auth = Auth.Digest('alice', 'secret')
+        ...     response = client.invite('sip:bob@example.com', 'sip:alice@local')
+    """
 
     def __init__(
         self,
-        addr: Addr,
-        *,
-        protocol: str = "UDP",
-        local_addr: Optional[Addr] = None,
-        identity: str = "sipx",
-        display_name: Optional[str] = None,
-        remote_uri: Optional[str] = None,
-        user_agent: str = "sipx/0.1",
-        credentials: Optional[DigestCredentials] = None,
+        local_host: str = "0.0.0.0",
+        local_port: int = 5060,
+        transport: str = "UDP",
+        events: Optional[Events] = None,
+        auth: Optional[SipAuthCredentials] = None,
     ) -> None:
-        self.addr = addr
-        self.protocol = protocol.upper()
-        if self.protocol not in {"UDP", "TCP"}:
-            raise ValueError("protocol must be 'UDP' or 'TCP'")
-        self._requested_local = local_addr or ("0.0.0.0", 0)
-        self.identity = identity
-        self.display_name = display_name
-        self.remote_uri = remote_uri or f"sip:{addr[0]}:{addr[1]}"
-        self.user_agent = user_agent
-        self.credentials = credentials
+        """
+        Initialize SIP client.
 
-        self._transport: Optional[SIPTransport] = None
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._started = False
-        self._local_addr: Optional[Addr] = None
-        self._local_uri: Optional[str] = None
-        self._via_host: Optional[str] = None
-        self._calls: Dict[str, Call] = {}
-        self._cseq = 1
-        self._nonce_counts: Dict[str, int] = {}
+        Args:
+            local_host: Local IP address to bind (default: 0.0.0.0)
+            local_port: Local port to bind (default: 5060)
+            transport: Transport protocol - UDP, TCP, or TLS (default: UDP)
+            events: Optional Events instance for handling SIP messages
+            auth: Optional authentication credentials (from Auth.Digest())
+        """
+        # Transport configuration
+        self.config = TransportConfig(
+            local_host=local_host,
+            local_port=local_port,
+        )
+        self.transport_protocol = transport.upper()
 
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
-    async def __aenter__(self) -> "Client":
-        await self.start()
+        # Initialize transport
+        self._transport = self._create_transport()
+
+        # State management (internal)
+        self._state_manager = StateManager()
+
+        # Events and Auth
+        self._events = events
+        self._auth = auth
+
+        # Client state
+        self._closed = False
+
+        # Re-registration support
+        self._reregister_timer: Optional[threading.Timer] = None
+        self._reregister_interval: Optional[int] = None
+        self._reregister_aor: Optional[str] = None
+        self._reregister_callback: Optional[Callable] = None
+
+    def _create_transport(self):
+        """Create transport based on protocol."""
+        if self.transport_protocol == "UDP":
+            return UDPTransport(self.config)
+        elif self.transport_protocol == "TCP":
+            return TCPTransport(self.config)
+        elif self.transport_protocol == "TLS":
+            return TLSTransport(self.config)
+        else:
+            raise ValueError(f"Unsupported transport: {self.transport_protocol}")
+
+    def _get_default_from_uri(self) -> str:
+        """
+        Get default FROM URI, using auth username if available.
+
+        Returns:
+            SIP URI like "sip:username@host" or "sip:user@host" if no auth.
+        """
+        host = self._transport.local_address.host
+        if self._auth and hasattr(self._auth, "username"):
+            username = self._auth.username
+        else:
+            username = "user"
+        return f"sip:{username}@{host}"
+
+    @property
+    def events(self) -> Optional[Events]:
+        """Get the current Events instance."""
+        return self._events
+
+    @events.setter
+    def events(self, events_instance: Optional[Events]) -> None:
+        """
+        Set the Events instance for handling SIP messages.
+
+        Example:
+            >>> class MyEvents(Events):
+            ...     @event_handler('INVITE', status=200)
+            ...     def on_invite_ok(self, request, response, context):
+            ...         print("Call accepted!")
+            ...
+            >>> client.events = MyEvents()
+        """
+        self._events = events_instance
+
+    @property
+    def auth(self) -> Optional[SipAuthCredentials]:
+        """Get the current authentication credentials."""
+        return self._auth
+
+    @auth.setter
+    def auth(self, credentials: Optional[SipAuthCredentials]) -> None:
+        """
+        Set authentication credentials.
+
+        Example:
+            >>> client.auth = Auth.Digest('alice', 'secret')
+        """
+        self._auth = credentials
+
+    def retry_with_auth(
+        self, response: Response, auth: Optional[SipAuthCredentials] = None
+    ) -> Optional[Response]:
+        """
+        Retry a request with authentication after receiving 401/407.
+
+        This method allows the user to manually handle authentication challenges.
+        Unlike automatic retry, this gives full control over when and how to retry.
+
+        Args:
+            response: The 401/407 response that triggered authentication
+            auth: Optional credentials to use (overrides client.auth if provided)
+
+        Returns:
+            Final response after authentication, or None if auth failed
+
+        Example:
+            >>> # Using client.auth
+            >>> response = client.invite('sip:bob@example.com')
+            >>> if response.status_code == 401:
+            ...     response = client.retry_with_auth(response)
+            ...     if response.status_code == 200:
+            ...         client.ack(response=response)
+
+        Example:
+            >>> # Using custom auth
+            >>> response = client.invite('sip:bob@example.com')
+            >>> if response.status_code == 401:
+            ...     custom_auth = Auth.Digest('alice', 'secret')
+            ...     response = client.retry_with_auth(response, auth=custom_auth)
+        """
+        # Use provided auth or fall back to client auth
+        credentials = auth or self._auth
+
+        if not credentials:
+            logger.warning("No credentials available for retry_with_auth")
+            return None
+
+        if response.status_code not in (401, 407):
+            logger.warning(
+                f"retry_with_auth called on {response.status_code} (expected 401/407)"
+            )
+            return None
+
+        # Get original request
+        request = response.request
+        if not request:
+            logger.error("No request attached to response")
+            return None
+
+        # Parse challenge
+        from ._models._auth import AuthParser
+
+        parser = AuthParser()
+        challenge = parser.parse_from_headers(response.headers)
+
+        if not challenge:
+            logger.error("No authentication challenge found in response")
+            return None
+
+        # Extract host/port from original request
+        host, port = self._extract_host_port(request.uri)
+
+        try:
+            # Build authorization header
+            auth_header = self._build_auth_header(
+                challenge, credentials, request.method, request.uri
+            )
+
+            # Determine header name
+            auth_header_name = (
+                "Proxy-Authorization"
+                if response.status_code == 407
+                else "Authorization"
+            )
+
+            # Update request with authorization
+            request.headers[auth_header_name] = auth_header
+
+            # Increment CSeq
+            if "CSeq" in request.headers:
+                cseq_parts = request.headers["CSeq"].split()
+                if len(cseq_parts) == 2:
+                    cseq_num = int(cseq_parts[0]) + 1
+                    request.headers["CSeq"] = f"{cseq_num} {cseq_parts[1]}"
+
+            # Log retry
+            console.print(
+                f"\n[bold yellow]>>> AUTH RETRY {request.method} "
+                f"({self._transport.local_address} → {host}:{port}):[/bold yellow]"
+            )
+            console.print(request.to_string())
+            console.print("=" * 80)
+
+            # Send authenticated request
+            destination = TransportAddress(
+                host=host, port=port, protocol=self.transport_protocol
+            )
+            self._transport.send(request.to_bytes(), destination)
+
+            # Receive response
+            parser = MessageParser()
+            final_response = None
+
+            while True:
+                response_data, source = self._transport.receive(
+                    timeout=self._transport.config.read_timeout
+                )
+
+                auth_response = parser.parse(response_data)
+                auth_response.raw = response_data
+                auth_response.request = request
+                auth_response.transport_info = {
+                    "protocol": self.transport_protocol,
+                    "local": str(self._transport.local_address),
+                    "remote": str(source),
+                }
+
+                console.print(
+                    f"\n[bold green]<<< RECEIVED {auth_response.status_code} "
+                    f"{auth_response.reason_phrase} ({source} → {self._transport.local_address}):[/bold green]"
+                )
+                console.print(auth_response.to_string())
+                console.print("=" * 80)
+
+                # Call events on response
+                if self._events:
+                    context = EventContext(
+                        request=request,
+                        response=auth_response,
+                        source=source,
+                    )
+                    auth_response = self._events._call_response_handlers(
+                        auth_response, context
+                    )
+
+                if auth_response.status_code >= 200:
+                    final_response = auth_response
+                    break
+
+                if final_response is None:
+                    final_response = auth_response
+
+            return final_response
+
+        except Exception as e:
+            logger.error(f"Auth retry failed: {e}")
+            return None
+
+    def _extract_host_port(self, uri: str) -> tuple[str, int]:
+        """Extract host and port from SIP URI."""
+        if not uri.startswith("sip:") and not uri.startswith("sips:"):
+            uri = f"sip:{uri}"
+
+        parsed = urlparse(uri)
+        host = parsed.hostname or parsed.path.split("@")[-1].split(":")[0]
+        port = parsed.port or 5060
+
+        return host, port
+
+    def _build_auth_header(
+        self, challenge, credentials: SipAuthCredentials, method: str, uri: str
+    ) -> str:
+        """Build Authorization header from challenge and credentials."""
+        digest_credentials = DigestCredentials(
+            username=credentials.username,
+            password=credentials.password,
+            realm=credentials.realm,
+        )
+
+        digest_auth = DigestAuth(
+            credentials=digest_credentials,
+            challenge=challenge,
+        )
+
+        return digest_auth.build_authorization(method=method, uri=uri)
+
+    def _detect_auth_challenge(self, response: Response, context: EventContext) -> None:
+        """Detect and parse authentication challenges."""
+        if response.status_code in (401, 407):
+            from ._models._auth import AuthParser
+
+            parser = AuthParser()
+            challenge = parser.parse_from_headers(response.headers)
+
+            if challenge:
+                context.metadata["needs_auth"] = True
+                context.metadata["auth_challenge"] = challenge
+                logger.debug(
+                    f"Authentication challenge detected: {response.status_code}"
+                )
+
+    def request(
+        self,
+        method: str,
+        uri: str,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        headers: Optional[dict] = None,
+        content: Optional[Union[str, bytes]] = None,
+        **kwargs,
+    ) -> Response:
+        """
+        Send a SIP request and return the response.
+
+        Args:
+            method: SIP method (INVITE, REGISTER, etc.)
+            uri: Request URI
+            host: Destination host (auto-extracted from uri if not provided)
+            port: Destination port (default: 5060)
+            headers: Optional headers dict
+            content: Optional message body
+            **kwargs: Additional request parameters
+
+        Returns:
+            SIP response
+        """
+        # Auto-extract host/port from URI if not provided
+        if host is None:
+            host, auto_port = self._extract_host_port(uri)
+            if port is None:
+                port = auto_port
+        elif port is None:
+            port = 5060
+
+        # Build request
+        request = Request(
+            method=method,
+            uri=uri,
+            headers=headers or {},
+            content=content,
+            **kwargs,
+        )
+
+        # Ensure required headers
+        request = self._ensure_required_headers(request, host, port)
+
+        # Create destination
+        destination = TransportAddress(
+            host=host,
+            port=port,
+            protocol=self.transport_protocol,
+        )
+
+        # Create transaction
+        transaction = self._state_manager.create_transaction(request)
+
+        # Create event context
+        context = EventContext(
+            request=request,
+            destination=destination,
+            transaction_id=transaction.id,
+            transaction=transaction,
+        )
+
+        # Call events on_request
+        if self._events:
+            request = self._events._call_request_handlers(request, context)
+
+        # Log request
+        console.print(
+            f"\n[bold cyan]>>> SENDING {method} ({self._transport.local_address} → {host}:{port}):[/bold cyan]"
+        )
+        console.print(request.to_string())
+        console.print("=" * 80)
+
+        try:
+            # Send request
+            self._transport.send(request.to_bytes(), destination)
+
+            # Receive responses
+            parser = MessageParser()
+            final_response = None
+
+            while True:
+                response_data, source = self._transport.receive(
+                    timeout=self._transport.config.read_timeout
+                )
+
+                response = parser.parse(response_data)
+                response.raw = response_data
+                response.request = request
+                response.transport_info = {
+                    "protocol": self.transport_protocol,
+                    "local": str(self._transport.local_address),
+                    "remote": str(source),
+                }
+
+                console.print(
+                    f"\n[bold green]<<< RECEIVED {response.status_code} {response.reason_phrase} "
+                    f"({source} → {self._transport.local_address}):[/bold green]"
+                )
+                console.print(response.to_string())
+                console.print("=" * 80)
+
+                # Update transaction
+                self._state_manager.update_transaction(transaction.id, response)
+
+                # Update context
+                context.response = response
+                context.source = source
+
+                # Detect auth challenges
+                self._detect_auth_challenge(response, context)
+
+                # Call events on_response
+                if self._events:
+                    response = self._events._call_response_handlers(response, context)
+
+                # Check for final response
+                if response.status_code >= 200:
+                    final_response = response
+                    break
+
+                # Store provisional response
+                if final_response is None:
+                    final_response = response
+
+            return final_response
+
+        except Exception as e:
+            logger.error(f"Request failed: {e}")
+            raise
+
+    def _ensure_required_headers(
+        self, request: Request, host: str, port: int
+    ) -> Request:
+        """Ensure all required SIP headers are present."""
+        headers = request.headers
+
+        # Via
+        if "Via" not in headers:
+            branch = f"z9hG4bK{uuid.uuid4().hex[:16]}"
+            local_addr = self._transport.local_address
+            headers["Via"] = (
+                f"SIP/2.0/{self.transport_protocol} {local_addr.host}:{local_addr.port};"
+                f"branch={branch};rport"
+            )
+
+        # From
+        if "From" not in headers:
+            headers["From"] = (
+                f"<{self._get_default_from_uri()}>;tag={uuid.uuid4().hex[:8]}"
+            )
+
+        # To
+        if "To" not in headers:
+            headers["To"] = f"<{request.uri}>"
+
+        # Call-ID
+        if "Call-ID" not in headers:
+            headers["Call-ID"] = (
+                f"{uuid.uuid4().hex}@{self._transport.local_address.host}"
+            )
+
+        # CSeq
+        if "CSeq" not in headers:
+            headers["CSeq"] = f"1 {request.method}"
+
+        # Max-Forwards
+        if "Max-Forwards" not in headers:
+            headers["Max-Forwards"] = "70"
+
+        # Content-Length
+        content_length = len(request.content) if request.content else 0
+        headers["Content-Length"] = str(content_length)
+
+        # User-Agent (if auth provides it)
+        if self._auth and self._auth.user_agent and "User-Agent" not in headers:
+            headers["User-Agent"] = self._auth.user_agent
+
+        return request
+
+    def invite(
+        self,
+        to_uri: str,
+        from_uri: Optional[str] = None,
+        body: Optional[str] = None,
+        **kwargs,
+    ) -> Response:
+        """
+        Send INVITE request to establish a call.
+
+        Args:
+            to_uri: Destination URI (e.g., 'sip:bob@example.com')
+            from_uri: Source URI (auto-generated if not provided)
+            body: SDP body content
+            **kwargs: Additional parameters (host, port, headers, etc.)
+
+        Returns:
+            SIP response
+
+        Example:
+            >>> sdp = SDPBody.offer(local_ip='192.168.1.100', local_port=8000, audio=True)
+            >>> response = client.invite('sip:bob@example.com', body=sdp.to_string())
+        """
+        # Auto-generate from_uri if not provided
+        if from_uri is None:
+            from_uri = self._get_default_from_uri()
+
+        # Build headers
+        headers = kwargs.pop("headers", {})
+        headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
+        headers["To"] = f"<{to_uri}>"
+
+        if body:
+            headers["Content-Type"] = "application/sdp"
+
+        return self.request(
+            method="INVITE",
+            uri=to_uri,
+            headers=headers,
+            content=body,
+            **kwargs,
+        )
+
+    def register(
+        self,
+        aor: str,
+        registrar: Optional[str] = None,
+        expires: int = 3600,
+        **kwargs,
+    ) -> Response:
+        """
+        Send REGISTER request.
+
+        Args:
+            aor: Address of Record (e.g., 'sip:alice@example.com')
+            registrar: Registrar host (auto-extracted from aor if not provided)
+            expires: Registration expiry in seconds (default: 3600)
+            **kwargs: Additional parameters
+
+        Returns:
+            SIP response
+
+        Example:
+            >>> response = client.register('sip:alice@example.com')
+        """
+        # Extract registrar from aor if not provided
+        if registrar is None:
+            registrar, _ = self._extract_host_port(aor)
+
+        # Build headers
+        headers = kwargs.pop("headers", {})
+        headers["From"] = f"<{aor}>;tag={uuid.uuid4().hex[:8]}"
+        headers["To"] = f"<{aor}>"
+        headers["Contact"] = (
+            f"<sip:{self._transport.local_address.host}:{self._transport.local_address.port}>;expires={expires}"
+        )
+
+        return self.request(
+            method="REGISTER",
+            uri=aor,
+            host=registrar,
+            headers=headers,
+            **kwargs,
+        )
+
+    def options(
+        self,
+        uri: str,
+        **kwargs,
+    ) -> Response:
+        """
+        Send OPTIONS request.
+
+        Args:
+            uri: Target URI
+            **kwargs: Additional parameters
+
+        Returns:
+            SIP response
+
+        Example:
+            >>> response = client.options('sip:example.com')
+        """
+        return self.request(method="OPTIONS", uri=uri, **kwargs)
+
+    def ack(
+        self,
+        response: Response,
+        **kwargs,
+    ) -> None:
+        """
+        Send ACK for INVITE response.
+
+        Args:
+            response: The INVITE response to acknowledge
+            **kwargs: Additional parameters
+        """
+        # Extract destination from response
+        request = response.request
+        host = kwargs.pop("host", None)
+        port = kwargs.pop("port", 5060)
+
+        if host is None:
+            host, port = self._extract_host_port(request.uri)
+
+        # Build ACK request
+        headers = kwargs.pop("headers", {})
+        headers["From"] = request.headers.get("From")
+        headers["To"] = response.headers.get("To")
+        headers["Call-ID"] = request.headers.get("Call-ID")
+        headers["CSeq"] = f"{request.headers.get('CSeq', '1').split()[0]} ACK"
+        headers["Via"] = request.headers.get("Via")
+
+        ack_request = Request(
+            method="ACK",
+            uri=request.uri,
+            headers=headers,
+        )
+
+        # Send ACK (no response expected)
+        destination = TransportAddress(
+            host=host, port=port, protocol=self.transport_protocol
+        )
+        self._transport.send(ack_request.to_bytes(), destination)
+
+        console.print(
+            f"\n[bold cyan]>>> SENDING ACK ({self._transport.local_address} → {host}:{port}):[/bold cyan]"
+        )
+        console.print(ack_request.to_string())
+        console.print("=" * 80)
+
+    def bye(
+        self,
+        response: Optional[Response] = None,
+        dialog_id: Optional[str] = None,
+        **kwargs,
+    ) -> Response:
+        """
+        Send BYE request to terminate a call.
+
+        Args:
+            response: Previous INVITE response (to extract dialog info)
+            dialog_id: Dialog ID (if not using response)
+            **kwargs: Additional parameters
+
+        Returns:
+            SIP response
+
+        Example:
+            >>> invite_response = client.invite('sip:bob@example.com', body=sdp)
+            >>> bye_response = client.bye(response=invite_response)
+        """
+        if response is None and dialog_id is None:
+            raise ValueError("Either response or dialog_id must be provided")
+
+        # Extract dialog info from response
+        request = response.request
+        headers = kwargs.pop("headers", {})
+        headers["From"] = request.headers.get("From")
+        headers["To"] = response.headers.get("To")
+        headers["Call-ID"] = request.headers.get("Call-ID")
+
+        # Increment CSeq
+        cseq_num = int(request.headers.get("CSeq", "1").split()[0]) + 1
+        headers["CSeq"] = f"{cseq_num} BYE"
+
+        return self.request(
+            method="BYE",
+            uri=request.uri,
+            headers=headers,
+            **kwargs,
+        )
+
+    def cancel(
+        self,
+        response: Response,
+        **kwargs,
+    ) -> Response:
+        """
+        Send CANCEL to cancel a pending INVITE.
+
+        Args:
+            response: Provisional response to the INVITE
+            **kwargs: Additional parameters
+
+        Returns:
+            SIP response
+        """
+        request = response.request
+        headers = kwargs.pop("headers", {})
+        headers["From"] = request.headers.get("From")
+        headers["To"] = request.headers.get("To")
+        headers["Call-ID"] = request.headers.get("Call-ID")
+        headers["CSeq"] = f"{request.headers.get('CSeq', '1').split()[0]} CANCEL"
+        headers["Via"] = request.headers.get("Via")
+
+        return self.request(
+            method="CANCEL",
+            uri=request.uri,
+            headers=headers,
+            **kwargs,
+        )
+
+    def message(
+        self,
+        to_uri: str,
+        from_uri: Optional[str] = None,
+        content: str = "",
+        content_type: str = "text/plain",
+        **kwargs,
+    ) -> Response:
+        """
+        Send MESSAGE (instant message).
+
+        Args:
+            to_uri: Destination URI
+            from_uri: Source URI (auto-generated if not provided)
+            content: Message content
+            content_type: Content type (default: text/plain)
+            **kwargs: Additional parameters
+
+        Returns:
+            SIP response
+
+        Example:
+            >>> response = client.message('sip:bob@example.com', content='Hello!')
+        """
+        if from_uri is None:
+            from_uri = self._get_default_from_uri()
+
+        headers = kwargs.pop("headers", {})
+        headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
+        headers["To"] = f"<{to_uri}>"
+        headers["Content-Type"] = content_type
+
+        return self.request(
+            method="MESSAGE",
+            uri=to_uri,
+            headers=headers,
+            content=content,
+            **kwargs,
+        )
+
+    def subscribe(
+        self,
+        uri: str,
+        event: str = "presence",
+        expires: int = 3600,
+        **kwargs,
+    ) -> Response:
+        """Send SUBSCRIBE request."""
+        headers = kwargs.pop("headers", {})
+        headers["Event"] = event
+        headers["Expires"] = str(expires)
+
+        return self.request(method="SUBSCRIBE", uri=uri, headers=headers, **kwargs)
+
+    def notify(
+        self,
+        uri: str,
+        event: str = "presence",
+        content: Optional[str] = None,
+        **kwargs,
+    ) -> Response:
+        """Send NOTIFY request."""
+        headers = kwargs.pop("headers", {})
+        headers["Event"] = event
+
+        if content:
+            headers["Content-Type"] = "application/pidf+xml"
+
+        return self.request(
+            method="NOTIFY", uri=uri, headers=headers, content=content, **kwargs
+        )
+
+    def refer(
+        self,
+        uri: str,
+        refer_to: str,
+        **kwargs,
+    ) -> Response:
+        """Send REFER request."""
+        headers = kwargs.pop("headers", {})
+        headers["Refer-To"] = f"<{refer_to}>"
+
+        return self.request(method="REFER", uri=uri, headers=headers, **kwargs)
+
+    def info(
+        self,
+        uri: str,
+        content: Optional[str] = None,
+        content_type: str = "application/dtmf-relay",
+        **kwargs,
+    ) -> Response:
+        """Send INFO request."""
+        headers = kwargs.pop("headers", {})
+
+        if content:
+            headers["Content-Type"] = content_type
+
+        return self.request(
+            method="INFO", uri=uri, headers=headers, content=content, **kwargs
+        )
+
+    def update(
+        self,
+        uri: str,
+        sdp_content: Optional[str] = None,
+        **kwargs,
+    ) -> Response:
+        """Send UPDATE request."""
+        headers = kwargs.pop("headers", {})
+
+        if sdp_content:
+            headers["Content-Type"] = "application/sdp"
+
+        return self.request(
+            method="UPDATE", uri=uri, headers=headers, content=sdp_content, **kwargs
+        )
+
+    def prack(
+        self,
+        response: Response,
+        **kwargs,
+    ) -> Response:
+        """Send PRACK (Provisional Response Acknowledgement)."""
+        request = response.request
+        headers = kwargs.pop("headers", {})
+        headers["From"] = request.headers.get("From")
+        headers["To"] = response.headers.get("To")
+        headers["Call-ID"] = request.headers.get("Call-ID")
+
+        # RAck header
+        rseq = response.headers.get("RSeq", "1")
+        cseq = request.headers.get("CSeq", "1 INVITE")
+        headers["RAck"] = f"{rseq} {cseq}"
+
+        return self.request(
+            method="PRACK",
+            uri=request.uri,
+            headers=headers,
+            **kwargs,
+        )
+
+    def publish(
+        self,
+        uri: str,
+        event: str = "presence",
+        content: Optional[str] = None,
+        expires: int = 3600,
+        **kwargs,
+    ) -> Response:
+        """Send PUBLISH request."""
+        headers = kwargs.pop("headers", {})
+        headers["Event"] = event
+        headers["Expires"] = str(expires)
+
+        if content:
+            headers["Content-Type"] = "application/pidf+xml"
+
+        return self.request(
+            method="PUBLISH", uri=uri, headers=headers, content=content, **kwargs
+        )
+
+    def close(self) -> None:
+        """Close the transport."""
+        if not self._closed:
+            self._transport.close()
+            self._closed = True
+
+    def __enter__(self):
+        """Context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        await self.close()
-
-    async def start(self) -> None:
-        if self._started:
-            return
-        self._loop = asyncio.get_running_loop()
-        self._transport = SIPTransport(
-            on_message=self._on_transport_message, protocol=self.protocol
-        )
-        await self._transport.start(self._requested_local)
-        bound = self._transport.local_address() or self._requested_local
-        self._local_addr = bound
-        host = self._determine_local_host(bound)
-        self._via_host = host
-        self._local_uri = f"sip:{self.identity}@{host}:{bound[1]}"
-        self._started = True
-        logger.debug(f"Client started on {bound} via {self._local_uri}")
-
-    async def close(self) -> None:
-        if not self._started:
-            return
-        assert self._transport is not None
-        await self._transport.stop()
-        self._transport = None
-        self._started = False
-        self._local_addr = None
-        self._local_uri = None
-        self._via_host = None
-        self._calls.clear()
-
-    # ------------------------------------------------------------------
-    # Event handling
-    # ------------------------------------------------------------------
-    @classmethod
-    def event_handler(
-        cls, name: str
-    ) -> Callable[[Callable[[Event], Any]], Callable[[Event], Any]]:
-        def decorator(func: Callable[[Event], Any]) -> Callable[[Event], Any]:
-            cls._event_handlers.setdefault(name, []).append(func)
-            return func
-
-        return decorator
-
-    async def _emit_event(self, name: str, event: Event) -> None:
-        handlers = list(self._event_handlers.get(name, []))
-        if not handlers:
-            return
-        awaitables: List[Awaitable[Any]] = []
-        for handler in handlers:
-            try:
-                result = handler(event)
-            except Exception:  # pragma: no cover - defensive logging
-                logger.exception(f"Handler for {name} raised")
-                continue
-            if inspect.isawaitable(result):
-                awaitables.append(result)  # type: ignore[arg-type]
-        if awaitables:
-            results = await asyncio.gather(*awaitables, return_exceptions=True)
-            for outcome in results:
-                if isinstance(outcome, Exception):
-                    logger.error(f"Async handler for {name} raised", exc_info=outcome)
-
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
-    @property
-    def local_uri(self) -> str:
-        if not self._local_uri:
-            raise RuntimeError("Client not started")
-        return self._local_uri
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.close()
 
     @property
-    def local_address(self) -> Addr:
-        if not self._local_addr:
-            raise RuntimeError("Client not started")
-        return self._local_addr
+    def transport(self):
+        """Get the transport instance."""
+        return self._transport
 
-    # ------------------------------------------------------------------
-    # Public SIP API
-    # ------------------------------------------------------------------
-    async def options(
+    @property
+    def local_address(self):
+        """Get the local transport address."""
+        return self._transport.local_address
+
+    @property
+    def is_closed(self):
+        """Check if client is closed."""
+        return self._closed
+
+    def enable_auto_reregister(
         self,
-        uri: Optional[str] = None,
-        *,
-        timeout: Optional[float] = 5.0,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> TransportResponse:
-        self._ensure_started()
-        target_uri = uri or self.remote_uri
-        call_id = self._generate_call_id()
-        from_tag = self._generate_tag()
-        cseq = self._next_cseq()
-        base_headers = self._base_headers(
-            method="OPTIONS",
-            uri=target_uri,
-            call_id=call_id,
-            from_tag=from_tag,
-            cseq=cseq,
+        aor: str,
+        interval: int,
+        callback: Optional[Callable[[Response], None]] = None,
+    ) -> None:
+        """
+        Enable automatic re-registration.
+
+        Args:
+            aor: Address of Record to register
+            interval: Re-registration interval in seconds (should be < expires)
+            callback: Optional callback function called after each registration
+                      with the Response object as argument
+
+        Example:
+            >>> def on_register(response):
+            ...     print(f"Re-registered: {response.status_code}")
+            >>> client.enable_auto_reregister(
+            ...     aor="sip:alice@domain.com",
+            ...     interval=300,  # Re-register every 5 minutes
+            ...     callback=on_register
+            ... )
+        """
+        self._reregister_aor = aor
+        self._reregister_interval = interval
+        self._reregister_callback = callback
+        self._schedule_reregister()
+
+    def disable_auto_reregister(self) -> None:
+        """
+        Disable automatic re-registration.
+
+        Cancels any pending re-registration timer.
+        """
+        if self._reregister_timer:
+            self._reregister_timer.cancel()
+            self._reregister_timer = None
+        self._reregister_aor = None
+        self._reregister_interval = None
+        self._reregister_callback = None
+
+    def _schedule_reregister(self) -> None:
+        """Schedule the next re-registration."""
+        if not self._reregister_interval or not self._reregister_aor:
+            return
+
+        # Cancel existing timer
+        if self._reregister_timer:
+            self._reregister_timer.cancel()
+
+        # Schedule new timer
+        self._reregister_timer = threading.Timer(
+            self._reregister_interval, self._do_reregister
         )
-        if headers:
-            base_headers.update(headers.items())
-        request = build_request("OPTIONS", target_uri, base_headers)
-        response = await self._send(request, wait_response=True, timeout=timeout)
-        raw = (
-            response.response_raw
-            or f"SIP/2.0 {response.status_code or 0} {response.status_text or ''}\r\n\r\n"
-        )
+        self._reregister_timer.daemon = True
+        self._reregister_timer.start()
+
+    def _do_reregister(self) -> None:
+        """Perform re-registration (called by timer)."""
+        if self._closed or not self._reregister_aor:
+            return
+
         try:
-            parsed = parse_sip_message(raw)
-        except ValueError:
-            logger.warning("Failed to parse OPTIONS response; skipping event dispatch")
+            # Calculate expires as interval + buffer (30 seconds)
+            expires = self._reregister_interval + 30
+
+            # Send REGISTER
+            response = self.register(aor=self._reregister_aor, expires=expires)
+
+            # Handle auth challenge
+            if response and response.status_code in (401, 407):
+                response = self.retry_with_auth(response)
+
+            # Call callback if provided
+            if self._reregister_callback and response:
+                try:
+                    self._reregister_callback(response)
+                except Exception as e:
+                    logger.error(f"Re-register callback error: {e}")
+
+            # Schedule next re-registration
+            if response and response.status_code == 200:
+                self._schedule_reregister()
+            else:
+                logger.warning(
+                    f"Re-registration failed: {response.status_code if response else 'No response'}"
+                )
+                # Retry after shorter interval on failure
+                if self._reregister_interval:
+                    retry_timer = threading.Timer(30, self._do_reregister)
+                    retry_timer.daemon = True
+                    retry_timer.start()
+
+        except Exception as e:
+            logger.error(f"Re-registration error: {e}")
+            # Retry after shorter interval on error
+            if self._reregister_interval:
+                retry_timer = threading.Timer(30, self._do_reregister)
+                retry_timer.daemon = True
+                retry_timer.start()
+
+    def unregister(self, aor: str, **kwargs) -> Response:
+        """
+        Unregister (send REGISTER with Expires: 0).
+
+        Args:
+            aor: Address of Record to unregister
+            **kwargs: Additional arguments passed to register()
+
+        Returns:
+            Response object
+
+        Example:
+            >>> response = client.unregister(aor="sip:alice@domain.com")
+            >>> if response.status_code == 200:
+            ...     print("Unregistered successfully")
+        """
+        # Disable auto re-registration if it was set for this AOR
+        if self._reregister_aor == aor:
+            self.disable_auto_reregister()
+
+        return self.register(aor=aor, expires=0, **kwargs)
+
+    def __repr__(self):
+        return (
+            f"Client(local={self.local_address}, transport={self.transport_protocol})"
+        )
+
+
+class AsyncClient:
+    """
+    Asynchronous SIP client with simplified API.
+
+    This client provides a clean, intuitive interface for async SIP communication:
+    - Set event handlers with `client.events = MyEvents()`
+    - Set authentication with `client.auth = Auth.Digest('user', 'pass')`
+    - Simple method signatures: `await client.invite(to_uri, from_uri, body=sdp)`
+
+    Example:
+        >>> class MyEvents(Events):
+        ...     @event_handler('INVITE', status=200)
+        ...     def on_invite_ok(self, request, response, context):
+        ...         print("Call accepted!")
+        ...
+        >>> async with AsyncClient() as client:
+        ...     client.events = MyEvents()
+        ...     client.auth = Auth.Digest('alice', 'secret')
+        ...     response = await client.invite('sip:bob@example.com', 'sip:alice@local')
+    """
+
+    def __init__(
+        self,
+        local_host: str = "0.0.0.0",
+        local_port: int = 0,
+        transport: str = "UDP",
+        events: Optional[Events] = None,
+        auth: Optional[SipAuthCredentials] = None,
+    ):
+        """
+        Initialize async SIP client.
+
+        Args:
+            local_host: Local IP to bind to (default: 0.0.0.0)
+            local_port: Local port to bind to (default: 0 = auto-assign)
+            transport: Transport protocol - UDP, TCP, or TLS
+            events: Optional Events instance for handling SIP messages
+            auth: Optional SipAuthCredentials for authentication
+        """
+        # Transport configuration
+        self.config = TransportConfig(
+            local_host=local_host,
+            local_port=local_port,
+        )
+        self.transport_protocol = transport.upper()
+
+        # Initialize transport
+        self._transport = self._create_transport()
+
+        # State management (internal)
+        self._state_manager = StateManager()
+
+        # Events and Auth
+        self._events = events
+        self._auth = auth
+
+        # Client state
+        self._closed = False
+        self._lock = asyncio.Lock()
+
+        # Re-registration support
+        self._reregister_task: Optional[asyncio.Task] = None
+        self._reregister_interval: Optional[int] = None
+        self._reregister_aor: Optional[str] = None
+        self._reregister_callback: Optional[Callable] = None
+
+    def _create_transport(self):
+        """Create transport based on protocol."""
+        if self.transport_protocol == "UDP":
+            return UDPTransport(self.config)
+        elif self.transport_protocol == "TCP":
+            return TCPTransport(self.config)
+        elif self.transport_protocol == "TLS":
+            return TLSTransport(self.config)
         else:
-            await self._emit_event(
-                "OptionResponse",
-                OptionResponseEvent(
-                    name="OptionResponse",
-                    client=self,
-                    message=parsed,
-                    response=response,
-                ),
+            raise ValueError(f"Unsupported transport: {self.transport_protocol}")
+
+    def _get_default_from_uri(self) -> str:
+        """
+        Get default FROM URI, using auth username if available.
+
+        Returns:
+            SIP URI like "sip:username@host" or "sip:user@host" if no auth.
+        """
+        host = self._transport.local_address.host
+        if self._auth and hasattr(self._auth, "username"):
+            username = self._auth.username
+        else:
+            username = "user"
+        return f"sip:{username}@{host}"
+
+    @property
+    def events(self) -> Optional[Events]:
+        """Get the current Events instance."""
+        return self._events
+
+    @events.setter
+    def events(self, events_instance: Optional[Events]) -> None:
+        """Set the Events instance for handling SIP messages."""
+        self._events = events_instance
+
+    @property
+    def auth(self) -> Optional[SipAuthCredentials]:
+        """Get the current authentication credentials."""
+        return self._auth
+
+    @auth.setter
+    def auth(self, credentials: Optional[SipAuthCredentials]) -> None:
+        """Set authentication credentials."""
+        self._auth = credentials
+
+    async def retry_with_auth(
+        self,
+        response: Response,
+        auth: Optional[SipAuthCredentials] = None,
+    ) -> Optional[Response]:
+        """
+        Retry a request with authentication (async version).
+
+        This method allows manual control over authentication retries.
+        When you receive a 401/407 response, call this method to retry
+        the original request with proper authentication headers.
+
+        Args:
+            response: The 401/407 response that challenged authentication
+            auth: Optional auth credentials (defaults to client.auth)
+
+        Returns:
+            New Response object, or None if retry failed
+
+        Example:
+            >>> response = await client.register(aor='sip:alice@domain.com')
+            >>> if response.status_code == 401:
+            ...     response = await client.retry_with_auth(response)
+        """
+        if not response or not response.request:
+            logger.error("Cannot retry: no original request in response")
+            return None
+
+        # Use provided auth or fall back to client auth
+        credentials = auth or self._auth
+        if not credentials:
+            logger.error("Cannot retry: no authentication credentials available")
+            return None
+
+        # Extract challenge from response
+        challenge_header = (
+            "WWW-Authenticate" if response.status_code == 401 else "Proxy-Authenticate"
+        )
+        auth_header_name = (
+            "Authorization" if response.status_code == 401 else "Proxy-Authorization"
+        )
+
+        challenge = response.headers.get(challenge_header)
+        if not challenge:
+            logger.error(
+                f"No {challenge_header} header in {response.status_code} response"
             )
-        return response
+            return None
 
-    async def register(
+        # Build auth header
+        auth_header_value = self._build_auth_header(
+            response.request,
+            challenge,
+            credentials,
+        )
+
+        if not auth_header_value:
+            logger.error("Failed to build authorization header")
+            return None
+
+        # Clone original request with auth header
+        original_request = response.request
+        new_headers = dict(original_request.headers)
+        new_headers[auth_header_name] = auth_header_value
+
+        # Increment CSeq
+        if "CSeq" in new_headers:
+            cseq_parts = new_headers["CSeq"].split()
+            if len(cseq_parts) >= 2:
+                try:
+                    cseq_num = int(cseq_parts[0])
+                    new_headers["CSeq"] = f"{cseq_num + 1} {cseq_parts[1]}"
+                except ValueError:
+                    pass
+
+        # Send authenticated request
+        console.print(
+            f"\n[bold yellow]>>> AUTH RETRY {original_request.method} ({self._transport.local_address} → {response.transport_info.get('remote', 'unknown')}):[/bold yellow]"
+        )
+
+        new_request = Request(
+            method=original_request.method,
+            uri=original_request.uri,
+            headers=new_headers,
+            body=original_request.body,
+        )
+
+        console.print(new_request.to_string())
+        console.print("=" * 80)
+
+        # Send the retry request
+        return await self.request(
+            method=original_request.method,
+            uri=original_request.uri,
+            headers=new_headers,
+            body=original_request.body,
+            host=response.transport_info.get("remote", "").split(":")[0]
+            if response.transport_info
+            else None,
+        )
+
+    def _extract_host_port(self, uri: str) -> tuple[str, int]:
+        """Extract host and port from SIP URI."""
+        parsed = urlparse(uri)
+        host = parsed.hostname or parsed.path.split("@")[-1].split(":")[0]
+        port = parsed.port or 5060
+        return host, port
+
+    def _build_auth_header(
+        self, request: Request, challenge: str, credentials: SipAuthCredentials
+    ) -> Optional[str]:
+        """Build Authorization/Proxy-Authorization header value."""
+        try:
+            digest_creds = DigestCredentials(
+                username=credentials.username,
+                password=credentials.password,
+            )
+            digest_auth = DigestAuth(digest_creds)
+            return digest_auth.build_authorization(request, challenge)
+        except Exception as e:
+            logger.error(f"Failed to build auth header: {e}")
+            return None
+
+    def _detect_auth_challenge(self, response: Response, context: EventContext):
+        """Detect and store auth challenge in context."""
+        if response.status_code in (401, 407):
+            context.metadata["auth_challenge"] = response
+
+    async def request(
         self,
-        *,
-        username: Optional[str] = None,
-        domain: Optional[str] = None,
-        expires: int = 300,
-        timeout: Optional[float] = 5.0,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> TransportResponse:
-        self._ensure_started()
-        user = username or (self.credentials.username if self.credentials else self.identity)
-        if not user:
-            raise ValueError("username required for REGISTER")
-        host = domain or self.addr[0]
-        request_uri = f"sip:{host}"
-        to_uri = f"sip:{user}@{host}"
-        call_id = self._generate_call_id()
-        from_tag = self._generate_tag()
-        cseq = self._next_cseq()
-        branch = self._generate_branch()
+        method: str,
+        uri: str,
+        headers: Optional[dict] = None,
+        body: Optional[Union[str, bytes]] = None,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        **kwargs,
+    ) -> Optional[Response]:
+        """
+        Send a SIP request (async version).
 
-        base_headers = self._base_headers(
-            method="REGISTER",
-            uri=request_uri,
-            call_id=call_id,
-            from_tag=from_tag,
-            cseq=cseq,
-            branch=branch,
-            to_override=f"<{to_uri}>",
-        )
-        contact = f"<sip:{user}@{self._assert_via_host()}:{self.local_address[1]}>"
-        base_headers["Contact"] = contact
-        base_headers["Expires"] = str(expires)
-        if headers:
-            base_headers.update(headers.items())
+        Args:
+            method: SIP method (INVITE, REGISTER, etc)
+            uri: Request URI
+            headers: Optional headers dict
+            body: Optional message body
+            host: Destination host (extracted from URI if not provided)
+            port: Destination port (default 5060)
 
-        request = build_request("REGISTER", request_uri, base_headers)
-        response = await self._send(request, wait_response=True, timeout=timeout)
-        if response.status_code in {401, 407} and self.credentials and response.response_raw:
-            message = parse_sip_message(response.response_raw)
-            www_auth = message.get("WWW-Authenticate")
-            proxy_auth = message.get("Proxy-Authenticate")
-            auth_header = www_auth or proxy_auth
-            if auth_header:
-                challenge = parse_challenge(auth_header)
-                key = f"{call_id}:REGISTER"
-                nc = self._nonce_counts.get(key, 0) + 1
-                self._nonce_counts[key] = nc
-                header_value = build_authorization_header(
-                    "REGISTER",
-                    request_uri,
-                    challenge,
-                    self.credentials,
-                    nonce_count=nc,
-                    qop=challenge.get("qop", "auth"),
-                )
-                header_name = "Authorization" if www_auth else "Proxy-Authorization"
-                base_headers = self._base_headers(
-                    method="REGISTER",
-                    uri=request_uri,
-                    call_id=call_id,
-                    from_tag=from_tag,
-                    cseq=cseq,
-                    branch=self._generate_branch(),
-                    to_override=f"<{to_uri}>",
-                )
-                base_headers["Contact"] = contact
-                base_headers["Expires"] = str(expires)
-                base_headers[header_name] = header_value
-                if headers:
-                    base_headers.update(headers.items())
-                request = build_request("REGISTER", request_uri, base_headers)
-                response = await self._send(
-                    request, wait_response=True, timeout=timeout
-                )
-        return response
+        Returns:
+            Final Response object or None
+        """
+        async with self._lock:
+            # Ensure required headers
+            headers = self._ensure_required_headers(method, uri, headers or {})
 
-    async def message(
-        self,
-        content: str,
-        uri: Optional[str] = None,
-        *,
-    content_type: str = "text/plain",
-    wait_response: bool = False,
-    timeout: Optional[float] = 10.0,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Optional[TransportResponse]:
-        self._ensure_started()
-        target_uri = uri or self.remote_uri
-        effective_timeout = (
-            timeout if timeout is not None else (10.0 if wait_response else None)
-        )
-        call_id = self._generate_call_id()
-        from_tag = self._generate_tag()
-        cseq = self._next_cseq()
-        base_headers = self._base_headers(
-            method="MESSAGE",
-            uri=target_uri,
-            call_id=call_id,
-            from_tag=from_tag,
-            cseq=cseq,
-        )
-        base_headers["Content-Type"] = content_type
-        if headers:
-            base_headers.update(headers.items())
-        request = build_request("MESSAGE", target_uri, base_headers, body=content)
-        response = await self._send(
-            request, wait_response=wait_response, timeout=effective_timeout
-        )
-        if (
-            wait_response
-            and response.status_code in {401, 407}
-            and self.credentials
-            and response.response_raw
-        ):
-            auth_message = parse_sip_message(response.response_raw)
-            www_auth = auth_message.get("WWW-Authenticate")
-            proxy_auth = auth_message.get("Proxy-Authenticate")
-            auth_header = www_auth or proxy_auth
-            if auth_header:
-                challenge = parse_challenge(auth_header)
-                key = f"{call_id}:MESSAGE"
-                nc = self._nonce_counts.get(key, 0) + 1
-                self._nonce_counts[key] = nc
-                header_value = build_authorization_header(
-                    "MESSAGE",
-                    target_uri,
-                    challenge,
-                    self.credentials,
-                    nonce_count=nc,
-                    qop=challenge.get("qop", "auth"),
+            # Create request
+            request = Request(method=method, uri=uri, headers=headers, body=body)
+
+            # Determine destination
+            if not host:
+                host, port = self._extract_host_port(uri)
+            destination = TransportAddress(host, port or 5060)
+
+            # Create transaction
+            transaction = self._state_manager.create_transaction(
+                request.method, is_client=True
+            )
+
+            # Create event context
+            context = EventContext(
+                request=request,
+                transaction=transaction,
+                destination=destination,
+            )
+
+            # Call events on_request
+            if self._events:
+                request = self._events._call_request_handlers(request, context)
+
+            # Log request
+            console.print(
+                f"\n[bold cyan]>>> SENDING {method} ({self._transport.local_address} → {destination}):[/bold cyan]"
+            )
+            console.print(request.to_string())
+            console.print("=" * 80)
+
+            try:
+                # Send request
+                await asyncio.to_thread(
+                    self._transport.send, request.to_bytes(), destination
                 )
-                header_name = "Authorization" if www_auth else "Proxy-Authorization"
-                retry_headers = self._base_headers(
-                    method="MESSAGE",
-                    uri=target_uri,
-                    call_id=call_id,
-                    from_tag=from_tag,
-                    cseq=cseq,
-                )
-                retry_headers["Content-Type"] = content_type
-                retry_headers[header_name] = header_value
-                if headers:
-                    retry_headers.update(headers.items())
-                retry_request = build_request(
-                    "MESSAGE", target_uri, retry_headers, body=content
-                )
-                response = await self._send(
-                    retry_request, wait_response=True, timeout=effective_timeout
-                )
-        return response if wait_response else None
+
+                # Receive responses
+                parser = MessageParser()
+                final_response = None
+
+                while True:
+                    response_data, source = await asyncio.to_thread(
+                        self._transport.receive,
+                        timeout=self._transport.config.read_timeout,
+                    )
+
+                    response = parser.parse(response_data)
+                    response.raw = response_data
+                    response.request = request
+                    response.transport_info = {
+                        "protocol": self.transport_protocol,
+                        "local": str(self._transport.local_address),
+                        "remote": str(source),
+                    }
+
+                    console.print(
+                        f"\n[bold green]<<< RECEIVED {response.status_code} {response.reason_phrase} "
+                        f"({source} → {self._transport.local_address}):[/bold green]"
+                    )
+                    console.print(response.to_string())
+                    console.print("=" * 80)
+
+                    # Update transaction
+                    self._state_manager.update_transaction(transaction.id, response)
+
+                    # Update context
+                    context.response = response
+                    context.source = source
+
+                    # Detect auth challenges
+                    self._detect_auth_challenge(response, context)
+
+                    # Call events on_response
+                    if self._events:
+                        response = self._events._call_response_handlers(
+                            response, context
+                        )
+
+                    # Check for final response
+                    if response.status_code >= 200:
+                        final_response = response
+                        break
+
+                return final_response
+
+            except Exception as e:
+                logger.error(f"Request failed: {e}")
+                return None
+
+    def _ensure_required_headers(self, method: str, uri: str, headers: dict) -> dict:
+        """Ensure required SIP headers are present."""
+        # From
+        if "From" not in headers:
+            headers["From"] = (
+                f"<{self._get_default_from_uri()}>;tag={uuid.uuid4().hex[:8]}"
+            )
+
+        # To
+        if "To" not in headers:
+            headers["To"] = f"<{uri}>"
+
+        # Call-ID
+        if "Call-ID" not in headers:
+            headers["Call-ID"] = (
+                f"{uuid.uuid4().hex}@{self._transport.local_address.host}"
+            )
+
+        # CSeq
+        if "CSeq" not in headers:
+            headers["CSeq"] = f"1 {method}"
+
+        # Via
+        if "Via" not in headers:
+            branch = f"z9hG4bK{uuid.uuid4().hex[:16]}"
+            headers["Via"] = (
+                f"SIP/2.0/{self.transport_protocol} {self._transport.local_address.host}:"
+                f"{self._transport.local_address.port};branch={branch};rport"
+            )
+
+        # Max-Forwards
+        if "Max-Forwards" not in headers:
+            headers["Max-Forwards"] = "70"
+
+        # Content-Length
+        if "Content-Length" not in headers:
+            headers["Content-Length"] = "0"
+
+        return headers
 
     async def invite(
         self,
-        uri: str,
-        *,
-        timeout: Optional[float] = 10.0,
-        sdp: bool | str | None = None,
-        media: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Call:
-        self._ensure_started()
-        call_id = self._generate_call_id()
-        from_tag = self._generate_tag()
-        branch = self._generate_branch()
-        cseq = self._next_cseq()
+        to_uri: str,
+        from_uri: Optional[str] = None,
+        body: Optional[str] = None,
+        **kwargs,
+    ) -> Response:
+        """Send INVITE request (async)."""
+        if from_uri is None:
+            from_uri = self._get_default_from_uri()
 
-        base_headers = self._base_headers(
-            method="INVITE",
-            uri=uri,
-            call_id=call_id,
-            from_tag=from_tag,
-            cseq=cseq,
-            branch=branch,
-            override_via=self._via_header(branch),
-        )
-        body = ""
-        if sdp:
-            offer = (
-                sdp
-                if isinstance(sdp, str)
-                else build_audio_sdp(
-                    self._assert_via_host(), self.local_address[1] + 10000
-                )
-            )
-            body = offer
-            base_headers["Content-Type"] = "application/sdp"
-        if headers:
-            base_headers.update(headers.items())
+        headers = kwargs.pop("headers", {})
+        headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
+        headers["To"] = f"<{to_uri}>"
 
-        request = build_request("INVITE", uri, base_headers, body=body)
-        call = Call(
-            client=self,
-            call_id=call_id,
-            target_uri=uri,
-            from_uri=self.local_uri,
-            from_tag=from_tag,
-            branch=branch,
-            invite_cseq=cseq,
-            cseq=cseq,
-        )
-        call.details.update(
-            {"call_id": call_id, "from_tag": from_tag, "target_uri": uri}
-        )
-        call.details.setdefault("requests", []).append(
-            {"method": "INVITE", "raw": request}
-        )
-        self._calls[call_id] = call
+        if body:
+            headers["Content-Type"] = kwargs.pop("content_type", "application/sdp")
+            headers["Content-Length"] = str(len(body))
 
-        response = await self._send(request, wait_response=True, timeout=timeout)
-        call.last_response = response
-        if response.timed_out:
-            call.fsm.advance_to(CallState.FAILED, reason="timeout")
-            raise TimeoutError("INVITE timed out")
-        if response.response_raw:
-            await self._handle_response(parse_sip_message(response.response_raw))
-        return call
-
-    async def _send_bye(
-        self, call: Call, *, timeout: Optional[float] = None
-    ) -> TransportResponse:
-        self._ensure_started()
-        cseq = call.next_cseq()
-        to_value = f"<{call.target_uri}>"
-        if call.remote_tag:
-            to_value = f"{to_value};tag={call.remote_tag}"
-        headers = self._base_headers(
-            method="BYE",
-            uri=call.target_uri,
-            call_id=call.call_id,
-            from_tag=call.from_tag,
-            cseq=cseq,
-            to_override=to_value,
+        return await self.request(
+            "INVITE", to_uri, headers=headers, body=body, **kwargs
         )
-        request = build_request("BYE", call.target_uri, headers)
-        call.details.setdefault("requests", []).append(
-            {"method": "BYE", "raw": request}
-        )
-        response = await self._send(request, wait_response=True, timeout=timeout)
-        call.last_response = response
-        if not response.timed_out:
-            call.fsm.advance_to(CallState.TERMINATED)
-            call.terminated_at = _now()
-            call.terminated_by = call.terminated_by or "local"
-            await self._emit_event(
-                "CallHangup",
-                CallHangupEvent(
-                    name="CallHangup",
-                    client=self,
-                    message=parse_sip_message(
-                        response.response_raw or self._empty_ok()
-                    ),
-                    call=call,
-                    by_remote=False,
-                ),
-            )
-        return response
 
-    # ------------------------------------------------------------------
-    # Transport helpers
-    # ------------------------------------------------------------------
-    async def _send(
+    async def register(
         self,
-        data: str,
-        *,
-        wait_response: bool,
-        timeout: Optional[float],
-    ) -> TransportResponse:
-        if not self._transport:
-            raise RuntimeError("Client not started")
-        snippet_prefix = "\n" if len(data) < 4000 else ""
-        logger.debug(f"Sending message:{snippet_prefix}{data}")
-        response = await self._transport.send(
-            data,
-            self.addr,
-            wait_response=wait_response,
-            timeout=timeout,
+        aor: str,
+        registrar: Optional[str] = None,
+        expires: int = 3600,
+        **kwargs,
+    ) -> Response:
+        """Send REGISTER request (async)."""
+        registrar = registrar or aor
+        headers = kwargs.pop("headers", {})
+        headers["Contact"] = (
+            f"<sip:{self._transport.local_address.host}:{self._transport.local_address.port}>;expires={expires}"
         )
-        if response.response_raw:
-            prefix = "\n" if len(response.response_raw) < 4000 else ""
-            logger.debug(f"Received response:{prefix}{response.response_raw}")
-        elif response.status_code is not None:
-            logger.debug(
-                f"Response status: {response.status_code} {response.status_text}"
-            )
-        return response
+        headers["Expires"] = str(expires)
+        return await self.request("REGISTER", registrar, headers=headers, **kwargs)
 
-    async def _on_transport_message(self, raw: str, addr: Addr) -> None:
-        try:
-            message = parse_sip_message(raw)
-        except ValueError:
-            logger.warning(f"Failed to parse SIP message from {addr}")
-            return
-        if message.is_request:
-            await self._handle_request(message, addr)
-        else:
-            await self._handle_response(message)
+    async def options(self, uri: str, **kwargs) -> Response:
+        """Send OPTIONS request (async)."""
+        return await self.request("OPTIONS", uri, **kwargs)
 
-    # ------------------------------------------------------------------
-    # Incoming responses
-    # ------------------------------------------------------------------
-    async def _handle_response(self, message: SIPMessage) -> None:
-        call_id = message.get("Call-ID")
-        if call_id:
-            call = self._calls.get(call_id)
-        else:
-            call = None
-        cseq_header = message.get("CSeq", "")
-        cseq_method = cseq_header.split(" ", 1)[1].upper() if " " in cseq_header else ""
-        status_code = message.status_code or 0
-
-        if status_code in {401, 407} and self.credentials:
-            await self._handle_auth_challenge(message)
-            return
-
-        if not call:
-            return
-
-        call.details.setdefault("responses", []).append(
-            {
-                "status_code": status_code,
-                "status_text": message.status_text,
-                "headers": dict(message.headers.items()),
-                "body": message.body,
-                "received_at": _now(),
-            }
-        )
-        if status_code < 200:
-            if call.state == CallState.INITIATING:
-                call.fsm.advance_to(CallState.PROCEEDING)
-        elif 200 <= status_code < 300:
-            if cseq_method == "INVITE":
-                change = call.fsm.advance_to(CallState.CONNECTED)
-                if change.current == CallState.CONNECTED:
-                    call.connected_at = call.connected_at or _now()
-                to_header = message.get("To", "") or ""
-                params = header_params(to_header)
-                if params.get("tag"):
-                    call.remote_tag = params["tag"]
-                body = message.body.strip()
-                if body and call.sdp != body:
-                    call.sdp = body
-                    await self._emit_event(
-                        "SDPNegotiated",
-                        SDPNegotiatedEvent(
-                            name="SDPNegotiated",
-                            client=self,
-                            message=message,
-                            call=call,
-                            sdp=body,
-                        ),
-                    )
-                await self._send_ack(call)
-            elif cseq_method == "BYE":
-                await self._finalize_call(call, message, by_remote=False)
-        else:
-            if call.state == CallState.TERMINATED:
-                logger.debug(
-                    f"Ignoring final response {status_code} for terminated call {call_id}"
-                )
-                return
-            if call.state == CallState.FAILED:
-                logger.debug(
-                    f"Ignoring final response {status_code} for failed call {call_id}"
-                )
-                return
-            if call.state == CallState.CONNECTED and cseq_method == "INVITE":
-                logger.debug(
-                    f"Ignoring non-success INVITE response {status_code} for connected call {call_id}"
-                )
-                return
-            call.fsm.advance_to(CallState.FAILED, reason=str(status_code))
-            await self._finalize_call(call, message, by_remote=False)
-
-    async def _handle_auth_challenge(self, message: SIPMessage) -> None:
-        call_id = message.get("Call-ID")
-        if not call_id or call_id not in self._calls or not self.credentials:
-            return
-        call = self._calls[call_id]
-        auth_header = message.get("WWW-Authenticate") or message.get(
-            "Proxy-Authenticate"
-        )
-        if not auth_header:
-            return
-        challenge = parse_challenge(auth_header)
-        nc = self._nonce_counts.get(call_id, 0) + 1
-        self._nonce_counts[call_id] = nc
-        header_value = build_authorization_header(
-            "INVITE",
-            call.target_uri,
-            challenge,
-            self.credentials,
-            nonce_count=nc,
-            qop=challenge.get("qop", "auth"),
-        )
-        new_cseq = call.next_cseq()
-        new_branch = self._generate_branch()
-        headers = self._base_headers(
-            method="INVITE",
-            uri=call.target_uri,
-            call_id=call.call_id,
-            from_tag=call.from_tag,
-            cseq=new_cseq,
-            branch=new_branch,
-            override_via=self._via_header(new_branch),
-        )
-        call.invite_cseq = new_cseq
-        headers[
-            "Authorization"
-            if "www-authenticate" in auth_header.lower()
-            else "Proxy-Authorization"
-        ] = header_value
-        request = build_request("INVITE", call.target_uri, headers, body=call.sdp or "")
-        call.details.setdefault("retries", []).append(
-            {"authorization": header_value, "raw": request}
-        )
-        response = await self._send(request, wait_response=True, timeout=10.0)
-        call.last_response = response
-        if response.response_raw:
-            await self._handle_response(parse_sip_message(response.response_raw))
-
-    async def _send_ack(self, call: Call) -> None:
-        if not call.remote_tag:
-            return
-        headers = self._base_headers(
-            method="ACK",
-            uri=call.target_uri,
-            call_id=call.call_id,
-            from_tag=call.from_tag,
-            cseq=call.invite_cseq,
-            to_override=f"<{call.target_uri}>;tag={call.remote_tag}",
-        )
-        request = build_request("ACK", call.target_uri, headers)
-        await self._send(request, wait_response=False, timeout=None)
-
-    async def _finalize_call(
-        self, call: Call, message: SIPMessage, *, by_remote: bool
+    async def ack(
+        self,
+        to_uri: Optional[str] = None,
+        from_uri: Optional[str] = None,
+        response: Optional[Response] = None,
+        **kwargs,
     ) -> None:
-        if call.state != CallState.TERMINATED:
-            call.fsm.advance_to(CallState.TERMINATED)
-        call.terminated_at = call.terminated_at or _now()
-        call.terminated_by = call.terminated_by or ("remote" if by_remote else "local")
-        await self._emit_event(
-            "CallHangup",
-            CallHangupEvent(
-                name="CallHangup",
-                client=self,
-                message=message,
-                call=call,
-                by_remote=by_remote,
-            ),
-        )
-
-    # ------------------------------------------------------------------
-    # Incoming requests
-    # ------------------------------------------------------------------
-    async def _handle_request(self, message: SIPMessage, addr: Addr) -> None:
-        method = (message.method or "").upper()
-        if method == "BYE":
-            await self._handle_remote_bye(message, addr)
-        elif method == "OPTIONS":
-            await self._respond_simple(
-                message,
-                addr,
-                200,
-                "OK",
-                {
-                    "Allow": "INVITE, ACK, CANCEL, OPTIONS, BYE, INFO, MESSAGE",
-                    "Accept": "application/sdp, application/dtmf-relay, text/plain",
-                },
+        """Send ACK request (async)."""
+        if response and response.request:
+            original_request = response.request
+            headers = kwargs.pop("headers", {})
+            headers["From"] = original_request.headers.get("From")
+            headers["To"] = response.headers.get("To")
+            headers["Call-ID"] = original_request.headers.get("Call-ID")
+            headers["CSeq"] = original_request.headers.get("CSeq", "1 INVITE").replace(
+                "INVITE", "ACK"
             )
-        elif method in {"ACK", "CANCEL"}:
-            await self._respond_simple(message, addr, 200, "OK")
-        else:
-            await self._respond_simple(message, addr, 501, "Not Implemented")
+            headers["Via"] = original_request.headers.get("Via")
 
-    async def _handle_remote_bye(self, message: SIPMessage, addr: Addr) -> None:
-        call_id = message.get("Call-ID")
-        call = self._calls.get(call_id, None) if call_id else None
-        if call:
-            if call.state != CallState.TERMINATED:
-                call.fsm.advance_to(CallState.TERMINATED)
-            call.terminated_at = call.terminated_at or _now()
-            already_remote = call.terminated_by == "remote"
-            call.terminated_by = "remote"
-            if not already_remote:
-                await self._emit_event(
-                    "CallHangup",
-                    CallHangupEvent(
-                        name="CallHangup",
-                        client=self,
-                        message=message,
-                        call=call,
-                        by_remote=True,
-                    ),
-                )
-        await self._respond_simple(message, addr, 200, "OK")
+            to_uri = to_uri or original_request.uri
+            await self.request("ACK", to_uri, headers=headers, **kwargs)
 
-    async def _respond_simple(
+    async def bye(
         self,
-        request: SIPMessage,
-        addr: Addr,
-        status_code: int,
-        reason: str,
-        extra_headers: Optional[Dict[str, str]] = None,
-    ) -> None:
-        headers = SIPHeaders(
-            [
-                ("Via", request.get("Via", "")),
-                ("From", request.get("From", "")),
-                ("To", request.get("To", "")),
-                ("Call-ID", request.get("Call-ID", "")),
-                ("CSeq", request.get("CSeq", "")),
-                ("Server", self.user_agent),
-            ]
+        to_uri: Optional[str] = None,
+        from_uri: Optional[str] = None,
+        dialog_info: Optional[dict] = None,
+        **kwargs,
+    ) -> Response:
+        """Send BYE request (async)."""
+        if from_uri is None:
+            from_uri = self._get_default_from_uri()
+
+        headers = kwargs.pop("headers", {})
+        if dialog_info:
+            headers["From"] = dialog_info.get("local_tag")
+            headers["To"] = dialog_info.get("remote_tag")
+            headers["Call-ID"] = dialog_info.get("call_id")
+
+        return await self.request("BYE", to_uri, headers=headers, **kwargs)
+
+    async def cancel(self, original_request: Request, **kwargs) -> Response:
+        """Send CANCEL request (async)."""
+        headers = kwargs.pop("headers", {})
+        headers["From"] = original_request.headers.get("From")
+        headers["To"] = original_request.headers.get("To")
+        headers["Call-ID"] = original_request.headers.get("Call-ID")
+        headers["Via"] = original_request.headers.get("Via")
+        headers["CSeq"] = original_request.headers.get("CSeq", "1 INVITE").replace(
+            "INVITE", "CANCEL"
         )
-        if extra_headers:
-            headers.update(extra_headers.items())
-        response = build_response(status_code, reason, headers)
-        if not self._transport:
+        return await self.request(
+            "CANCEL", original_request.uri, headers=headers, **kwargs
+        )
+
+    async def message(
+        self,
+        to_uri: str,
+        from_uri: Optional[str] = None,
+        content: str = "",
+        content_type: str = "text/plain",
+        **kwargs,
+    ) -> Response:
+        """Send MESSAGE request (async)."""
+        if from_uri is None:
+            from_uri = self._get_default_from_uri()
+
+        headers = kwargs.pop("headers", {})
+        headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
+        headers["To"] = f"<{to_uri}>"
+        headers["Content-Type"] = content_type
+        headers["Content-Length"] = str(len(content))
+
+        return await self.request(
+            "MESSAGE", to_uri, headers=headers, body=content, **kwargs
+        )
+
+    async def subscribe(self, uri: str, event: str = "presence", **kwargs) -> Response:
+        """Send SUBSCRIBE request (async)."""
+        headers = kwargs.pop("headers", {})
+        headers["Event"] = event
+        return await self.request("SUBSCRIBE", uri, headers=headers, **kwargs)
+
+    async def notify(self, uri: str, event: str = "presence", **kwargs) -> Response:
+        """Send NOTIFY request (async)."""
+        headers = kwargs.pop("headers", {})
+        headers["Event"] = event
+        return await self.request("NOTIFY", uri, headers=headers, **kwargs)
+
+    async def refer(self, uri: str, refer_to: str, **kwargs) -> Response:
+        """Send REFER request (async)."""
+        headers = kwargs.pop("headers", {})
+        headers["Refer-To"] = f"<{refer_to}>"
+        return await self.request("REFER", uri, headers=headers, **kwargs)
+
+    async def info(self, uri: str, **kwargs) -> Response:
+        """Send INFO request (async)."""
+        return await self.request("INFO", uri, **kwargs)
+
+    async def update(self, uri: str, **kwargs) -> Response:
+        """Send UPDATE request (async)."""
+        return await self.request("UPDATE", uri, **kwargs)
+
+    async def prack(self, response: Response, **kwargs) -> Response:
+        """Send PRACK request (async)."""
+        if not response or not response.request:
+            raise ValueError("PRACK requires a provisional response with request")
+
+        headers = kwargs.pop("headers", {})
+        rack_value = f"{response.headers.get('RSeq', '1')} {response.headers.get('CSeq', '1 INVITE')}"
+        headers["RAck"] = rack_value
+        return await self.request(
+            "PRACK", response.request.uri, headers=headers, **kwargs
+        )
+
+    async def publish(self, uri: str, event: str = "presence", **kwargs) -> Response:
+        """Send PUBLISH request (async)."""
+        headers = kwargs.pop("headers", {})
+        headers["Event"] = event
+        return await self.request("PUBLISH", uri, headers=headers, **kwargs)
+
+    async def close(self):
+        """Close the client and cleanup resources."""
+        if self._closed:
             return
-        await self._transport.send(response, addr, wait_response=False, timeout=None)
+        self._closed = True
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-    def _ensure_started(self) -> None:
-        if not self._started:
-            raise RuntimeError(
-                "Client not started; use 'async with Client(...)' or await start()"
-            )
-
-    def _next_cseq(self) -> int:
-        value = self._cseq
-        self._cseq += 1
-        return value
-
-    def _generate_call_id(self) -> str:
-        host = self._assert_via_host()
-        return f"{uuid.uuid4().hex}@{host}"
-
-    def _generate_tag(self) -> str:
-        return uuid.uuid4().hex[:8]
-
-    def _generate_branch(self) -> str:
-        return f"z9hG4bK{uuid.uuid4().hex[:8]}"
-
-    def _via_header(self, branch: str) -> str:
-        host = self._assert_via_host()
-        return f"SIP/2.0/{self.protocol} {host}:{self.local_address[1]};branch={branch}"
-
-    def _base_headers(
-        self,
-        *,
-        method: str,
-        uri: str,
-        call_id: str,
-        from_tag: str,
-        cseq: int,
-        branch: Optional[str] = None,
-        override_via: Optional[str] = None,
-        to_override: Optional[str] = None,
-    ) -> SIPHeaders:
-        self._ensure_started()
-        via_value = override_via or self._via_header(branch or self._generate_branch())
-        display = f'"{self.display_name}" ' if self.display_name else ""
-        from_value = f"{display}<{self.local_uri}>;tag={from_tag}"
-        to_value = to_override or f"<{uri}>"
-        headers = SIPHeaders(
-            [
-                ("Via", via_value),
-                ("Max-Forwards", "70"),
-                ("From", from_value),
-                ("To", to_value),
-                ("Call-ID", call_id),
-                ("CSeq", f"{cseq} {method}"),
-                ("Contact", f"<{self.local_uri}>"),
-                ("User-Agent", self.user_agent),
-            ]
-        )
-        return headers
-
-    def _assert_via_host(self) -> str:
-        if not self._via_host:
-            raise RuntimeError("Client not started")
-        return self._via_host
-
-    def _empty_ok(self) -> str:
-        return "SIP/2.0 200 OK\r\nContent-Length: 0\r\n\r\n"
-
-    def _determine_local_host(self, bound: Addr) -> str:
-        host = bound[0]
-        if host not in {"0.0.0.0", "::"}:
-            return host
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-                sock.connect(self.addr)
-                host = sock.getsockname()[0]
-        except OSError:
+        # Cancel re-registration task if active
+        if self._reregister_task:
+            self._reregister_task.cancel()
             try:
-                host = socket.gethostbyname(socket.gethostname())
-            except OSError:
-                host = "127.0.0.1"
-        return host
+                await self._reregister_task
+            except asyncio.CancelledError:
+                pass
+            self._reregister_task = None
 
+        await asyncio.to_thread(self._transport.close)
 
-__all__ = [
-    "Client",
-    "Call",
-    "CallEvent",
-    "CallHangupEvent",
-    "OptionResponseEvent",
-    "SDPNegotiatedEvent",
-]
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.close()
+        return False
+
+    @property
+    def transport(self) -> str:
+        """Get transport protocol."""
+        return self.transport_protocol
+
+    @property
+    def local_address(self) -> TransportAddress:
+        """Get local transport address."""
+        return self._transport.local_address
+
+    @property
+    def is_closed(self) -> bool:
+        """Check if client is closed."""
+        return self._closed
+
+    def enable_auto_reregister(
+        self,
+        aor: str,
+        interval: int,
+        callback: Optional[Callable[[Response], None]] = None,
+    ) -> None:
+        """
+        Enable automatic re-registration (async version).
+
+        Args:
+            aor: Address of Record to register
+            interval: Re-registration interval in seconds (should be < expires)
+            callback: Optional callback function called after each registration
+
+        Example:
+            >>> async def on_register(response):
+            ...     print(f"Re-registered: {response.status_code}")
+            >>> client.enable_auto_reregister(
+            ...     aor="sip:alice@domain.com",
+            ...     interval=300,
+            ...     callback=on_register
+            ... )
+        """
+        self._reregister_aor = aor
+        self._reregister_interval = interval
+        self._reregister_callback = callback
+
+        # Cancel existing task
+        if self._reregister_task:
+            self._reregister_task.cancel()
+
+        # Start re-registration task
+        self._reregister_task = asyncio.create_task(self._reregister_loop())
+
+    def disable_auto_reregister(self) -> None:
+        """Disable automatic re-registration."""
+        if self._reregister_task:
+            self._reregister_task.cancel()
+            self._reregister_task = None
+        self._reregister_aor = None
+        self._reregister_interval = None
+        self._reregister_callback = None
+
+    async def _reregister_loop(self) -> None:
+        """Re-registration loop (runs as background task)."""
+        while not self._closed and self._reregister_aor and self._reregister_interval:
+            try:
+                # Wait for interval
+                await asyncio.sleep(self._reregister_interval)
+
+                # Calculate expires
+                expires = self._reregister_interval + 30
+
+                # Send REGISTER
+                response = await self.register(
+                    aor=self._reregister_aor, expires=expires
+                )
+
+                # Handle auth challenge
+                if response and response.status_code in (401, 407):
+                    response = await self.retry_with_auth(response)
+
+                # Call callback if provided
+                if self._reregister_callback and response:
+                    try:
+                        if asyncio.iscoroutinefunction(self._reregister_callback):
+                            await self._reregister_callback(response)
+                        else:
+                            self._reregister_callback(response)
+                    except Exception as e:
+                        logger.error(f"Re-register callback error: {e}")
+
+                if not response or response.status_code != 200:
+                    logger.warning(
+                        f"Re-registration failed: {response.status_code if response else 'No response'}"
+                    )
+                    # Retry after shorter interval on failure
+                    await asyncio.sleep(30)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Re-registration error: {e}")
+                # Retry after shorter interval on error
+                await asyncio.sleep(30)
+
+    async def unregister(self, aor: str, **kwargs) -> Response:
+        """
+        Unregister (send REGISTER with Expires: 0).
+
+        Args:
+            aor: Address of Record to unregister
+            **kwargs: Additional arguments passed to register()
+
+        Returns:
+            Response object
+        """
+        # Disable auto re-registration if it was set for this AOR
+        if self._reregister_aor == aor:
+            self.disable_auto_reregister()
+
+        return await self.register(aor=aor, expires=0, **kwargs)
+
+    def __repr__(self):
+        return f"AsyncClient(local={self.local_address}, transport={self.transport_protocol})"
