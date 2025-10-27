@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "sipx"
 version = "0.0.3"
@@ -21,3 +25,14 @@ dev = [
     "taskipy>=1.14.1",
     "ty>=0.0.1a20",
 ]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sipx*"]
+exclude = ["docker*", "docs*", "examples*", "tests*"]
+
+[tool.setuptools.package-data]
+sipx = ["py.typed"]
