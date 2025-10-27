@@ -193,7 +193,7 @@ Content-Length: 0
 │          │ Invite Answer             │ ✅ PASS    │
 │          │ Early Media               │ ✅ PASS    │
 │          │ Unregister                │ ✅ PASS    │
-│ 3333     │ Options Rejected          │ ❌ FAIL    │
+│ 3333     │ Options Rejected          │ ❌ FAIL     │
 │          │ Invalid Creds             │ ✅ PASS    │
 │          │ Register Valid            │ ✅ PASS    │
 │          │ Invite                    │ ✅ PASS    │
@@ -202,7 +202,7 @@ Content-Length: 0
 ╰──────────┴───────────────────────────┴────────────╯
 
 ╭────────────────────────╮
-│ ⚠️  SOME TESTS FAILED   │
+│ ⚠️  SOME TESTS FAILED  │
 │ 15/16 passed, 1 failed │
 ╰────────────────────────╯
 ```
@@ -496,7 +496,7 @@ class DemoEvents(Events):
     @event_handler("request")
     def on_request(self, request, context):
         # Rich formatted output
-        
+
     @event_handler("response")
     def on_response(self, response, context):
         # Rich formatted output
@@ -506,10 +506,10 @@ def test_user_1111() -> dict:
     # Cria cliente
     # Executa testes
     # Retorna resultados
-    
+
 def test_user_2222() -> dict:
     # ...
-    
+
 def test_user_3333() -> dict:
     # ...
 
@@ -548,7 +548,7 @@ class DemoEvents(Events):
     @event_handler("response")
     def on_response(self, response: Response, context: RequestContext):
         self.responses.append(response)
-        
+
         if response.status_code == 183:
             self.early_media_detected = True
             console.print("[magenta]🎵 Early Media (183 Session Progress)[/magenta]")
@@ -833,7 +833,7 @@ MIT License - Veja LICENSE no diretório raiz do projeto.
 
 ---
 
-**Última atualização**: 27 de Outubro de 2025  
-**Versão do Demo**: 2.0.0  
-**Status**: ✅ Produção  
+**Última atualização**: 27 de Outubro de 2025
+**Versão do Demo**: 2.0.0
+**Status**: ✅ Produção
 **Compatibilidade**: Python 3.12+, Asterisk 18+
