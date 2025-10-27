@@ -95,7 +95,6 @@ from ._utility import (
 # Authentication handlers
 from ._auth import (
     AuthenticationHandler,
-    LegacyAuthHandler,
 )
 
 # Response handlers
@@ -144,7 +143,6 @@ __all__ = [
     "TimeoutHandler",
     # Authentication
     "AuthenticationHandler",
-    "LegacyAuthHandler",
     # Response
     "ResponseCategory",
     "ProvisionalResponseHandler",
@@ -163,4 +161,3 @@ __all__ = [
     # Composite
     "SipFlowHandler",
 ]
-

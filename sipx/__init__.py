@@ -26,7 +26,6 @@ from ._handlers import (
     TimeoutHandler,
     # Authentication
     AuthenticationHandler,
-    LegacyAuthHandler as AuthHandler,  # Backwards compatibility
     # Response handlers
     ResponseCategory,
     ProvisionalResponseHandler,
@@ -216,7 +215,6 @@ __all__ = [
     "TimeoutHandler",
     # Handlers - Authentication
     "AuthenticationHandler",
-    "AuthHandler",  # Legacy
     # Handlers - Response
     "ResponseCategory",
     "ProvisionalResponseHandler",

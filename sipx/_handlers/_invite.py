@@ -202,4 +202,3 @@ class InviteFlowHandler(EventHandler):
         if call_id in self._invite_states:
             del self._invite_states[call_id]
             logger.debug(f"Cleaned up INVITE state for Call-ID: {call_id}")
-

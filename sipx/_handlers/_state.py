@@ -339,4 +339,3 @@ class DialogStateHandler(EventHandler):
         if dialog_id in self._dialogs:
             del self._dialogs[dialog_id]
             logger.debug(f"Cleaned up dialog: {dialog_id[:40]}...")
-

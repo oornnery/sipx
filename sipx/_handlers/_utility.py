@@ -181,4 +181,3 @@ class TimeoutHandler(EventHandler):
         """Handle timeout errors."""
         if isinstance(error, TimeoutError):
             logger.error(f"Request timed out after {self.default_timeout}s")
-

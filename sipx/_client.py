@@ -265,11 +265,18 @@ class Client:
             if context.metadata.get(
                 "needs_auth"
             ) and self._auth_handler.should_authenticate(response):
-                # Find AuthHandler credentials from event handlers
+                # Find AuthenticationHandler credentials from event handlers
                 handler_credentials = None
                 for handler in self.handlers._handlers:
-                    if hasattr(handler, "username") and hasattr(handler, "password"):
-                        # Convert old AuthHandler to SipAuthCredentials
+                    # Check if it's an AuthenticationHandler with credentials
+                    if (
+                        hasattr(handler, "default_credentials")
+                        and handler.default_credentials
+                    ):
+                        handler_credentials = handler.default_credentials
+                        break
+                    # Legacy support: check for old username/password attributes
+                    elif hasattr(handler, "username") and hasattr(handler, "password"):
                         handler_credentials = SipAuthCredentials(
                             username=handler.username,
                             password=handler.password,

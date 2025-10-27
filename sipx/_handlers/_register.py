@@ -228,4 +228,3 @@ class RegisterFlowHandler(EventHandler):
         if aor in self._register_states:
             del self._register_states[aor]
             logger.debug(f"Cleaned up REGISTER state for AOR: {aor}")
-

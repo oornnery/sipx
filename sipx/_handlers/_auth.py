@@ -43,6 +43,38 @@ class AuthenticationHandler(EventHandler):
         """
         self.default_credentials = credentials
 
+    def on_response(self, response: Response, context: EventContext) -> Response:
+        """
+        Handle authentication challenges (401/407).
+
+        This method detects authentication challenges and sets metadata
+        so the Client can trigger an auth retry.
+
+        Args:
+            response: SIP response
+            context: Event context
+
+        Returns:
+            Original response (unmodified)
+        """
+        from .._models._auth import AuthParser
+
+        if response.status_code in (401, 407):
+            # Parse challenge
+            parser = AuthParser()
+            challenge = parser.parse_from_headers(response.headers)
+
+            if challenge:
+                # Signal that auth retry should happen
+                context.metadata["needs_auth"] = True
+                context.metadata["auth_challenge"] = challenge
+
+                logger.debug(
+                    f"Authentication challenge received: {response.status_code}"
+                )
+
+        return response
+
     def should_authenticate(self, response: Response) -> bool:
         """
         Check if response requires authentication.
@@ -271,77 +303,3 @@ class AuthenticationHandler(EventHandler):
         except Exception as e:
             logger.error(f"Authentication retry failed: {e}")
             return None
-
-
-class LegacyAuthHandler(EventHandler):
-    """
-    Legacy authentication handler for backwards compatibility.
-
-    This handler provides the old username/password interface and stores
-    challenges for manual authentication. New code should use
-    AuthenticationHandler with SipAuthCredentials instead.
-    """
-
-    def __init__(self, username: str, password: str):
-        """
-        Initialize legacy auth handler.
-
-        Args:
-            username: SIP username
-            password: SIP password
-        """
-        self.username = username
-        self.password = password
-        self._challenges: dict = {}
-
-    def on_response(self, response: Response, context: EventContext) -> Response:
-        """Handle 401/407 authentication challenges."""
-        from .._models._auth import AuthParser
-
-        if response.status_code in (401, 407):
-            # Parse challenge
-            parser = AuthParser()
-            challenge = parser.parse_from_headers(response.headers)
-
-            if challenge and response.request:
-                # Store challenge for retry
-                request_id = id(response.request)
-                self._challenges[request_id] = challenge
-
-                # Signal that auth retry should happen
-                context.metadata["needs_auth"] = True
-                context.metadata["auth_challenge"] = challenge
-
-                logger.debug(
-                    f"Authentication challenge received: {response.status_code}"
-                )
-
-        return response
-
-    def on_request(self, request: Request, context: EventContext) -> Request:
-        """Add authentication to requests if challenge was received."""
-        from .._models._auth import DigestCredentials
-
-        # Check if we have a challenge for this request
-        request_id = id(request)
-        challenge = self._challenges.get(request_id)
-
-        if challenge:
-            # Create credentials
-            credentials = DigestCredentials(
-                username=self.username,
-                password=self.password,
-            )
-
-            # Add authorization header
-            try:
-                request.add_authorization(
-                    credentials=credentials,
-                    challenge=challenge,
-                    entity_body=request.content if request.content else None,
-                )
-                logger.debug("Added authorization header to request")
-            except Exception as e:
-                logger.warning(f"Failed to add authorization: {e}")
-
-        return request

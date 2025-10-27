@@ -268,4 +268,3 @@ class ResponseFilterHandler(EventHandler):
             self.callback(response, context)
 
         return response
-

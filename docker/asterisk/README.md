@@ -69,6 +69,23 @@ Disque `400` para ouvir o horário
 ### Chamadas Entre Extensões
 Disque `2222` ou `3333` para chamar outros usuários
 
+## ⚠️ Notas Importantes
+
+### Autenticação em OPTIONS
+Por padrão, o Asterisk/PJSIP **requer autenticação para OPTIONS**. Isso é o comportamento correto segundo RFC 3261. Certifique-se de adicionar o `AuthenticationHandler` ao seu cliente:
+
+```python
+from sipx import Client, SipAuthCredentials
+from sipx._handlers import AuthenticationHandler
+
+credentials = SipAuthCredentials(username="1111", password="1111xxx")
+client = Client()
+client.add_handler(AuthenticationHandler(credentials))
+
+# OPTIONS agora funcionará com retry automático
+response = client.options(uri="sip:127.0.0.1", host="127.0.0.1")
+```
+
 ## 📊 Monitoramento
 
 ### Ver chamadas ativas
@@ -171,27 +188,30 @@ print(f"Registro: {response.status_code} {response.reason}")
 ### Exemplo 2: Chamada para Echo Test
 
 ```python
-from sipx import Client
+from sipx import Client, SipAuthCredentials
+from sipx._handlers import AuthenticationHandler
 
-client = Client(
-    server="127.0.0.1",
-    port=5060,
-    username="1111",
-    password="1111xxx",
-    domain="127.0.0.1"
-)
+credentials = SipAuthCredentials(username="1111", password="1111xxx")
+
+client = Client()
+client.add_handler(AuthenticationHandler(credentials))
 
 # Registrar
-client.register()
+client.register(aor="sip:1111@127.0.0.1", registrar="127.0.0.1")
 
 # Chamar extensão de echo (100)
-response = client.invite("100")
-print(f"INVITE: {response.status_code} {response.reason}")
+response = client.invite(
+    to_uri="sip:100@127.0.0.1",
+    from_uri="sip:1111@127.0.0.1",
+    host="127.0.0.1"
+)
+print(f"INVITE: {response.status_code} {response.reason_phrase}")
 
 # Aguardar um pouco e desligar
 import time
 time.sleep(5)
 client.bye()
+client.close()
 ```
 
 ### Exemplo 3: Chamada Entre Extensões

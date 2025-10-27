@@ -7,7 +7,7 @@ for building custom SIP event handlers.
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 
