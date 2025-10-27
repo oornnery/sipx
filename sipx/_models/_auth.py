@@ -56,6 +56,88 @@ class SipAuthCredentials:
 
 
 # ============================================================================
+# Simplified Auth API
+# ============================================================================
+
+
+class Auth:
+    """
+    Simplified authentication interface for SIP clients.
+
+    This class provides static factory methods for creating authentication
+    credentials that can be easily assigned to a Client instance.
+
+    Example:
+        >>> from sipx import Client, Auth
+        >>> with Client() as client:
+        ...     client.auth = Auth.Digest('alice', 'secret')
+        ...     response = client.register('sip:alice@example.com')
+    """
+
+    @staticmethod
+    def Digest(
+        username: str,
+        password: str,
+        realm: str | None = None,
+        display_name: str | None = None,
+        user_agent: str | None = None,
+    ) -> SipAuthCredentials:
+        """
+        Create digest authentication credentials.
+
+        Digest authentication is the standard authentication mechanism for SIP
+        (RFC 2617, RFC 3261). It provides secure challenge-response authentication
+        without sending passwords in plaintext.
+
+        Args:
+            username: SIP username/identity (e.g., 'alice', '1001')
+            password: Plain text password for authentication
+            realm: Authentication realm (optional, server will provide in challenge)
+            display_name: Display name for From header (optional, e.g., 'Alice Smith')
+            user_agent: User-Agent header value (optional, e.g., 'MyApp/1.0')
+
+        Returns:
+            SipAuthCredentials instance configured for digest authentication
+
+        Example:
+            >>> auth = Auth.Digest('alice', 'secret')
+            >>> client.auth = auth
+        """
+        return SipAuthCredentials(
+            username=username,
+            password=password,
+            realm=realm,
+            display_name=display_name,
+            user_agent=user_agent,
+        )
+
+    @staticmethod
+    def generate_challenge(response) -> str:
+        """
+        Generate authentication challenge from a 401/407 response.
+
+        This is a helper method for advanced use cases where you need to
+        manually parse and handle authentication challenges.
+
+        Args:
+            response: SIP Response with status 401 or 407
+
+        Returns:
+            WWW-Authenticate or Proxy-Authenticate header value
+
+        Example:
+            >>> response = client.invite(...)
+            >>> if response.status_code == 401:
+            ...     challenge = Auth.generate_challenge(response)
+            ...     print(f"Server challenge: {challenge}")
+        """
+        if response.status_code == 407:
+            return response.headers.get("Proxy-Authenticate", "")
+        else:  # 401 or other
+            return response.headers.get("WWW-Authenticate", "")
+
+
+# ============================================================================
 # Base Classes
 # ============================================================================
 

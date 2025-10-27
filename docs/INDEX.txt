@@ -1,0 +1,37 @@
+SIPX Documentation Structure
+============================
+
+docs/
+├── README.md                    [354 lines] - Índice principal, onde começar
+├── QUICK_START.md              [685 lines] - Guia de início rápido
+├── ARCHITECTURE.md            [1116 lines] - Arquitetura completa
+├── MODULES.md                  [969 lines] - Documentação de módulos
+└── GUIA_WSL_ASTERISK.md       [271 lines] - Guia WSL/Docker (PT-BR)
+
+examples/
+└── README.md                   [838 lines] - Guia de exemplos práticos
+
+docker/asterisk/
+└── README.md                   [516 lines] - Asterisk Docker setup
+
+Total: 4,749 lines of documentation
+
+Quick Links
+===========
+
+New to SIPX?
+→ docs/QUICK_START.md
+
+Want to understand internals?
+→ docs/ARCHITECTURE.md
+→ docs/MODULES.md
+
+Need examples?
+→ examples/README.md
+→ uv run examples/asterisk_demo.py
+
+Setup Asterisk?
+→ docker/asterisk/README.md
+
+WSL/Windows users?
+→ docs/GUIA_WSL_ASTERISK.md

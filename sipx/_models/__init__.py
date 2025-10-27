@@ -5,6 +5,7 @@ This package contains models for SIP messages, headers, and body content.
 """
 
 from ._auth import (
+    Auth,
     AuthMethod,
     AuthParser,
     Challenge,
@@ -16,22 +17,8 @@ from ._auth import (
 )
 from ._body import (
     BodyParser,
-    ConferenceInfoBody,
-    DialogInfoBody,
-    DTMFBody,
-    DTMFRelayBody,
-    HTMLBody,
-    ISUPBody,
     MessageBody,
-    MultipartBody,
-    PIDFBody,
-    RawBody,
-    ResourceListsBody,
     SDPBody,
-    SimpleMsgSummaryBody,
-    SIPFragBody,
-    TextBody,
-    XMLBody,
 )
 from ._header import HeaderContainer, HeaderParser, Headers
 from ._message import MessageParser, Request, Response, SIPMessage
@@ -50,6 +37,8 @@ __all__ = [
     "Response",
     # Messages - Parser
     "MessageParser",
+    # Authentication - Simplified API
+    "Auth",
     # Authentication - Base classes
     "AuthMethod",
     "Challenge",
@@ -66,18 +55,4 @@ __all__ = [
     "MessageBody",
     "BodyParser",
     "SDPBody",
-    "TextBody",
-    "HTMLBody",
-    "DTMFRelayBody",
-    "DTMFBody",
-    "SIPFragBody",
-    "XMLBody",
-    "PIDFBody",
-    "ConferenceInfoBody",
-    "DialogInfoBody",
-    "ResourceListsBody",
-    "ISUPBody",
-    "SimpleMsgSummaryBody",
-    "RawBody",
-    "MultipartBody",
 ]

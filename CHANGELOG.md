@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.3] - 2025-01-XX
+
+### Fixed
+
+- **Type Hints**: Fixed undefined name errors in `_types.py`
+  - Added forward references for `Transaction` and `Dialog` classes in `TYPE_CHECKING` block
+  - Resolved F821 lint errors for `TransactionCallback` and `DialogCallback` type aliases
+
+### Changed
+
+- **Code Quality**: All lint checks now pass cleanly
+  - Fixed Ruff linting errors
+  - Maintained code formatting standards
+
+### Documentation
+
+- Improved type safety and IDE support with proper forward references
+
+---
+
 ## [0.2.0] - 2024
 
 ### Major Refactoring - Complete Architecture Overhaul
@@ -223,5 +243,6 @@ if isinstance(response.body, SDPBody):
 
 ---
 
+[0.0.3]: https://github.com/yourusername/sipx/compare/v0.2.0...v0.0.3
 [0.2.0]: https://github.com/yourusername/sipx/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yourusername/sipx/releases/tag/v0.1.0

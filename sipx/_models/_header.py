@@ -351,7 +351,7 @@ class Headers(HeaderContainer):
         """
         Serialize headers to raw bytes format for SIP messages.
 
-        Returns headers in the format:
+        Returns headers in RFC 3261 order:
             Header-Name: value\r\n
             Another-Header: value\r\n
 
@@ -362,12 +362,11 @@ class Headers(HeaderContainer):
             Serialized headers as bytes
         """
         enc = encoding or self._encoding
-        lines = []
-        for name, value in self.items():
-            lines.append(f"{name}: {value}".encode(enc))
+        lines = self.to_lines()  # Use RFC 3261 ordering
         if not lines:
             return b""
-        return EOL.encode(enc).join(lines) + EOL.encode(enc)
+        encoded_lines = [line.encode(enc) for line in lines]
+        return EOL.encode(enc).join(encoded_lines) + EOL.encode(enc)
 
 
 # ============================================================================

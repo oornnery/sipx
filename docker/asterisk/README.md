@@ -1,13 +1,17 @@
 # Asterisk Docker para Testes SIPX
 
-Container Docker com Asterisk configurado para testar sua biblioteca SIPX.
+Container Docker com Asterisk configurado para testar a biblioteca SIPX com 3 políticas de autenticação diferentes.
+
+**Versão**: 2.0.0  
+**Asterisk**: 18+  
+**Status**: ✅ Produção
 
 ## 🚀 Como Usar
 
 ### 1. Build e Start
 
 ```bash
-cd asterisk-docker
+cd docker/asterisk
 docker-compose up -d --build
 ```
 
@@ -34,23 +38,63 @@ pjsip show contacts
 
 ## 📞 Usuários Configurados
 
-| Username | Password | Contexto |
-|----------|----------|----------|
-| 1111     | 1111xxx  | sipx-test |
-| 2222     | 2222xxx  | sipx-test |
-| 3333     | 3333xxx  | sipx-test |
+### Políticas de Autenticação
+
+Este setup possui **3 usuários com políticas diferentes** para testar diversos cenários de autenticação:
+
+| Username | Password | Política | Porta Cliente | Contexto |
+|----------|----------|----------|---------------|----------|
+| **1111** | 1111xxx  | 🔐 **Auth para TODOS os métodos** | 5061 | sipx-test |
+| **2222** | 2222xxx  | 🔓 **OPTIONS sem auth, outros com auth** | 5062 | sipx-test |
+| **3333** | 3333xxx  | 🚫 **OPTIONS rejeitado, strict security** | 5063 | sipx-test |
+
+### Detalhes das Políticas
+
+#### 🔐 Usuário 1111 - Autenticação Completa
+- Requer autenticação para **todos** os métodos (OPTIONS, REGISTER, INVITE)
+- Ideal para testar fluxo completo de autenticação
+- Usado para testar `retry_with_auth()` em todos os cenários
+
+#### 🔓 Usuário 2222 - OPTIONS Aberto (Relaxed)
+- **OPTIONS**: Aceita sem autenticação (para health checks)
+- **REGISTER/INVITE**: Requer autenticação
+- Ideal para testar servidores que permitem OPTIONS sem credenciais
+- Usado para testar:
+  - INVITE com late offer (SDP answer)
+  - Early media detection (183 Session Progress)
+  - Codec negotiation
+
+#### 🚫 Usuário 3333 - Segurança Restritiva (Paranoid)
+- **OPTIONS**: Rejeitado (403 Forbidden)
+- **REGISTER/INVITE**: Requer autenticação
+- Ideal para testar:
+  - Credenciais inválidas (403)
+  - Políticas de segurança estritas
+  - Auto re-registration com threading
+  - Handling de rejeições
 
 ## 🔧 Configuração do Cliente SIPX
 
-Atualize seu `demo.py` para usar o Asterisk local:
+### Exemplo Básico
 
 ```python
-SIP_SERVER = "127.0.0.1"  # ou IP da máquina
-SIP_PORT = 5060
-SIP_USERNAME = "1111"
-SIP_PASSWORD = "1111xxx"
-SIP_DOMAIN = "127.0.0.1"
+from sipx import Client, Auth
+
+# Credenciais
+auth = Auth.Digest(username="1111", password="1111xxx")
+
+# Cliente (use porta diferente de 5060!)
+with Client(local_port=5061, auth=auth) as client:
+    response = client.register(aor="sip:1111@127.0.0.1")
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
+    print(f"Status: {response.status_code}")
 ```
+
+**Importante**: 
+- Cliente usa porta **5061+** (não 5060)
+- Servidor Asterisk usa porta **5060**
+- Evita conflito "Address already in use"
 
 ## 🧪 Testes Disponíveis
 
@@ -66,25 +110,35 @@ Disque `300` para ouvir mensagem de voicemail
 ### Time Announcement
 Disque `400` para ouvir o horário
 
+### Conference Room
+Disque `500` para entrar em sala de conferência
+
 ### Chamadas Entre Extensões
-Disque `2222` ou `3333` para chamar outros usuários
+Disque `1111`, `2222` ou `3333` para chamar outros usuários
 
 ## ⚠️ Notas Importantes
 
-### Autenticação em OPTIONS
-Por padrão, o Asterisk/PJSIP **requer autenticação para OPTIONS**. Isso é o comportamento correto segundo RFC 3261. Certifique-se de adicionar o `AuthenticationHandler` ao seu cliente:
+### Portas
+
+- **Asterisk Docker**: Porta `5060` (UDP/TCP)
+- **Cliente SIPX**: Use portas `5061`, `5062`, `5063` etc
+- **Motivo**: Evitar conflito "Address already in use"
+
+### Autenticação
+
+A biblioteca SIPX v2.0 usa **autenticação manual explícita**:
 
 ```python
-from sipx import Client, SipAuthCredentials
-from sipx._handlers import AuthenticationHandler
+# Enviar request
+response = client.register(aor="sip:1111@127.0.0.1")
 
-credentials = SipAuthCredentials(username="1111", password="1111xxx")
-client = Client()
-client.add_handler(AuthenticationHandler(credentials))
-
-# OPTIONS agora funcionará com retry automático
-response = client.options(uri="sip:127.0.0.1", host="127.0.0.1")
+# Verificar se precisa autenticação
+if response.status_code == 401:
+    # Retry com autenticação
+    response = client.retry_with_auth(response)
 ```
+
+**Não há retry automático** - você controla quando e como autenticar.
 
 ## 📊 Monitoramento
 
@@ -167,92 +221,214 @@ core restart now              # Reinicia Asterisk
 
 ## 🧪 Testando com SIPX
 
+### Demo Completo (Recomendado) ⭐
+
+Execute o demo completo com interface Rich que testa todos os 3 usuários:
+
+```bash
+uv run examples/asterisk_demo.py
+```
+
+**Este demo executa 16 testes**:
+
+#### User 1111 (5 testes)
+- ✅ OPTIONS com autenticação
+- ✅ REGISTER (expires=3600)
+- ✅ REGISTER update (expires=1800)
+- ✅ INVITE com create_offer (early offer)
+- ✅ UNREGISTER
+
+#### User 2222 (5 testes)
+- ✅ OPTIONS sem autenticação
+- ✅ REGISTER
+- ✅ INVITE com create_answer (late offer)
+- ✅ Early media detection (183)
+- ✅ UNREGISTER
+
+#### User 3333 (6 testes)
+- ❌ OPTIONS (deve ser rejeitado - esperado)
+- ✅ REGISTER com credenciais inválidas (deve falhar)
+- ✅ REGISTER com credenciais válidas
+- ✅ INVITE
+- ✅ Auto re-registration (5s interval)
+- ✅ UNREGISTER
+
+**Resultado esperado**: 15/16 testes passam (1 falha intencional)
+
 ### Exemplo 1: Registro Simples
 
 ```python
-from sipx import Client
+from sipx import Client, Auth
 
-client = Client(
-    server="127.0.0.1",
-    port=5060,
-    username="1111",
-    password="1111xxx",
-    domain="127.0.0.1"
-)
+auth = Auth.Digest(username="1111", password="1111xxx")
 
-# Fazer registro
-response = client.register()
-print(f"Registro: {response.status_code} {response.reason}")
+with Client(local_port=5061, auth=auth) as client:
+    # Fazer registro
+    response = client.register(aor="sip:1111@127.0.0.1")
+    
+    # Tratar autenticação
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
+    
+    print(f"Registro: {response.status_code} {response.reason_phrase}")
 ```
 
 ### Exemplo 2: Chamada para Echo Test
 
 ```python
-from sipx import Client, SipAuthCredentials
-from sipx._handlers import AuthenticationHandler
-
-credentials = SipAuthCredentials(username="1111", password="1111xxx")
-
-client = Client()
-client.add_handler(AuthenticationHandler(credentials))
-
-# Registrar
-client.register(aor="sip:1111@127.0.0.1", registrar="127.0.0.1")
-
-# Chamar extensão de echo (100)
-response = client.invite(
-    to_uri="sip:100@127.0.0.1",
-    from_uri="sip:1111@127.0.0.1",
-    host="127.0.0.1"
-)
-print(f"INVITE: {response.status_code} {response.reason_phrase}")
-
-# Aguardar um pouco e desligar
+from sipx import Client, Auth, SDPBody
 import time
-time.sleep(5)
-client.bye()
-client.close()
+
+auth = Auth.Digest(username="1111", password="1111xxx")
+
+with Client(local_port=5061, auth=auth) as client:
+    # Criar SDP offer
+    sdp_offer = SDPBody.create_offer(
+        session_name="Echo Test",
+        origin_username="1111",
+        origin_address=client.local_address.host,
+        connection_address=client.local_address.host,
+        media_specs=[{
+            "media": "audio",
+            "port": 8000,
+            "codecs": [
+                {"payload": "0", "name": "PCMU", "rate": "8000"},
+                {"payload": "8", "name": "PCMA", "rate": "8000"},
+            ]
+        }]
+    )
+    
+    # Chamar extensão 100 (echo test)
+    response = client.invite(
+        to_uri="sip:100@127.0.0.1",
+        from_uri=f"sip:1111@{client.local_address.host}",
+        body=sdp_offer.to_string(),
+        headers={"Contact": f"<sip:1111@{client.local_address.host}:5061>"}
+    )
+    
+    # Autenticação
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
+    
+    if response.status_code == 200:
+        print(f"✅ INVITE: {response.status_code}")
+        client.ack(response=response)
+        time.sleep(5)
+        client.bye(response=response)
 ```
 
-### Exemplo 3: Chamada Entre Extensões
+### Exemplo 3: Auto Re-Registration
 
-Terminal 1 (usuário 1111):
 ```python
-from sipx import Client, SIPServer
+from sipx import Client, Auth
+import time
 
-# Iniciar servidor para receber chamadas
-server = SIPServer(port=5070)
-server.start()
+auth = Auth.Digest(username="1111", password="1111xxx")
 
-# Cliente
-client = Client(
-    server="127.0.0.1",
-    port=5060,
-    username="1111",
-    password="1111xxx",
-    domain="127.0.0.1",
-    local_port=5070
-)
-client.register()
-print("Aguardando chamadas na extensão 1111...")
+with Client(local_port=5061, auth=auth) as client:
+    # Registrar inicialmente
+    response = client.register(aor="sip:1111@127.0.0.1")
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
+    
+    # Ativar auto re-registration (threading.Timer)
+    client.enable_auto_reregister(
+        aor="sip:1111@127.0.0.1",
+        interval=300  # Re-registrar a cada 5 minutos
+    )
+    
+    print("✅ Auto re-registration habilitado")
+    
+    # Manter rodando (re-registro acontece automaticamente)
+    time.sleep(600)  # 10 minutos
+    
+    # Desabilitar e remover registro
+    client.disable_auto_reregister()
+    response = client.unregister(aor="sip:1111@127.0.0.1")
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
 ```
 
-Terminal 2 (usuário 2222):
+### Exemplo 4: Early Media Detection (183)
+
 ```python
-from sipx import Client
+from sipx import Client, Auth, Events, event_handler, SDPBody
+from sipx._types import Response, RequestContext
 
-client = Client(
-    server="127.0.0.1",
-    port=5060,
-    username="2222",
-    password="2222xxx",
-    domain="127.0.0.1"
-)
-client.register()
+class EarlyMediaEvents(Events):
+    def __init__(self):
+        super().__init__()
+        self.early_media_detected = False
+    
+    @event_handler("response")
+    def on_response(self, response: Response, context: RequestContext):
+        if response.status_code == 183:
+            print("🎵 Early Media (183 Session Progress)")
+            self.early_media_detected = True
+            
+            if response.body:
+                codecs = response.body.get_codecs_summary()
+                print(f"   Codecs: {', '.join(codecs)}")
+        
+        return response
 
-# Chamar extensão 1111
-response = client.invite("1111")
-print(f"Chamando 1111: {response.status_code}")
+auth = Auth.Digest(username="2222", password="2222xxx")
+events = EarlyMediaEvents()
+
+with Client(local_port=5062, auth=auth, events=events) as client:
+    # INVITE sem SDP (late offer)
+    response = client.invite(
+        to_uri="sip:100@127.0.0.1",
+        from_uri=f"sip:2222@{client.local_address.host}",
+        body=None,
+        headers={"Contact": f"<sip:2222@{client.local_address.host}:5062>"}
+    )
+    
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
+    
+    if events.early_media_detected:
+        print("✅ Early media foi detectado!")
+```
+
+### Exemplo 5: Event Handlers Customizados
+
+```python
+from sipx import Client, Auth, Events, event_handler
+from sipx._types import Request, Response, RequestContext
+
+class CustomEvents(Events):
+    """Event handlers com Rich console output"""
+    
+    @event_handler("request")
+    def on_request(self, request: Request, context: RequestContext):
+        print(f"📤 {request.method} → {request.uri}")
+        return request
+    
+    @event_handler("response")
+    def on_response(self, response: Response, context: RequestContext):
+        if response.status_code >= 200 and response.status_code < 300:
+            print(f"✅ {response.status_code} {response.reason_phrase}")
+        elif response.status_code == 401:
+            print(f"🔐 401 Unauthorized")
+        else:
+            print(f"❌ {response.status_code} {response.reason_phrase}")
+        return response
+
+auth = Auth.Digest(username="1111", password="1111xxx")
+events = CustomEvents()
+
+with Client(local_port=5061, auth=auth, events=events) as client:
+    # Requests acionam os event handlers automaticamente
+    response = client.register(aor="sip:1111@127.0.0.1")
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
+    
+    # Output:
+    # 📤 REGISTER → sip:1111@127.0.0.1
+    # 🔐 401 Unauthorized
+    # 📤 REGISTER → sip:1111@127.0.0.1
+    # ✅ 200 OK
 ```
 
 ## 🔧 Estrutura dos Arquivos
@@ -321,6 +497,21 @@ messages => notice,warning,error,verbose
 full => notice,warning,error,debug,verbose
 ```
 
+## 📚 Recursos Adicionais
+
+- **[examples/README.md](../../examples/README.md)** - Guia de exemplos
+- **[docs/QUICK_START.md](../../docs/QUICK_START.md)** - Início rápido
+- **[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)** - Arquitetura
+- **[docs/GUIA_WSL_ASTERISK.md](../../docs/GUIA_WSL_ASTERISK.md)** - Guia WSL
+
+---
+
 ## 📄 Licença
 
-Este setup é fornecido como exemplo para testes. Consulte as licenças do Asterisk e suas dependências para uso em produção.
+MIT License - Este setup é fornecido como exemplo para testes.
+
+---
+
+**Versão**: 2.0.0  
+**Última Atualização**: Outubro 2025  
+**Status**: ✅ Produção

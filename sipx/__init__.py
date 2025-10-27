@@ -1,297 +1,210 @@
-"""sipx - Modern SIP (Session Initiation Protocol) library for Python."""
+"""
+SIPX - Modern SIP (Session Initiation Protocol) library for Python.
+
+This library provides a simplified, declarative API for SIP communication:
+
+- **Events-based handlers**: Use the `Events` class with decorators
+- **Simple authentication**: Use `Auth.Digest()` for authentication
+- **Clean client API**: Simple method signatures with auto-extraction
+
+Quick Start:
+    >>> from sipx import Client, Events, Auth, event_handler, SDPBody
+    >>>
+    >>> class MyEvents(Events):
+    ...     @event_handler('INVITE', status=200)
+    ...     def on_call_accepted(self, request, response, context):
+    ...         print("Call accepted!")
+    ...
+    >>> with Client() as client:
+    ...     client.events = MyEvents()
+    ...     client.auth = Auth.Digest('alice', 'secret')
+    ...     response = client.invite('sip:bob@example.com', 'sip:alice@local')
+
+Main Components:
+    - Client: Synchronous SIP client
+    - Events: Base class for event handlers
+    - Auth: Authentication helpers (Auth.Digest)
+    - event_handler: Decorator for specific events
+    - SDPBody: SDP body creation and parsing
+
+For advanced use cases, you can access:
+    - Request/Response models
+    - Body parsers (SDP, XML, PIDF, etc.)
+    - Transport layer
+    - State management (Transaction, Dialog)
+"""
 
 from __future__ import annotations
 
-# Client implementations
-from ._client import AsyncClient, Client
+# ============================================================================
+# Main API - Client and Server
+# ============================================================================
 
-# Server implementations
-from ._server import AsyncSIPServer, SIPServer
+from ._client import Client, AsyncClient
 
-# FSM components
+# ============================================================================
+# Simplified Events API
+# ============================================================================
+
+from ._events import Events, EventContext, event_handler
+
+# ============================================================================
+# FSM Components (for advanced use)
+# ============================================================================
+
 from ._fsm import Dialog, StateManager, Transaction
 
-# Handler system - All handlers now in modular _handlers package
-from ._handlers import (
-    # Base classes
-    AsyncEventHandler,
-    AsyncHandlerChain,
-    EventContext,
-    EventHandler,
-    HandlerChain,
-    # Utility handlers
-    HeaderInjectionHandler,
-    LoggingHandler,
-    RetryHandler,
-    TimeoutHandler,
-    # Authentication
-    AuthenticationHandler,
-    # Response handlers
-    ResponseCategory,
-    ProvisionalResponseHandler,
-    FinalResponseHandler,
-    ResponseFilterHandler,
-    # Flow handlers
-    InviteFlowHandler,
-    InviteFlowState,
-    RegisterFlowHandler,
-    RegisterFlowState,
-    # State handlers
-    TransactionStateHandler,
-    TransactionFlowState,
-    DialogStateHandler,
-    # Composite handler
-    SipFlowHandler,
-)
+# ============================================================================
+# Message Models
+# ============================================================================
 
-
-# Decorators (kept at module level for backwards compatibility)
-def on_request(func=None, *, method=None):
-    """Decorator for request handlers."""
-    import functools
-
-    def decorator(f):
-        @functools.wraps(f)
-        def wrapper(request, context):
-            if method and request.method != method:
-                return request
-            return f(request, context)
-
-        wrapper._is_request_handler = True
-        wrapper._filter_method = method
-        return wrapper
-
-    if func is not None:
-        return decorator(func)
-    return decorator
-
-
-def on_response(func=None, *, status_code=None, status_range=None):
-    """Decorator for response handlers."""
-    import functools
-
-    def decorator(f):
-        @functools.wraps(f)
-        def wrapper(response, context):
-            if status_code and response.status_code != status_code:
-                return response
-            if status_range:
-                min_code, max_code = status_range
-                if not (min_code <= response.status_code <= max_code):
-                    return response
-            return f(response, context)
-
-        wrapper._is_response_handler = True
-        wrapper._filter_status_code = status_code
-        wrapper._filter_status_range = status_range
-        return wrapper
-
-    if func is not None:
-        return decorator(func)
-    return decorator
-
-
-def on_error(func):
-    """Decorator for error handlers."""
-    import functools
-
-    @functools.wraps(func)
-    def wrapper(error, context):
-        return func(error, context)
-
-    wrapper._is_error_handler = True
-    return wrapper
-
-
-def before_send(func):
-    """Alias for on_request."""
-    return on_request(func)
-
-
-def after_receive(func):
-    """Alias for on_response."""
-    return on_response(func)
-
-
-# Message models
 from ._models import (
-    AuthMethod,
-    AuthParser,
+    # Base classes
+    SIPMessage,
+    Request,
+    Response,
+    MessageParser,
+    # Headers
+    Headers,
+    HeaderParser,
+    HeaderContainer,
+    # Bodies
+    MessageBody,
+    SDPBody,
     BodyParser,
-    Challenge,
-    ConferenceInfoBody,
-    Credentials,
-    DialogInfoBody,
+    # Authentication
+    Auth,
+    SipAuthCredentials,
+    AuthMethod,
     DigestAuth,
     DigestChallenge,
     DigestCredentials,
-    DTMFBody,
-    DTMFRelayBody,
-    HeaderContainer,
-    HeaderParser,
-    Headers,
-    HTMLBody,
-    ISUPBody,
-    MessageBody,
-    MessageParser,
-    MultipartBody,
-    PIDFBody,
-    RawBody,
-    Request,
-    ResourceListsBody,
-    Response,
-    SDPBody,
-    SimpleMsgSummaryBody,
-    SipAuthCredentials,
-    SIPFragBody,
-    SIPMessage,
-    TextBody,
-    XMLBody,
+    Challenge,
+    Credentials,
+    AuthParser,
 )
 
-# Transport layer
+# ============================================================================
+# Transport Layer
+# ============================================================================
+
 from ._transports import (
-    AsyncBaseTransport,
     BaseTransport,
+    AsyncBaseTransport,
     TransportAddress,
     TransportConfig,
     TransportError,
 )
 
-# Types
+# ============================================================================
+# Types and Constants
+# ============================================================================
+
 from ._types import (
-    ConnectionError,
     DialogState,
-    HeaderTypes,
-    ReadError,
-    TimeoutError,
     TransactionState,
     TransactionType,
+    HeaderTypes,
+    ConnectionError,
+    ReadError,
     WriteError,
+    TimeoutError,
 )
 
-# Utilities
 from ._utils import (
-    BRANCH,
+    console,
+    logger,
     EOL,
+    SCHEME,
+    VERSION,
+    BRANCH,
     HEADERS,
     HEADERS_COMPACT,
     REASON_PHRASES,
-    SCHEME,
-    VERSION,
-    console,
-    logger,
 )
 
-__version__ = "0.2.0"
+# ============================================================================
+# Version
+# ============================================================================
+
+__version__ = "0.3.0"
+
+# ============================================================================
+# Public API
+# ============================================================================
 
 __all__ = [
-    # Client - Main API
+    # ========================================================================
+    # Main API - Start Here
+    # ========================================================================
     "Client",
-    "AsyncClient",
-    # Server - Listener API
-    "SIPServer",
-    "AsyncSIPServer",
-    # Utilities - Console & Logging
-    "console",
-    "logger",
-    # FSM - State Management
+    "Events",
+    "Auth",
+    "event_handler",
+    # ========================================================================
+    # Core Models - Messages and Bodies
+    # ========================================================================
+    "Request",
+    "Response",
+    "SDPBody",
+    "SipAuthCredentials",
+    # ========================================================================
+    # Advanced - Event Context
+    # ========================================================================
+    "EventContext",
+    # ========================================================================
+    # Advanced - State Management
+    # ========================================================================
     "StateManager",
     "Transaction",
     "Dialog",
     "TransactionState",
     "DialogState",
     "TransactionType",
-    # Handlers - Base Classes
-    "EventHandler",
-    "AsyncEventHandler",
-    "HandlerChain",
-    "AsyncHandlerChain",
-    "EventContext",
-    # Handlers - Utility
-    "LoggingHandler",
-    "RetryHandler",
-    "HeaderInjectionHandler",
-    "TimeoutHandler",
-    # Handlers - Authentication
-    "AuthenticationHandler",
-    # Handlers - Response
-    "ResponseCategory",
-    "ProvisionalResponseHandler",
-    "FinalResponseHandler",
-    "ResponseFilterHandler",
-    # Handlers - Flow
-    "InviteFlowHandler",
-    "InviteFlowState",
-    "RegisterFlowHandler",
-    "RegisterFlowState",
-    # Handlers - State
-    "TransactionStateHandler",
-    "TransactionFlowState",
-    "DialogStateHandler",
-    # Handlers - Composite
-    "SipFlowHandler",
-    # Handlers - Decorators
-    "on_request",
-    "on_response",
-    "on_error",
-    "before_send",
-    "after_receive",
-    # Transport - Layer
+    # ========================================================================
+    # Advanced - Message Models
+    # ========================================================================
+    "SIPMessage",
+    "MessageParser",
+    # Headers
+    "Headers",
+    "HeaderParser",
+    "HeaderContainer",
+    # Bodies
+    "MessageBody",
+    "SDPBody",
+    "BodyParser",
+    # ========================================================================
+    # Advanced - Authentication
+    # ========================================================================
+    "AuthMethod",
+    "DigestAuth",
+    "DigestChallenge",
+    "DigestCredentials",
+    "Challenge",
+    "Credentials",
+    "AuthParser",
+    # ========================================================================
+    # Advanced - Transport
+    # ========================================================================
     "BaseTransport",
     "AsyncBaseTransport",
-    "TransportConfig",
     "TransportAddress",
+    "TransportConfig",
     "TransportError",
+    # ========================================================================
+    # Advanced - Types and Errors
+    # ========================================================================
+    "HeaderTypes",
     "ConnectionError",
     "ReadError",
     "WriteError",
     "TimeoutError",
-    # Headers - Base classes
-    "HeaderContainer",
-    # Headers - Implementations
-    "Headers",
-    # Headers - Parser
-    "HeaderParser",
-    # Messages - Base classes
-    "SIPMessage",
-    # Messages - Implementations
-    "Request",
-    "Response",
-    # Messages - Parser
-    "MessageParser",
-    # Body - Base classes
-    "MessageBody",
-    # Body - Implementations
-    "SDPBody",
-    "TextBody",
-    "HTMLBody",
-    "DTMFRelayBody",
-    "DTMFBody",
-    "SIPFragBody",
-    "XMLBody",
-    "PIDFBody",
-    "ConferenceInfoBody",
-    "DialogInfoBody",
-    "ResourceListsBody",
-    "ISUPBody",
-    "SimpleMsgSummaryBody",
-    "RawBody",
-    "MultipartBody",
-    # Body - Parser
-    "BodyParser",
-    # Authentication - Base classes
-    "AuthMethod",
-    "Challenge",
-    "Credentials",
-    # Authentication - Digest
-    "DigestAuth",
-    "DigestChallenge",
-    "DigestCredentials",
-    # Authentication - Simplified Credentials
-    "SipAuthCredentials",
-    # Authentication - Parser
-    "AuthParser",
+    # ========================================================================
+    # Utilities
+    # ========================================================================
+    "console",
+    "logger",
     # Constants
     "EOL",
     "SCHEME",
@@ -300,8 +213,8 @@ __all__ = [
     "HEADERS",
     "HEADERS_COMPACT",
     "REASON_PHRASES",
-    # Types
-    "HeaderTypes",
-    # Metadata
-    "__version__",
+    # ========================================================================
+    # Async (not yet implemented)
+    # ========================================================================
+    "AsyncClient",
 ]
