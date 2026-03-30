@@ -1,4 +1,4 @@
-# sipx + Asterisk on WSL
+# Astrerisk Guide
 
 Guide for configuring and testing sipx with Asterisk running in Docker on WSL.
 
