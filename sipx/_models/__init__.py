@@ -18,6 +18,7 @@ from ._auth import (
 from ._body import (
     BodyParser,
     MessageBody,
+    RawBody,
     SDPBody,
 )
 from ._header import HeaderContainer, HeaderParser, Headers
@@ -53,6 +54,7 @@ __all__ = [
     "AuthParser",
     # Body types
     "MessageBody",
+    "RawBody",
     "BodyParser",
     "SDPBody",
 ]

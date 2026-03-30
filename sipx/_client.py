@@ -28,6 +28,31 @@ from ._transports import (
     TCPTransport,
     TLSTransport,
 )
+from ._transports._udp import AsyncUDPTransport
+from ._transports._tcp import AsyncTCPTransport
+from ._transports._tls import AsyncTLSTransport
+
+
+def _create_sync_transport(protocol: str, config: TransportConfig):
+    """Create a sync transport based on protocol name."""
+    if protocol == "UDP":
+        return UDPTransport(config)
+    elif protocol == "TCP":
+        return TCPTransport(config)
+    elif protocol == "TLS":
+        return TLSTransport(config)
+    raise ValueError(f"Unsupported transport: {protocol}")
+
+
+def _create_async_transport(protocol: str, config: TransportConfig):
+    """Create an async transport based on protocol name."""
+    if protocol == "UDP":
+        return AsyncUDPTransport(config)
+    elif protocol == "TCP":
+        return AsyncTCPTransport(config)
+    elif protocol == "TLS":
+        return AsyncTLSTransport(config)
+    raise ValueError(f"Unsupported transport: {protocol}")
 
 
 class Client:
@@ -97,14 +122,7 @@ class Client:
 
     def _create_transport(self):
         """Create transport based on protocol."""
-        if self.transport_protocol == "UDP":
-            return UDPTransport(self.config)
-        elif self.transport_protocol == "TCP":
-            return TCPTransport(self.config)
-        elif self.transport_protocol == "TLS":
-            return TLSTransport(self.config)
-        else:
-            raise ValueError(f"Unsupported transport: {self.transport_protocol}")
+        return _create_sync_transport(self.transport_protocol, self.config)
 
     def _get_default_from_uri(self) -> str:
         """
@@ -1138,15 +1156,8 @@ class AsyncClient:
         self._reregister_callback: Optional[Callable] = None
 
     def _create_transport(self):
-        """Create transport based on protocol."""
-        if self.transport_protocol == "UDP":
-            return UDPTransport(self.config)
-        elif self.transport_protocol == "TCP":
-            return TCPTransport(self.config)
-        elif self.transport_protocol == "TLS":
-            return TLSTransport(self.config)
-        else:
-            raise ValueError(f"Unsupported transport: {self.transport_protocol}")
+        """Create async transport based on protocol."""
+        return _create_async_transport(self.transport_protocol, self.config)
 
     def _get_default_from_uri(self) -> str:
         """

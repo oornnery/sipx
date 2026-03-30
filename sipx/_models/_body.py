@@ -678,6 +678,27 @@ class SDPBody(MessageBody):
 # ============================================================================
 
 
+class RawBody(MessageBody):
+    """Raw message body for non-SDP content types."""
+
+    def __init__(self, content: bytes, content_type_value: str) -> None:
+        self._content = content
+        self._content_type = content_type_value
+
+    def to_bytes(self) -> bytes:
+        return self._content
+
+    def to_string(self) -> str:
+        return self._content.decode("utf-8", errors="replace")
+
+    @property
+    def content_type(self) -> str:
+        return self._content_type
+
+    def __repr__(self) -> str:
+        return f"<RawBody({self._content_type}, {len(self._content)} bytes)>"
+
+
 class BodyParser:
     """Parser for SIP message bodies based on Content-Type."""
 
@@ -692,36 +713,16 @@ class BodyParser:
 
         Returns:
             Parsed MessageBody subclass instance
-
-        Example:
-            >>> body = BodyParser.parse(b"v=0\\r\\no=...", "application/sdp")
-            >>> isinstance(body, SDPBody)
-            True
         """
         if not content:
-            # Return empty SDP for empty content
-            return SDPBody(
-                session_name="-",
-                origin_username="-",
-                origin_session_id="0",
-                origin_session_version="0",
-            )
+            return RawBody(b"", content_type)
 
-        # Extract MIME type (ignore parameters)
         mime_type = content_type.split(";")[0].strip().lower()
 
-        # Parse based on MIME type
         if mime_type == "application/sdp":
             return BodyParser.parse_sdp(content)
         else:
-            # For any other type, return as raw SDPBody with the content as session_name
-            # This is a simplified approach - in production you might want a RawBody class
-            return SDPBody(
-                session_name=content.decode("utf-8", errors="ignore")[:100],
-                origin_username="-",
-                origin_session_id="0",
-                origin_session_version="0",
-            )
+            return RawBody(content, content_type)
 
     @staticmethod
     def parse_sdp(content: bytes) -> SDPBody:

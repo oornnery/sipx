@@ -11,6 +11,7 @@ import asyncio
 import socket
 from typing import Optional, Tuple
 
+from ._utils import parse_content_length
 from .._types import (
     ConnectionError,
     ReadError,
@@ -273,26 +274,9 @@ class TCPTransport(BaseTransport):
             if timeout is not None:
                 self._socket.settimeout(old_timeout)
 
-    def _parse_content_length(self, headers: bytes) -> Optional[int]:
-        """
-        Parse Content-Length from SIP headers.
-
-        Args:
-            headers: Raw header bytes
-
-        Returns:
-            Content-Length value or None if not found
-        """
-        for line in headers.split(b"\r\n"):
-            if line.lower().startswith(b"content-length:") or line.lower().startswith(
-                b"l:"
-            ):
-                try:
-                    value = line.split(b":", 1)[1].strip()
-                    return int(value)
-                except (IndexError, ValueError):
-                    pass
-        return None
+    @staticmethod
+    def _parse_content_length(headers: bytes) -> Optional[int]:
+        return parse_content_length(headers)
 
     def close(self) -> None:
         """Close TCP connection and socket."""
@@ -527,26 +511,9 @@ class AsyncTCPTransport(AsyncBaseTransport):
         except Exception as e:
             raise ReadError(f"Failed to receive TCP data: {e}") from e
 
-    def _parse_content_length(self, headers: bytes) -> Optional[int]:
-        """
-        Parse Content-Length from SIP headers.
-
-        Args:
-            headers: Raw header bytes
-
-        Returns:
-            Content-Length value or None if not found
-        """
-        for line in headers.split(b"\r\n"):
-            if line.lower().startswith(b"content-length:") or line.lower().startswith(
-                b"l:"
-            ):
-                try:
-                    value = line.split(b":", 1)[1].strip()
-                    return int(value)
-                except (IndexError, ValueError):
-                    pass
-        return None
+    @staticmethod
+    def _parse_content_length(headers: bytes) -> Optional[int]:
+        return parse_content_length(headers)
 
     async def close(self) -> None:
         """Close TCP connection."""

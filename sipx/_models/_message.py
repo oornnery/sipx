@@ -608,7 +608,7 @@ class Response(SIPMessage):
             for ch in www_challenges:
                 if hasattr(ch, "is_proxy"):
                     ch.is_proxy = False
-                challenges.extend(www_challenges)
+            challenges.extend(www_challenges)
 
         # Check Proxy-Authenticate
         if "Proxy-Authenticate" in self._headers:
@@ -618,7 +618,7 @@ class Response(SIPMessage):
             for ch in proxy_challenges:
                 if hasattr(ch, "is_proxy"):
                     ch.is_proxy = True
-                challenges.extend(proxy_challenges)
+            challenges.extend(proxy_challenges)
 
         return challenges
 

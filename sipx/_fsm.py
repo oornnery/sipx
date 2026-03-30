@@ -156,16 +156,6 @@ class Transaction:
                 return response
         return None
 
-    @property
-    def transactions(self) -> Dict[str, Transaction]:
-        """Get all transactions."""
-        return self._transactions
-
-    @property
-    def dialogs(self) -> Dict[str, Dialog]:
-        """Get all dialogs."""
-        return self._dialogs
-
     def __repr__(self) -> str:
         method = self.request.method if self.request else "?"
         return f"<Transaction({method}, {self.state.name}, {len(self.responses)} responses)>"

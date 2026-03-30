@@ -14,7 +14,7 @@ from enum import Enum, auto
 from typing import Any, Optional
 
 if typing.TYPE_CHECKING:
-    from .headers import Headers
+    from ._models._header import Headers
     from ._models._message import Request, Response
     from ._fsm import Transaction, Dialog
 
@@ -232,14 +232,6 @@ AddressLike = typing.Union[TransportAddress, str, tuple[str, int]]
 # Callback types
 TransactionCallback = typing.Callable[["Transaction"], None]
 DialogCallback = typing.Callable[["Dialog"], None]
-
-# Handler types (forward references for _handlers module)
-if typing.TYPE_CHECKING:
-    from ._handlers import EventHandler, AsyncEventHandler
-
-    HandlerType = typing.Union[EventHandler, AsyncEventHandler]
-    SyncHandlerType = EventHandler
-    AsyncHandlerType = AsyncEventHandler
 
 
 # =============================================================================
