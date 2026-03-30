@@ -1382,17 +1382,14 @@ class AsyncClient:
 
             try:
                 # Send request
-                await asyncio.to_thread(
-                    self._transport.send, request.to_bytes(), destination
-                )
+                await self._transport.send(request.to_bytes(), destination)
 
                 # Receive responses
                 parser = MessageParser()
                 final_response = None
 
                 while True:
-                    response_data, source = await asyncio.to_thread(
-                        self._transport.receive,
+                    response_data, source = await self._transport.receive(
                         timeout=self._transport.config.read_timeout,
                     )
 
@@ -1658,7 +1655,7 @@ class AsyncClient:
                 pass
             self._reregister_task = None
 
-        await asyncio.to_thread(self._transport.close)
+        await self._transport.close()
 
     async def __aenter__(self):
         """Async context manager entry."""

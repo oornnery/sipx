@@ -216,6 +216,8 @@ class TransactionType(Enum):
 
     INVITE = auto()  # INVITE transaction (ICT)
     NON_INVITE = auto()  # All other methods: REGISTER, OPTIONS, BYE, etc. (NICT)
+    INVITE_SERVER = auto()  # Invite Server Transaction (IST)
+    NON_INVITE_SERVER = auto()  # Non-Invite Server Transaction (NIST)
 
 
 # =============================================================================

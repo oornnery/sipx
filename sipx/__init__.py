@@ -52,7 +52,7 @@ from ._events import Events, EventContext, event_handler
 # FSM Components (for advanced use)
 # ============================================================================
 
-from ._fsm import Dialog, StateManager, Transaction
+from ._fsm import Dialog, StateManager, TimerManager, Transaction
 
 # ============================================================================
 # Message Models
@@ -156,6 +156,7 @@ __all__ = [
     # Advanced - State Management
     # ========================================================================
     "StateManager",
+    "TimerManager",
     "Transaction",
     "Dialog",
     "TransactionState",

@@ -4,8 +4,8 @@ Finite State Machines (FSM) for SIP transactions and dialogs.
 This module implements the four SIP FSMs defined in RFC 3261:
 - ICT (Invite Client Transaction)
 - NICT (Non-Invite Client Transaction)
-- IST (Invite Server Transaction) - future
-- NIST (Non-Invite Server Transaction) - future
+- IST (Invite Server Transaction)
+- NIST (Non-Invite Server Transaction)
 
 FSM Overview:
 =============
@@ -24,6 +24,7 @@ Dialogs represent persistent peer-to-peer SIP relationships across transactions.
 
 from __future__ import annotations
 
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -38,6 +39,69 @@ from ._types import (
 
 if TYPE_CHECKING:
     from ._models._message import Request, Response
+
+
+class TimerManager:
+    """
+    Manages active retransmission timers for SIP transactions.
+
+    Tracks timers by name and ensures only one timer per name is active.
+    Thread-safe: timers run in background threads via threading.Timer.
+    """
+
+    def __init__(self) -> None:
+        """Initialize timer manager."""
+        self._timers: Dict[str, threading.Timer] = {}
+        self._lock = threading.Lock()
+
+    def start_timer(
+        self, name: str, delay: float, callback: Callable[[], None]
+    ) -> None:
+        """
+        Start a named timer. Cancels any existing timer with the same name.
+
+        Args:
+            name: Unique timer name (e.g. "Timer G", "Timer H")
+            delay: Delay in seconds before callback fires
+            callback: Function to call when timer expires
+        """
+        with self._lock:
+            # Cancel existing timer with this name
+            if name in self._timers:
+                self._timers[name].cancel()
+            timer = threading.Timer(delay, callback)
+            timer.daemon = True
+            timer.name = f"SIP-{name}"
+            self._timers[name] = timer
+            timer.start()
+
+    def cancel_timer(self, name: str) -> None:
+        """
+        Cancel a specific timer by name.
+
+        Args:
+            name: Timer name to cancel
+        """
+        with self._lock:
+            timer = self._timers.pop(name, None)
+            if timer is not None:
+                timer.cancel()
+
+    def cancel_all(self) -> None:
+        """Cancel all active timers."""
+        with self._lock:
+            for timer in self._timers.values():
+                timer.cancel()
+            self._timers.clear()
+
+    @property
+    def active_timers(self) -> List[str]:
+        """Return list of active timer names."""
+        with self._lock:
+            return list(self._timers.keys())
+
+    def __repr__(self) -> str:
+        return f"<TimerManager({len(self._timers)} active)>"
 
 
 @dataclass
@@ -65,7 +129,7 @@ class Transaction:
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
 
-    # Timers (in seconds)
+    # Timers (in seconds) - Client-side (ICT/NICT)
     timer_a: Optional[float] = None  # Retransmit timer (INVITE)
     timer_b: Optional[float] = None  # Transaction timeout (INVITE)
     timer_d: Optional[float] = None  # Wait time for response retransmissions
@@ -74,6 +138,18 @@ class Transaction:
     timer_k: Optional[float] = (
         None  # Wait time for response retransmissions (non-INVITE)
     )
+
+    # Timers (in seconds) - Server-side (IST/NIST)
+    timer_g: Optional[float] = None  # Retransmit response (IST)
+    timer_h: Optional[float] = None  # Transaction timeout (IST)
+    timer_i: Optional[float] = None  # Wait for ACK retransmissions (IST)
+    timer_j: Optional[float] = None  # Wait for retransmissions (NIST)
+
+    # Transport type for timer calculation ("UDP" vs reliable)
+    transport: str = "UDP"
+
+    # Active timer manager (not serialized, set externally)
+    timer_manager: Optional[TimerManager] = field(default=None, repr=False)
 
     # Metadata
     dialog_id: Optional[str] = None  # Associated dialog
@@ -99,23 +175,98 @@ class Transaction:
         """
         Handle state change side effects.
 
+        Sets timer values and schedules active timers (via TimerManager)
+        based on transaction type and new state per RFC 3261 Sections 17.1/17.2.
+
         Args:
             old_state: Previous state
             new_state: New state
         """
-        # Set timers based on transaction type and state
+        is_reliable = self.transport.upper() in ("TCP", "TLS")
+
+        # --- Client-side transactions ---
         if self.transaction_type == TransactionType.INVITE:
             if new_state == TransactionState.CALLING:
                 self.timer_a = 0.5  # T1 (500ms)
                 self.timer_b = 32.0  # 64*T1
             elif new_state == TransactionState.COMPLETED:
                 self.timer_d = 32.0  # > 32s for UDP
-        else:  # NON_INVITE
+
+        elif self.transaction_type == TransactionType.NON_INVITE:
             if new_state == TransactionState.TRYING:
                 self.timer_e = 0.5  # T1
                 self.timer_f = 32.0  # 64*T1
             elif new_state == TransactionState.COMPLETED:
                 self.timer_k = 5.0  # T4
+
+        # --- Server-side: IST (INVITE Server Transaction, RFC 3261 17.2.1) ---
+        elif self.transaction_type == TransactionType.INVITE_SERVER:
+            if new_state == TransactionState.PROCEEDING:
+                if not is_reliable:
+                    self.timer_g = 0.5  # T1 (500ms) - retransmit response
+                self.timer_h = 32.0  # 64*T1 - timeout waiting for ACK
+                self._schedule_ist_timers()
+            elif new_state == TransactionState.COMPLETED:
+                self._cancel_active_timers("Timer G", "Timer H")
+                self.timer_i = 0.0 if is_reliable else 5.0  # T4 for UDP
+                self._schedule_timer("Timer I", self.timer_i, self._on_timer_expired)
+            elif new_state == TransactionState.CONFIRMED:
+                self._cancel_active_timers("Timer I")
+                self.transition_to(TransactionState.TERMINATED)
+            elif new_state == TransactionState.TERMINATED:
+                self._cancel_all_timers()
+
+        # --- Server-side: NIST (Non-Invite Server Transaction, RFC 3261 17.2.2) ---
+        elif self.transaction_type == TransactionType.NON_INVITE_SERVER:
+            if new_state == TransactionState.COMPLETED:
+                self.timer_j = 0.0 if is_reliable else 32.0  # 64*T1 for UDP
+                self._schedule_timer("Timer J", self.timer_j, self._on_timer_expired)
+            elif new_state == TransactionState.TERMINATED:
+                self._cancel_all_timers()
+
+    # --- Timer scheduling helpers ---
+
+    def _schedule_timer(
+        self, name: str, delay: float, callback: Callable[[], None]
+    ) -> None:
+        """Schedule a single timer via the TimerManager, if available."""
+        if self.timer_manager is not None and delay > 0:
+            self.timer_manager.start_timer(name, delay, callback)
+        elif self.timer_manager is not None and delay == 0:
+            # Zero delay means immediate transition
+            callback()
+
+    def _cancel_active_timers(self, *names: str) -> None:
+        """Cancel specific active timers."""
+        if self.timer_manager is not None:
+            for name in names:
+                self.timer_manager.cancel_timer(name)
+
+    def _cancel_all_timers(self) -> None:
+        """Cancel all active timers for this transaction."""
+        if self.timer_manager is not None:
+            self.timer_manager.cancel_all()
+
+    def _schedule_ist_timers(self) -> None:
+        """Schedule IST timers G and H when entering PROCEEDING."""
+        if self.timer_g is not None:
+            self._schedule_timer("Timer G", self.timer_g, self._on_timer_g)
+        if self.timer_h is not None:
+            self._schedule_timer("Timer H", self.timer_h, self._on_timer_expired)
+
+    def _on_timer_g(self) -> None:
+        """Timer G fired: retransmit last response and double the interval."""
+        if self.state != TransactionState.PROCEEDING:
+            return
+        # Double timer G up to T2 (4s)
+        if self.timer_g is not None:
+            self.timer_g = min(self.timer_g * 2, 4.0)
+            self._schedule_timer("Timer G", self.timer_g, self._on_timer_g)
+
+    def _on_timer_expired(self) -> None:
+        """Generic timer expiry: transition to TERMINATED."""
+        if self.state != TransactionState.TERMINATED:
+            self.transition_to(TransactionState.TERMINATED)
 
     def add_response(self, response: Response) -> None:
         """
@@ -310,10 +461,21 @@ class StateManager:
         # Extract branch from Via header
         branch = self._extract_branch(request)
 
+        # Determine initial state based on transaction type
+        if transaction_type == TransactionType.INVITE_SERVER:
+            initial_state = TransactionState.PROCEEDING
+        elif transaction_type == TransactionType.NON_INVITE_SERVER:
+            initial_state = TransactionState.TRYING
+        elif transaction_type == TransactionType.INVITE:
+            initial_state = TransactionState.CALLING
+        else:
+            initial_state = TransactionState.TRYING
+
         # Create transaction
         transaction = Transaction(
             branch=branch,
             transaction_type=transaction_type,
+            state=initial_state,
             request=request,
         )
 
