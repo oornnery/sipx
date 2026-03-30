@@ -259,6 +259,15 @@ class Client:
                     cseq_num = int(cseq_parts[0]) + 1
                     request.headers["CSeq"] = f"{cseq_num} {cseq_parts[1]}"
 
+            # Generate new Via branch (new transaction)
+            if "Via" in request.headers:
+                old_via = request.headers["Via"]
+                new_branch = f"z9hG4bK{uuid.uuid4().hex[:16]}"
+                import re as _re
+                request.headers["Via"] = _re.sub(
+                    r"branch=z9hG4bK[^;,\s]+", f"branch={new_branch}", old_via
+                )
+
             # Log retry
             console.print(
                 f"\n[bold yellow]>>> AUTH RETRY {request.method} "
@@ -283,6 +292,11 @@ class Client:
                 )
 
                 auth_response = parser.parse(response_data)
+
+                # Skip incoming requests (e.g. re-INVITE from server)
+                if not isinstance(auth_response, Response):
+                    continue
+
                 auth_response.raw = response_data
                 auth_response.request = request
                 auth_response.transport_info = {
@@ -453,6 +467,12 @@ class Client:
                 )
 
                 response = parser.parse(response_data)
+
+                # Skip incoming requests (e.g. re-INVITE from server)
+                if not isinstance(response, Response):
+                    logger.debug(f"Skipped incoming {type(response).__name__}, waiting for Response")
+                    continue
+
                 response.raw = response_data
                 response.request = request
                 response.transport_info = {

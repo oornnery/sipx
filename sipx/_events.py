@@ -272,23 +272,21 @@ class Events:
         # First call the generic on_request
         request = self.on_request(request, context)
 
-        # Then call matching decorated handlers
+        # Then call matching decorated handlers (request-only: skip status-filtered handlers)
         for handler, methods, statuses in self._handlers:
-            # Request handlers only match on method
+            # Skip handlers that filter on status — they are response-only
+            if statuses is not None:
+                continue
             if self._matches_method(request.method, methods):
                 try:
-                    # Get handler signature to determine what to pass
                     sig = inspect.signature(handler)
                     params = list(sig.parameters.keys())
 
-                    # Call with appropriate parameters
-                    # Handler signature: (request, context) or (request, response, context)
-                    if len(params) == 2:  # self, request, context
+                    if len(params) == 2:
                         result = handler(request, context)
-                    else:  # self, request, response, context
+                    else:
                         result = handler(request, None, context)
 
-                    # If handler returns a Request, use it
                     if isinstance(result, Request):
                         request = result
 
