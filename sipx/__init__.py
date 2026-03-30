@@ -46,7 +46,7 @@ from ._client import Client, AsyncClient
 # Simplified Events API
 # ============================================================================
 
-from ._events import Events, EventContext, event_handler
+from ._events import Events, EventContext, event_handler, on
 
 # ============================================================================
 # FSM Components (for advanced use)
@@ -141,6 +141,7 @@ __all__ = [
     "Events",
     "Auth",
     "event_handler",
+    "on",
     # ========================================================================
     # Core Models - Messages and Bodies
     # ========================================================================

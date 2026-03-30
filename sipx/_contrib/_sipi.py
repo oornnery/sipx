@@ -1,0 +1,169 @@
+"""
+SIP-I / ISUP interworking support (ITU-T Q.1912.5).
+
+Provides ISUP cause code <-> SIP status code mapping tables and
+helper functions for common SIP-I headers (P-Asserted-Identity,
+P-Charging-Vector).
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from .._models._message import Request, Response
+
+# ---------------------------------------------------------------------------
+# ISUP cause -> SIP status  (ITU-T Q.1912.5 / RFC 3398)
+# ---------------------------------------------------------------------------
+
+ISUP_CAUSE_TO_SIP: dict[int, int] = {
+    1: 404,  # Unallocated number
+    2: 404,  # No route to specified transit network
+    3: 404,  # No route to destination
+    16: 487,  # Normal clearing -> Request Terminated (BYE context)
+    17: 486,  # User busy
+    18: 408,  # No user responding
+    19: 480,  # No answer from user
+    21: 403,  # Call rejected
+    27: 502,  # Destination out of order
+    28: 484,  # Invalid number format (address incomplete)
+    34: 503,  # No circuit/channel available
+    38: 503,  # Network out of order
+    41: 503,  # Temporary failure
+    42: 503,  # Switching equipment congestion
+    47: 503,  # Resource unavailable
+    55: 403,  # Incoming calls barred within CUG
+    57: 403,  # Bearer capability not authorized
+    58: 503,  # Bearer capability not presently available
+    63: 503,  # Service or option not available
+    65: 488,  # Bearer capability not implemented
+    79: 501,  # Service or option not implemented
+    87: 502,  # User not member of CUG
+    88: 488,  # Incompatible destination
+    102: 504,  # Recovery on timer expiry
+    111: 500,  # Protocol error, unspecified
+    127: 500,  # Interworking, unspecified
+}
+
+# ---------------------------------------------------------------------------
+# SIP status -> ISUP cause  (reverse mapping)
+# ---------------------------------------------------------------------------
+
+SIP_TO_ISUP_CAUSE: dict[int, int] = {
+    400: 41,  # Bad Request -> Temporary failure
+    401: 21,  # Unauthorized -> Call rejected
+    403: 21,  # Forbidden -> Call rejected
+    404: 1,  # Not Found -> Unallocated number
+    405: 63,  # Method Not Allowed -> Service/option unavailable
+    408: 18,  # Request Timeout -> No user responding
+    410: 1,  # Gone -> Unallocated number
+    480: 19,  # Temporarily Unavailable -> No answer from user
+    484: 28,  # Address Incomplete -> Invalid number format
+    486: 17,  # Busy Here -> User busy
+    487: 16,  # Request Terminated -> Normal clearing
+    488: 127,  # Not Acceptable Here -> Interworking
+    500: 41,  # Server Internal Error -> Temporary failure
+    501: 79,  # Not Implemented -> Service not implemented
+    502: 38,  # Bad Gateway -> Network out of order
+    503: 34,  # Service Unavailable -> No circuit/channel available
+    504: 102,  # Server Timeout -> Recovery on timer expiry
+    600: 17,  # Busy Everywhere -> User busy
+    603: 21,  # Decline -> Call rejected
+    604: 1,  # Does Not Exist Anywhere -> Unallocated number
+}
+
+
+# ---------------------------------------------------------------------------
+# Conversion helpers
+# ---------------------------------------------------------------------------
+
+
+def isup_to_sip(cause: int) -> int:
+    """
+    Convert an ISUP cause code to a SIP status code.
+
+    Args:
+        cause: ISUP cause code (ITU-T Q.850).
+
+    Returns:
+        Corresponding SIP status code.  Returns 500 when no mapping exists.
+    """
+    return ISUP_CAUSE_TO_SIP.get(cause, 500)
+
+
+def sip_to_isup(status: int) -> int:
+    """
+    Convert a SIP status code to an ISUP cause code.
+
+    Args:
+        status: SIP response status code.
+
+    Returns:
+        Corresponding ISUP cause code.  Returns 127 (Interworking) when
+        no mapping exists.
+    """
+    return SIP_TO_ISUP_CAUSE.get(status, 127)
+
+
+# ---------------------------------------------------------------------------
+# SIP-I header helpers
+# ---------------------------------------------------------------------------
+
+
+def add_pai_header(
+    request: "Request",
+    identity: str,
+) -> None:
+    """
+    Add a P-Asserted-Identity header to a SIP request.
+
+    Args:
+        request: The SIP request to modify.
+        identity: Identity value, typically a SIP or tel URI
+                  (e.g. ``"sip:alice@example.com"`` or ``"tel:+15551234567"``).
+    """
+    request.headers["P-Asserted-Identity"] = identity
+
+
+def add_charging_vector(
+    request: "Request",
+    icid: str,
+) -> None:
+    """
+    Add a P-Charging-Vector header to a SIP request.
+
+    The ``icid-value`` parameter is the IMS Charging Identifier
+    defined in 3GPP TS 24.229.
+
+    Args:
+        request: The SIP request to modify.
+        icid: IMS Charging Identifier value.
+    """
+    request.headers["P-Charging-Vector"] = f"icid-value={icid}"
+
+
+def get_pai(
+    message: Union["Request", "Response"],
+) -> str | None:
+    """
+    Extract the P-Asserted-Identity header value from a SIP message.
+
+    Args:
+        message: A SIP request or response.
+
+    Returns:
+        The header value, or ``None`` if the header is not present.
+    """
+    return message.headers.get("P-Asserted-Identity")
+
+
+__all__ = [
+    "ISUP_CAUSE_TO_SIP",
+    "SIP_TO_ISUP_CAUSE",
+    "isup_to_sip",
+    "sip_to_isup",
+    "add_pai_header",
+    "add_charging_vector",
+    "get_pai",
+]

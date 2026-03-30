@@ -125,6 +125,10 @@ def event_handler(
     return decorator
 
 
+# Short alias: @on('INVITE', status=200)
+on = event_handler
+
+
 class Events:
     """
     Base class for SIP event handlers with declarative API.
