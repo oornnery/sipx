@@ -672,6 +672,36 @@ class SDPBody(MessageBody):
             ports[media_type] = media["port"]
         return ports
 
+    def get_rtp_params(self, media_index: int = 0) -> Optional[Dict[str, Any]]:
+        """
+        Get RTP session parameters from SDP for creating an RTPSession.
+
+        Returns:
+            Dict with keys: ip, port, codec_name, payload_type, clock_rate
+            or None if media index is out of range.
+        """
+        info = self.get_media_info(media_index)
+        if info is None or info["rejected"]:
+            return None
+
+        # Get connection address (media-level or session-level)
+        ip = self.get_connection_address()
+        port = info["port"]
+
+        # Get first codec
+        codecs = info["codecs"]
+        if codecs:
+            first = codecs[0]
+            return {
+                "ip": ip,
+                "port": port,
+                "codec_name": first.get("name", "PCMU"),
+                "payload_type": int(first.get("payload", "0")),
+                "clock_rate": int(first.get("rate", "8000")),
+            }
+
+        return {"ip": ip, "port": port, "codec_name": "PCMU", "payload_type": 0, "clock_rate": 8000}
+
 
 # ============================================================================
 # Body Parser
