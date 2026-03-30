@@ -1,24 +1,24 @@
-# sipx - Exemplos
+# sipx - Examples
 
-Demo completo exercitando todos os componentes da lib sipx.
+Full demo exercising all components of the sipx library.
 
-## Executar
+## Run
 
 ```bash
-# Iniciar Asterisk
+# Start Asterisk
 cd docker/asterisk && docker-compose up -d
 
-# Rodar demo
+# Run demo
 uv run python examples/asterisk_demo.py
 ```
 
-## O que e testado
+## What is tested
 
 - Constants, Headers, MessageParser, SDPBody, Auth, FSM (offline)
-- SIPServer com handlers customizados
-- 3 usuarios Asterisk (OPTIONS, REGISTER, INVITE, ACK, BYE, MESSAGE, INFO)
+- SIPServer with custom handlers
+- 3 Asterisk users (OPTIONS, REGISTER, INVITE, ACK, BYE, MESSAGE, INFO)
 - Auth: invalid creds, per-request override, auto re-registration
 - SDP: early offer, late offer, create_answer, codec analysis
-- Events: on_request, on_response, @event_handler com method/status/tuple
+- Events: on_request, on_response, @event_handler with method/status/tuple
 
-Veja [docs/SDD.md](../docs/SDD.md) para a spec completa.
+See [docs/SDD.md](../docs/SDD.md) for the full spec.
