@@ -1,272 +1,264 @@
-# Guia Rápido: SIPX com Asterisk no WSL
+# sipx + Asterisk no WSL
 
-Este guia mostra como configurar e testar a biblioteca SIPX com Asterisk rodando em Docker no WSL (Windows Subsystem for Linux).
+Guia para configurar e testar sipx com Asterisk rodando em Docker no WSL.
 
-## 🎯 Problema Resolvido
-
-Você estava recebendo o erro:
-```
-OSError: [Errno 98] Address already in use
-```
-
-**Causa**: O Docker estava usando a porta 5060, impedindo o cliente SIP de usar a mesma porta.
-
-**Solução**: Usar uma porta diferente para o cliente (5061) e corrigir as credenciais do Asterisk.
-
-## ⚙️ Configuração do Ambiente
-
-### Seu Setup Atual
-- **Windows**: IP Wi-Fi `192.168.15.7`
-- **WSL**: IP `172.19.112.1`
-- **Asterisk Docker**: Rodando e expondo porta `5060`
-
-### Credenciais do Asterisk
-Conforme `docker/asterisk/README.md`:
-
-| Usuário | Senha    | Extensão |
-|---------|----------|----------|
-| 1111    | 1111xxx  | 1111     |
-| 2222    | 2222xxx  | 2222     |
-| 3333    | 3333xxx  | 3333     |
-
-## 🚀 Passos para Executar
-
-### 1. Verificar se Asterisk está Rodando
-
-```bash
-docker ps | grep asterisk
-```
-
-Você deve ver:
-```
-sipx-asterisk   ... Up X minutes   0.0.0.0:5060->5060/tcp, ...
-```
-
-### 2. Verificar Configuração (Script de Diagnóstico)
-
-```bash
-uv run examples/check_asterisk.py
-```
-
-Saída esperada:
-```
-✅ Container 'sipx-asterisk' is running
-✅ Port 5060 is in use (expected for Docker)
-✅ Can connect to 127.0.0.1:5060
-✅ Available client ports: 5061, 5062, 5063
-✅ SIP OPTIONS successful: 200 OK
-✅ ALL CHECKS PASSED - Ready to run demos!
-```
-
-### 3. Executar Demo Completo
-
-```bash
-uv run examples/asterisk_demo.py
-```
-
-Resultado esperado:
-```
-======================================================================
-DEMO SUMMARY
-======================================================================
-  ✅ REGISTER: SUCCESS
-  ✅ OPTIONS: SUCCESS
-  ✅ INVITE: SUCCESS
-  ✅ MESSAGE: SUCCESS
-
-Total: 4/4 successful
-======================================================================
-
-🎉 All steps completed successfully!
-```
-
-## 🔧 Correções Aplicadas
-
-### 1. Porta do Cliente
-**Antes**: `LOCAL_PORT = 5060` ❌  
-**Depois**: `LOCAL_PORT = 5061` ✅
-
-### 2. Credenciais
-**Antes**:
-```python
-ASTERISK_HOST = "192.168.1.100"
-USERNAME = "alice"
-PASSWORD = "secret"
-```
-
-**Depois**:
-```python
-ASTERISK_HOST = "127.0.0.1"  # localhost no WSL
-USERNAME = "1111"
-PASSWORD = "1111xxx"
-```
-
-### 3. FROM URI com Username Correto
-Adicionado método que usa `auth.username` automaticamente em vez de "user" genérico.
-
-### 4. Contact Header no INVITE
-Asterisk/PJSIP requer header `Contact` em INVITE requests:
-```python
-invite_headers = {
-    "Contact": f"<sip:{username}@{host}:{port}>"
-}
-```
-
-## 🐛 Troubleshooting
-
-### Porta 5060 em Uso
-```bash
-# Ver o que está usando a porta
-ss -tulnp | grep 5060
-
-# Solução: Use porta diferente no cliente (5061, 5062, etc)
-```
-
-### Container não está rodando
-```bash
-# Iniciar Asterisk
-cd docker/asterisk
-docker-compose up -d
-
-# Ver logs
-docker logs -f sipx-asterisk
-```
-
-### Autenticação falhando
-```bash
-# Conectar ao CLI do Asterisk
-docker exec -it sipx-asterisk asterisk -rvvv
-
-# Verificar endpoints
-pjsip show endpoints
-
-# Ver se usuário está configurado
-pjsip show auth auth1111
-```
-
-### Chamada cai imediatamente
-```bash
-# Ver logs do Asterisk em tempo real
-docker logs -f sipx-asterisk
-
-# Ou conectar ao CLI
-docker exec -it sipx-asterisk asterisk -rvvv
-# Dentro do CLI:
-pjsip set logger on
-```
-
-## 📊 O que o Demo Faz
-
-### 1. REGISTER (Registro)
-Registra o usuário 1111 no servidor Asterisk por 3600 segundos.
-
-### 2. OPTIONS (Verificação)
-Verifica as capacidades do servidor (métodos suportados, codecs, etc).
-
-### 3. INVITE (Chamada)
-Faz uma chamada para a extensão 100 (echo test):
-- Envia SDP offer com codecs de áudio
-- Recebe 401 Unauthorized
-- Reenvia com autenticação Digest
-- Recebe 200 OK
-- Envia ACK
-- Mantém a chamada por 5 segundos
-- Envia BYE para encerrar
-
-### 4. MESSAGE (Mensagem Instantânea)
-Envia uma mensagem de texto para extensão 2222.
-
-## 🎓 Comandos Úteis do Asterisk
-
-```bash
-# Conectar ao CLI
-docker exec -it sipx-asterisk asterisk -rvvv
-
-# Comandos dentro do CLI:
-pjsip show endpoints          # Lista endpoints configurados
-pjsip show registrations      # Registros ativos
-pjsip show contacts           # Contatos registrados
-core show channels            # Chamadas ativas
-dialplan show sipx-test       # Dialplan (rotas)
-pjsip set logger on           # Ativar debug SIP
-pjsip set logger off          # Desativar debug SIP
-core reload                   # Recarregar configurações
-
-# Sair: Ctrl+C ou 'exit'
-```
-
-## 📝 Extensões de Teste Disponíveis
-
-| Extensão | Descrição                    |
-|----------|------------------------------|
-| 100      | Echo test (repete seu áudio) |
-| 200      | Music on Hold                |
-| 300      | Voicemail test               |
-| 400      | Time announcement            |
-| 1111     | Usuário 1 (você)             |
-| 2222     | Usuário 2 (outro ramal)      |
-| 3333     | Usuário 3 (outro ramal)      |
-
-## 🔍 Debug Avançado
-
-### Capturar Tráfego SIP
-```bash
-# Com tcpdump
-sudo tcpdump -i any -s 0 -A 'port 5060' -w sip.pcap
-
-# Com sngrep (mais visual)
-sudo apt-get install sngrep
-sudo sngrep port 5060
-```
-
-### Ver Mensagens SIP no Asterisk
-```bash
-docker exec -it sipx-asterisk asterisk -rvvv
-# Dentro do CLI:
-pjsip set logger on
-```
-
-### Verificar Configuração PJSIP
-```bash
-docker exec sipx-asterisk cat /etc/asterisk/pjsip.conf | grep -A 10 "1111"
-```
-
-## 💡 Dicas
-
-1. **Sempre use porta diferente de 5060** no cliente para evitar conflito com Docker
-2. **Use 127.0.0.1** como host do Asterisk (localhost no WSL)
-3. **Verifique credenciais** em `docker/asterisk/README.md`
-4. **Execute check_asterisk.py** antes do demo para validar configuração
-5. **Monitore logs** do Asterisk durante testes: `docker logs -f sipx-asterisk`
-
-## 📚 Próximos Passos
-
-- Testar chamadas entre extensões (1111 → 2222)
-- Implementar recebimento de chamadas (servidor SIP)
-- Adicionar suporte a áudio RTP real
-- Testar com softphones (Linphone, X-Lite)
-- Implementar transfer, hold, conference
-
-## 🆘 Precisa de Ajuda?
-
-1. Verifique os logs: `docker logs sipx-asterisk`
-2. Execute diagnóstico: `uv run examples/check_asterisk.py`
-3. Veja o arquivo: `ASTERISK_SETUP_FIXES.md` (detalhes técnicos)
-4. Consulte: `docker/asterisk/README.md` (configuração Asterisk)
-
-## ✅ Checklist de Validação
-
-- [ ] Docker container rodando (`docker ps`)
-- [ ] Porta 5060 em uso (`ss -tulnp | grep 5060`)
-- [ ] Porta 5061 disponível para cliente
-- [ ] Credenciais corretas (1111/1111xxx)
-- [ ] `check_asterisk.py` passou todos os testes
-- [ ] `asterisk_demo.py` completou 4/4 steps
+**Versao**: 0.3.0
+**Data**: Marco 2026
 
 ---
 
-**Status**: ✅ Tudo funcionando perfeitamente!
+## Pre-requisitos
 
-**Data**: 27 de Outubro de 2025
+- WSL2 (Ubuntu)
+- Docker Desktop com integracao WSL
+- Python 3.13+ (via uv)
+- sipx instalado (`uv sync`)
 
-**Ambiente**: WSL (Ubuntu) + Docker + Asterisk PJSIP
+## Configuracao do ambiente
+
+| Componente | Endereco |
+|------------|----------|
+| WSL | `172.19.x.x` (ou `127.0.0.1`) |
+| Asterisk Docker | porta `5060` |
+| sipx Client | porta `5061`+ |
+
+### Credenciais do Asterisk
+
+Configuradas em `docker/asterisk/config/pjsip.conf`:
+
+| Usuario | Senha | Extensao |
+|---------|-------|----------|
+| 1111 | 1111xxx | 1111 |
+| 2222 | 2222xxx | 2222 |
+| 3333 | 3333xxx | 3333 |
+
+---
+
+## Setup
+
+### 1. Iniciar Asterisk
+
+```bash
+cd docker/asterisk
+docker-compose up -d
+```
+
+Verificar:
+
+```bash
+docker ps | grep asterisk
+# sipx-asterisk   ... Up X minutes   0.0.0.0:5060->5060/tcp
+```
+
+### 2. Testar conectividade
+
+```python
+from sipx import Client
+
+with Client(local_port=5061) as client:
+    response = client.options('sip:127.0.0.1')
+    print(f"Status: {response.status_code}")
+    # Esperado: 200 ou 401
+```
+
+### 3. Teste completo
+
+```bash
+uv run python examples/asterisk_demo.py
+```
+
+---
+
+## Porta 5060 em uso
+
+O Docker expoe Asterisk na porta 5060. O cliente sipx precisa usar outra porta:
+
+```python
+# Errado - conflita com Docker
+client = Client(local_port=5060)
+
+# Correto
+client = Client(local_port=5061)
+```
+
+Se receber `OSError: [Errno 98] Address already in use`:
+
+```bash
+# Ver o que usa a porta
+ss -tulnp | grep 5060
+# Solucao: use 5061, 5062, 5063...
+```
+
+---
+
+## Exemplos
+
+### Registro
+
+```python
+from sipx import Client, Auth
+
+with Client(local_port=5061) as client:
+    client.auth = Auth.Digest('1111', '1111xxx')
+
+    response = client.register('sip:1111@127.0.0.1')
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
+
+    print(f"REGISTER: {response.status_code}")
+```
+
+### Chamada para echo test (ext 100)
+
+```python
+from sipx import Client, Auth, SDPBody
+
+with Client(local_port=5061) as client:
+    client.auth = Auth.Digest('1111', '1111xxx')
+
+    sdp = SDPBody.create_offer(
+        session_name="Test",
+        origin_username="1111",
+        origin_address=client.local_address.host,
+        connection_address=client.local_address.host,
+        media_specs=[{
+            "media": "audio",
+            "port": 8000,
+            "codecs": [
+                {"payload": "0", "name": "PCMU", "rate": "8000"},
+                {"payload": "8", "name": "PCMA", "rate": "8000"},
+            ],
+        }],
+    )
+
+    response = client.invite(
+        to_uri='sip:100@127.0.0.1',
+        body=sdp.to_string(),
+    )
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
+
+    if response.status_code == 200:
+        client.ack(response=response)
+        import time
+        time.sleep(5)
+        client.bye(response=response)
+```
+
+### Mensagem
+
+```python
+with Client(local_port=5061) as client:
+    client.auth = Auth.Digest('1111', '1111xxx')
+
+    response = client.message(
+        to_uri='sip:2222@127.0.0.1',
+        content='Hello from sipx!',
+    )
+    if response.status_code == 401:
+        response = client.retry_with_auth(response)
+```
+
+---
+
+## Extensoes de teste
+
+| Extensao | Descricao |
+|----------|-----------|
+| 100 | Echo test (repete audio) |
+| 200 | Music on Hold |
+| 300 | Voicemail test |
+| 400 | Time announcement |
+| 1111 | Usuario 1 |
+| 2222 | Usuario 2 |
+| 3333 | Usuario 3 |
+
+---
+
+## Troubleshooting
+
+### Container nao roda
+
+```bash
+cd docker/asterisk
+docker-compose up -d
+docker logs -f sipx-asterisk
+```
+
+### 401 persistente
+
+Verificar credenciais:
+
+```bash
+docker exec -it sipx-asterisk asterisk -rvvv
+# Dentro do CLI:
+pjsip show endpoints
+pjsip show auth auth1111
+```
+
+### Chamada cai
+
+```bash
+docker exec -it sipx-asterisk asterisk -rvvv
+# Dentro do CLI:
+pjsip set logger on
+```
+
+### Capturar trafico SIP
+
+```bash
+# sngrep (visual)
+sudo apt-get install sngrep
+sudo sngrep port 5060
+
+# tcpdump
+sudo tcpdump -i any -s 0 -A 'port 5060'
+```
+
+---
+
+## Comandos uteis do Asterisk CLI
+
+```bash
+docker exec -it sipx-asterisk asterisk -rvvv
+```
+
+Dentro do CLI:
+
+| Comando | Descricao |
+|---------|-----------|
+| `pjsip show endpoints` | Lista endpoints |
+| `pjsip show registrations` | Registros ativos |
+| `pjsip show contacts` | Contatos registrados |
+| `core show channels` | Chamadas ativas |
+| `dialplan show sipx-test` | Dialplan |
+| `pjsip set logger on` | Ativar debug SIP |
+| `pjsip set logger off` | Desativar debug |
+| `core reload` | Recarregar config |
+
+Sair: `Ctrl+C` ou `exit`
+
+---
+
+## Checklist
+
+- [ ] Docker container rodando (`docker ps`)
+- [ ] Porta 5060 usada pelo Asterisk (`ss -tulnp | grep 5060`)
+- [ ] Client usando porta 5061+ (`Client(local_port=5061)`)
+- [ ] Credenciais corretas (1111/1111xxx)
+- [ ] OPTIONS retorna 200
+- [ ] REGISTER com auth retorna 200
+
+---
+
+## Proximos passos
+
+- [QUICK_START.md](QUICK_START.md) — mais exemplos
+- [SDD.md](SDD.md) — spec completa e roadmap
+- [../docker/asterisk/README.md](../docker/asterisk/README.md) — config Asterisk
+
+---
+
+**Versao**: 0.3.0
+**Ultima atualizacao**: Marco 2026
+**Ambiente**: WSL2 + Docker + Asterisk PJSIP
