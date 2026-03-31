@@ -38,7 +38,7 @@ from ._types import (
 )
 
 if TYPE_CHECKING:
-    from ._models._message import Request, Response
+    from .models._message import Request, Response
 
 
 class TimerManager:

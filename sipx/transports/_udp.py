@@ -19,7 +19,7 @@ from .._types import (
     WriteError,
 )
 from ._base import AsyncBaseTransport, BaseTransport
-from .._models._message import Request, Response
+from ..models._message import Request, Response
 
 
 class UDPTransport(BaseTransport):
@@ -79,7 +79,7 @@ class UDPTransport(BaseTransport):
             TransportError: On send/receive failure
             TimeoutError: If response timeout expires
         """
-        from .._models._message import MessageParser
+        from ..models._message import MessageParser
 
         # Serialize request
         data = request.to_bytes()
@@ -261,7 +261,7 @@ class AsyncUDPTransport(AsyncBaseTransport):
             TransportError: On send/receive failure
             TimeoutError: If response timeout expires
         """
-        from .._models._message import MessageParser
+        from ..models._message import MessageParser
 
         await self._ensure_initialized()
 

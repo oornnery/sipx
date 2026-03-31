@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Optional
 from ._codecs import PCMA, PCMU, Codec
 
 if TYPE_CHECKING:
-    from sipx._models._body import SDPBody
+    from sipx.models._body import SDPBody
 
 
 @dataclass

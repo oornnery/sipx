@@ -10,10 +10,10 @@ from unittest.mock import patch
 
 from sipx._client import Client
 from sipx._events import Events
-from sipx._models._auth import Auth
-from sipx._models._message import Request
+from sipx.models._auth import Auth
+from sipx.models._message import Request
 from sipx._types import TransportAddress
-from sipx._transports._base import BaseTransport
+from sipx.transports._base import BaseTransport
 
 
 class MockTransport(BaseTransport):
@@ -321,7 +321,7 @@ class TestBuildAuthHeader:
         return client
 
     def test_generates_digest_header(self):
-        from sipx._models._auth import DigestChallenge
+        from sipx.models._auth import DigestChallenge
 
         client = self._make_client()
         creds = Auth.Digest("alice", "secret")
@@ -386,7 +386,7 @@ class TestTupleAuth:
 
 class TestSDPAudioFactory:
     def test_sdp_audio_basic(self):
-        from sipx._models._body import SDPBody
+        from sipx.models._body import SDPBody
 
         sdp = SDPBody.audio(ip="10.0.0.1", port=8000)
         assert sdp.get_connection_address() == "10.0.0.1"
@@ -397,14 +397,14 @@ class TestSDPAudioFactory:
         assert "PCMA" in codecs.get("audio", [])
 
     def test_sdp_audio_custom_codecs(self):
-        from sipx._models._body import SDPBody
+        from sipx.models._body import SDPBody
 
         sdp = SDPBody.audio(ip="10.0.0.1", port=9000, codecs=["PCMU"])
         codecs = sdp.get_codecs_summary()
         assert "PCMU" in codecs.get("audio", [])
 
     def test_sdp_audio_default_session_name(self):
-        from sipx._models._body import SDPBody
+        from sipx.models._body import SDPBody
 
         sdp = SDPBody.audio(ip="10.0.0.1", port=8000)
         assert sdp.session_name == "sipx"

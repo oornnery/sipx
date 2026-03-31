@@ -13,7 +13,7 @@ from sipx.contrib._sipi_br import (
     is_valid_br_number,
     normalize_br_number,
 )
-from sipx._models._message import Request, Response
+from sipx.models._message import Request, Response
 
 
 class TestNormalizeBrNumber:
@@ -191,7 +191,7 @@ class TestSipIBRReason:
 
 class TestATIQuery:
     def test_query_ported_number(self):
-        from sipx._models._message import Response
+        from sipx.models._message import Response
 
         client = MagicMock()
         resp = Response(
@@ -206,7 +206,7 @@ class TestATIQuery:
         assert result.rn1 == "12345"
 
     def test_query_not_ported(self):
-        from sipx._models._message import Response
+        from sipx.models._message import Response
 
         client = MagicMock()
         resp = Response(status_code=200)
@@ -225,7 +225,7 @@ class TestATIQuery:
         assert result.ported is False
 
     def test_query_normalizes_number(self):
-        from sipx._models._message import Response
+        from sipx.models._message import Response
 
         client = MagicMock()
         resp = Response(status_code=200)

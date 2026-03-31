@@ -50,7 +50,7 @@ from ._events import Events, EventContext, event_handler, on
 # Models
 # ============================================================================
 
-from ._models import (
+from .models import (
     SIPMessage,
     Request,
     Response,
@@ -111,7 +111,7 @@ from ._fsm import Dialog, StateManager, TimerManager, Transaction
 # Transport
 # ============================================================================
 
-from ._transports import (
+from .transports import (
     BaseTransport,
     AsyncBaseTransport,
     TransportAddress,

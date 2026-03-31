@@ -1,4 +1,4 @@
-"""Tests for sipx._models._auth (Auth, DigestAuth, DigestChallenge, DigestCredentials, AuthParser)."""
+"""Tests for sipx.models._auth (Auth, DigestAuth, DigestChallenge, DigestCredentials, AuthParser)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-from sipx._models._auth import (
+from sipx.models._auth import (
     Auth,
     AuthParser,
     DigestAuth,
@@ -15,7 +15,7 @@ from sipx._models._auth import (
     DigestCredentials,
     SipAuthCredentials,
 )
-from sipx._models._header import Headers
+from sipx.models._header import Headers
 
 
 # ============================================================================
@@ -372,7 +372,7 @@ class TestParseMultipleChallenges:
 
 class TestAuthGenerateChallenge:
     def test_401_returns_www_authenticate(self):
-        from sipx._models._message import Response
+        from sipx.models._message import Response
 
         resp = Response(
             401,
@@ -383,7 +383,7 @@ class TestAuthGenerateChallenge:
         assert "test" in val
 
     def test_407_returns_proxy_authenticate(self):
-        from sipx._models._message import Response
+        from sipx.models._message import Response
 
         resp = Response(
             407,
@@ -394,7 +394,7 @@ class TestAuthGenerateChallenge:
         assert "proxy" in val
 
     def test_missing_header_returns_empty(self):
-        from sipx._models._message import Response
+        from sipx.models._message import Response
 
         resp = Response(401)
         val = Auth.generate_challenge(resp)

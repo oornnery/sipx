@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from .._models._message import Request, Response
+    from ..models._message import Request, Response
 
 # ---------------------------------------------------------------------------
 # ISUP cause -> SIP status  (ITU-T Q.1912.5 / RFC 3398)

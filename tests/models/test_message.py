@@ -1,11 +1,11 @@
-"""Tests for sipx._models._message (Request, Response, MessageParser)."""
+"""Tests for sipx.models._message (Request, Response, MessageParser)."""
 
 from __future__ import annotations
 
 import pytest
 
-from sipx._models._message import Request, Response, MessageParser
-from sipx._models._body import SDPBody, RawBody
+from sipx.models._message import Request, Response, MessageParser
+from sipx.models._body import SDPBody, RawBody
 
 
 # ============================================================================

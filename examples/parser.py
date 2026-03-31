@@ -2,7 +2,7 @@
 """sipx — Parse raw SIP messages and headers."""
 
 from sipx import MessageParser, Headers
-from sipx._models._message import Request, Response
+from sipx.models._message import Request, Response
 from sipx._utils import console
 
 # --- Parse a raw SIP request ---

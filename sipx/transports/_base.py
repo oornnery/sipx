@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 from .._types import TransportAddress, TransportConfig
 
 if TYPE_CHECKING:
-    from .._models._message import Request, Response
+    from ..models._message import Request, Response
 
 
 class BaseTransport(abc.ABC):

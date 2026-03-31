@@ -17,20 +17,20 @@ from typing import Optional, Union, Callable
 from urllib.parse import urlparse
 
 from ._utils import logger
-from ._models._auth import SipAuthCredentials, DigestCredentials, DigestAuth
+from .models._auth import SipAuthCredentials, DigestCredentials, DigestAuth
 from ._events import Events, EventContext
 from ._fsm import StateManager
-from ._models._message import Request, Response, MessageParser
-from ._transports import (
+from .models._message import Request, Response, MessageParser
+from .transports import (
     TransportAddress,
     TransportConfig,
     UDPTransport,
     TCPTransport,
     TLSTransport,
 )
-from ._transports._udp import AsyncUDPTransport
-from ._transports._tcp import AsyncTCPTransport
-from ._transports._tls import AsyncTLSTransport
+from .transports._udp import AsyncUDPTransport
+from .transports._tcp import AsyncTCPTransport
+from .transports._tls import AsyncTLSTransport
 
 
 def _create_sync_transport(protocol: str, config: TransportConfig):
@@ -246,7 +246,7 @@ class Client:
             return None
 
         # Parse challenge
-        from ._models._auth import AuthParser
+        from .models._auth import AuthParser
 
         parser = AuthParser()
         challenge = parser.parse_from_headers(response.headers)
@@ -394,7 +394,7 @@ class Client:
     def _detect_auth_challenge(self, response: Response, context: EventContext) -> None:
         """Detect and parse authentication challenges."""
         if response.status_code in (401, 407):
-            from ._models._auth import AuthParser
+            from .models._auth import AuthParser
 
             parser = AuthParser()
             challenge = parser.parse_from_headers(response.headers)

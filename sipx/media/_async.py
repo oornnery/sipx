@@ -14,8 +14,8 @@ from ._rtp import RTPSession
 
 if TYPE_CHECKING:
     from sipx._client import Client
-    from sipx._models._body import SDPBody
-    from sipx._models._message import Response
+    from sipx.models._body import SDPBody
+    from sipx.models._message import Response
     from sipx.media._codecs import Codec
 
 

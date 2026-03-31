@@ -1,9 +1,9 @@
-"""Tests for sipx._models._body (SDPBody, RawBody, BodyParser)."""
+"""Tests for sipx.models._body (SDPBody, RawBody, BodyParser)."""
 
 from __future__ import annotations
 
 
-from sipx._models._body import SDPBody, RawBody, BodyParser
+from sipx.models._body import SDPBody, RawBody, BodyParser
 
 
 # ============================================================================

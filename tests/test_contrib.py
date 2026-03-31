@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sipx.contrib._ivr import Menu, MenuItem, Prompt
 from sipx.contrib._sipi import SipI
-from sipx._models._message import Request
+from sipx.models._message import Request
 
 
 class TestSipI:

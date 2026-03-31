@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from sipx._routing import RouteSet
-from sipx._models._message import Request, Response
+from sipx.models._message import Request, Response
 
 
 class TestRouteSetFromResponse:

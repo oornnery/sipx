@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 
 from sipx._server import SIPServer
-from sipx._models._message import Response
+from sipx.models._message import Response
 from sipx._types import TransportConfig
 
 

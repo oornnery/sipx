@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sipx._client import Client
-    from sipx._models._message import Response
+    from sipx.models._message import Response
 
     from ._rtp import RTPSession
 

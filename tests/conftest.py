@@ -7,9 +7,9 @@ from typing import Optional, Tuple
 
 import pytest
 
-from sipx._models._body import SDPBody
-from sipx._models._message import Request, Response
-from sipx._transports._base import BaseTransport
+from sipx.models._body import SDPBody
+from sipx.models._message import Request, Response
+from sipx.transports._base import BaseTransport
 from sipx._types import TransportAddress, TransportConfig
 
 
@@ -58,7 +58,7 @@ class MockTransport(BaseTransport):
         destination: TransportAddress,
     ) -> Response:
         """Send the request bytes then receive and parse the response."""
-        from sipx._models._message import MessageParser
+        from sipx.models._message import MessageParser
 
         self.send(request.to_bytes(), destination)
         data, _ = self.receive()

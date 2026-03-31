@@ -14,7 +14,7 @@ from sipx._depends import (
     ToHeader,
     resolve_handler,
 )
-from sipx._models._message import Request
+from sipx.models._message import Request
 from sipx._types import TransportAddress
 
 

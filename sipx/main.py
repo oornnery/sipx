@@ -63,7 +63,7 @@ def _get_app():
         """Register with a SIP server."""
         auth = None
         if user and password:
-            from ._models._auth import Auth
+            from .models._auth import Auth
 
             auth = Auth.Digest(username=user, password=password)
 
@@ -124,7 +124,7 @@ def _get_app():
         """Make a call: INVITE + ACK, hold, BYE."""
         auth = None
         if user and password:
-            from ._models._auth import Auth
+            from .models._auth import Auth
 
             auth = Auth.Digest(username=user, password=password)
 
@@ -175,7 +175,7 @@ def _get_app():
         """Send a SIP MESSAGE."""
         auth = None
         if user and password:
-            from ._models._auth import Auth
+            from .models._auth import Auth
 
             auth = Auth.Digest(username=user, password=password)
 

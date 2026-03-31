@@ -14,8 +14,8 @@ from enum import Enum, auto
 from typing import Any, Optional
 
 if typing.TYPE_CHECKING:
-    from ._models._header import Headers
-    from ._models._message import Request, Response
+    from .models._header import Headers
+    from .models._message import Request, Response
     from ._fsm import Transaction, Dialog
 
 

@@ -26,7 +26,7 @@ import typing
 from abc import ABC, abstractmethod
 from typing import Any
 
-from ._models._message import Request
+from .models._message import Request
 from ._types import TransportAddress
 
 
@@ -179,7 +179,7 @@ class AutoRTP(Extractor):
 
         body = request.body
         if body and hasattr(body, "get_rtp_params"):
-            from sipx._models._body import SDPBody as _SDPBody
+            from sipx.models._body import SDPBody as _SDPBody
 
             return RTPSession.from_sdp(
                 body if isinstance(body, _SDPBody) else body, source.host, self.port

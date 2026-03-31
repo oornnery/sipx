@@ -6,7 +6,7 @@ import time
 
 
 from sipx._fsm import Dialog, StateManager, Transaction
-from sipx._models._message import Request, Response
+from sipx.models._message import Request, Response
 from sipx._types import DialogState, TransactionState, TransactionType
 
 

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 from ._utils import logger
 
 # Import at runtime for isinstance checks
-from ._models._message import Request, Response
+from .models._message import Request, Response
 
 if TYPE_CHECKING:
     pass

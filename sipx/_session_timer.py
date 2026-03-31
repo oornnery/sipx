@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
     from ._client import Client
-    from ._models._message import Response
+    from .models._message import Response
 
 
 @dataclass

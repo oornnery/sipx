@@ -1,10 +1,10 @@
-"""Tests for sipx._models._header (Headers, HeaderParser)."""
+"""Tests for sipx.models._header (Headers, HeaderParser)."""
 
 from __future__ import annotations
 
 import pytest
 
-from sipx._models._header import Headers, HeaderParser
+from sipx.models._header import Headers, HeaderParser
 
 
 # ============================================================================

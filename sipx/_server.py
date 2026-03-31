@@ -12,8 +12,8 @@ import threading
 from typing import Callable, Dict, Optional
 
 from ._utils import logger
-from ._models._message import MessageParser, Request, Response
-from ._transports._udp import UDPTransport
+from .models._message import MessageParser, Request, Response
+from .transports._udp import UDPTransport
 from ._types import TransportConfig, TransportAddress, TransactionType, TransactionState
 from ._fsm import StateManager
 from ._depends import resolve_handler

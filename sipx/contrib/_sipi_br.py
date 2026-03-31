@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from .._models._message import Request, Response
+    from ..models._message import Request, Response
 
 
 # ---------------------------------------------------------------------------

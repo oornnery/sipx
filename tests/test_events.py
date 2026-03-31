@@ -4,7 +4,7 @@ from __future__ import annotations
 
 
 from sipx._events import Events, EventContext, event_handler
-from sipx._models._message import Request, Response
+from sipx.models._message import Request, Response
 
 
 # ============================================================================

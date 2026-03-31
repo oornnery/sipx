@@ -26,7 +26,7 @@ from .._types import (
 )
 from ._base import AsyncBaseTransport, BaseTransport
 
-from .._models._message import Request, Response
+from ..models._message import Request, Response
 
 
 class TLSTransport(BaseTransport):
@@ -165,7 +165,7 @@ class TLSTransport(BaseTransport):
             ConnectionError: If connection fails
             TimeoutError: If response timeout expires
         """
-        from .._models._message import MessageParser
+        from ..models._message import MessageParser
 
         # Ensure connection
         self._ensure_connected(destination)
@@ -472,7 +472,7 @@ class AsyncTLSTransport(AsyncBaseTransport):
             ConnectionError: If connection fails
             TimeoutError: If response timeout expires
         """
-        from .._models._message import MessageParser
+        from ..models._message import MessageParser
 
         # Ensure connection
         await self._ensure_connected(destination)

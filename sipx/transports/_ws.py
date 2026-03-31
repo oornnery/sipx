@@ -17,7 +17,7 @@ from .._types import TransportAddress, TransportConfig
 from ._base import AsyncBaseTransport, BaseTransport
 
 if TYPE_CHECKING:
-    from .._models._message import Request, Response
+    from ..models._message import Request, Response
 
 
 def _import_websockets():
@@ -95,7 +95,7 @@ class WSTransport(BaseTransport):
         Returns:
             Parsed SIP response.
         """
-        from .._models._message import MessageParser
+        from ..models._message import MessageParser
 
         with self._lock:
             self._ensure_connected()
@@ -204,7 +204,7 @@ class AsyncWSTransport(AsyncBaseTransport):
         Returns:
             Parsed SIP response.
         """
-        from .._models._message import MessageParser
+        from ..models._message import MessageParser
 
         await self._ensure_connected()
         data = request.to_bytes()
