@@ -26,6 +26,33 @@ dev = [
     "ty>=0.0.1a20",
 ]
 
+[tool.taskipy.tasks]
+# Quality
+lint = "ruff check sipx/ tests/ examples/"
+format = "ruff format sipx/ tests/ examples/"
+check = "ruff format --check sipx/ tests/ examples/ && ruff check sipx/ tests/ examples/"
+typecheck = "ty check"
+
+# Test
+test = "pytest tests/ -v"
+cov = "pytest tests/ --cov=sipx --cov-report=term-missing"
+cov-html = "pytest tests/ --cov=sipx --cov-report=html && open htmlcov/index.html"
+
+# Run examples
+example-ivr = "python examples/ivr.py"
+example-asterisk = "python examples/asterisk.py"
+example-server = "python examples/server.py"
+example-sdp = "python examples/sdp.py"
+example-audio = "python examples/audio.py"
+example-parser = "python examples/parser.py"
+
+# Docker
+asterisk-up = "docker-compose -f docker/asterisk/docker-compose.yml up -d"
+asterisk-down = "docker-compose -f docker/asterisk/docker-compose.yml down"
+
+# CI (run in order)
+ci = "task check && task test"
+
 [tool.setuptools]
 package-dir = {"" = "."}
 
