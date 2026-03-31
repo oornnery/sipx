@@ -99,13 +99,13 @@ class DTMFSender:
         pkt = RTPPacket(
             marker=True,
             payload_type=DTMF_PAYLOAD_TYPE,
-            sequence_number=self.rtp_session._sequence,
+            sequence_number=self.rtp_session._sequence_number,
             timestamp=ts,
             ssrc=self.rtp_session._ssrc,
             payload=payload,
         )
         self.rtp_session.send_packet(pkt)
-        self.rtp_session._sequence = (self.rtp_session._sequence + 1) & 0xFFFF
+        self.rtp_session._sequence_number = (self.rtp_session._sequence_number + 1) & 0xFFFF
 
         # Wait half duration
         time.sleep(duration_ms / 2000.0)
@@ -118,13 +118,13 @@ class DTMFSender:
         pkt = RTPPacket(
             marker=False,
             payload_type=DTMF_PAYLOAD_TYPE,
-            sequence_number=self.rtp_session._sequence,
+            sequence_number=self.rtp_session._sequence_number,
             timestamp=ts,
             ssrc=self.rtp_session._ssrc,
             payload=payload,
         )
         self.rtp_session.send_packet(pkt)
-        self.rtp_session._sequence = (self.rtp_session._sequence + 1) & 0xFFFF
+        self.rtp_session._sequence_number = (self.rtp_session._sequence_number + 1) & 0xFFFF
 
         # Wait remaining duration
         time.sleep(duration_ms / 2000.0)
@@ -137,13 +137,13 @@ class DTMFSender:
             pkt = RTPPacket(
                 marker=False,
                 payload_type=DTMF_PAYLOAD_TYPE,
-                sequence_number=self.rtp_session._sequence,
+                sequence_number=self.rtp_session._sequence_number,
                 timestamp=ts,
                 ssrc=self.rtp_session._ssrc,
                 payload=payload,
             )
             self.rtp_session.send_packet(pkt)
-            self.rtp_session._sequence = (self.rtp_session._sequence + 1) & 0xFFFF
+            self.rtp_session._sequence_number = (self.rtp_session._sequence_number + 1) & 0xFFFF
 
 
 class DTMFCollector:
@@ -182,6 +182,8 @@ class DTMFCollector:
             except Exception:
                 continue
 
+            if pkt is None:
+                continue
             if pkt.payload_type != DTMF_PAYLOAD_TYPE:
                 continue
             if len(pkt.payload) < 4:
