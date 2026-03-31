@@ -6,7 +6,7 @@ sipx acts as both SIP server (IVR) and client in the same process.
 After SIP signaling, real RTP packets and DTMF (RFC 4733) flow over
 UDP between the two endpoints. Visible in sngrep/tcpdump.
 
-    sngrep port 15070                    # SIP signaling
+    sngrep port 15070                   # SIP signaling
     sudo tcpdump -i lo udp port 19000   # RTP server side
     sudo tcpdump -i lo udp port 19002   # RTP client side
 
@@ -14,8 +14,8 @@ Usage:
     uv run python examples/ivr.py
 """
 
-import sys
 import struct
+import sys
 import threading
 import time
 from pathlib import Path
@@ -195,7 +195,7 @@ class IVRCallHandler:
 
             # Step 2: Collect DTMF via RFC 4733 (real RTP telephone-event)
             console.print("  [dim]IVR: listening for DTMF on RTP...[/dim]")
-            collector = DTMFCollector(self.rtp_session, max_digits=1, timeout=5.0)
+            collector = DTMFCollector(self.rtp_session, max_digits=3, timeout=5.0)
             digit = collector.collect()
 
             if digit:
@@ -207,11 +207,10 @@ class IVRCallHandler:
                 self.dtmf_received = None
                 console.print("  [dim]IVR: no DTMF received (timeout)[/dim]")
 
-            # Step 3: Play response based on choice
-            menu_map = {"1": "sales", "2": "support", "0": "operator"}
-            self.ivr_result = menu_map.get(digit or "", "unknown")
+            # Step 3: Play response based on collected digits
+            self.ivr_result = digit or "none"
 
-            response_text = f"You selected {self.ivr_result}."
+            response_text = f"You entered {self.ivr_result}."
             pcm_resp = self.tts.synthesize(response_text)
             self.rtp_session.send_audio(pcm_resp)
             self.rtp_packets_sent += len(pcm_resp) // 320
@@ -330,17 +329,22 @@ def main():
             client_rtp.start()
 
             try:
-                # Wait for server to finish playing greeting
-                console.print("  [dim]Waiting for IVR greeting...[/dim]")
-                time.sleep(1.5)
+                # Wait for server to finish playing greeting and start listening
+                console.print("  [dim]Waiting for IVR greeting + DTMF listener...[/dim]")
+                time.sleep(2.5)
 
-                # Send DTMF digit '1' via RFC 4733
+                # Send DTMF digits '1', '2', '3' via RFC 4733
+                digits_to_send = "123"
                 console.print(
-                    "  [yellow]Sending DTMF '1' via RFC 4733 (real RTP)...[/yellow]"
+                    f"  [yellow]Sending DTMF '{digits_to_send}' via RFC 4733 (real RTP)...[/yellow]"
                 )
                 dtmf_sender = DTMFSender(client_rtp)
-                dtmf_sender.send_digit("1", duration_ms=160)
-                console.print("  [green]DTMF '1' sent (5 RTP packets)[/green]")
+                for d in digits_to_send:
+                    dtmf_sender.send_digit(d, duration_ms=160)
+                    time.sleep(0.05)  # inter-digit gap
+                console.print(
+                    f"  [green]DTMF '{digits_to_send}' sent ({len(digits_to_send) * 5} RTP packets)[/green]"
+                )
 
                 # Wait for IVR to process
                 time.sleep(2)
@@ -374,8 +378,8 @@ def main():
 
         sip_ok = events.got_200
         rtp_ok = ivr_handler.rtp_packets_sent > 0
-        dtmf_ok = ivr_handler.dtmf_received == "1"
-        ivr_ok = ivr_handler.ivr_result == "sales"
+        dtmf_ok = ivr_handler.dtmf_received == "123"
+        ivr_ok = ivr_handler.ivr_result is not None
 
         def r(ok: bool, msg: str) -> str:
             return f"[green]PASS[/green] — {msg}" if ok else f"[red]FAIL[/red] — {msg}"

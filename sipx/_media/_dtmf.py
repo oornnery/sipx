@@ -145,6 +145,11 @@ class DTMFSender:
             self.rtp_session.send_packet(pkt)
             self.rtp_session._sequence_number = (self.rtp_session._sequence_number + 1) & 0xFFFF
 
+        # Advance timestamp past this digit so next digit has a different ts
+        self.rtp_session._timestamp = (
+            self.rtp_session._timestamp + total_duration
+        ) & 0xFFFFFFFF
+
 
 class DTMFCollector:
     """Collect DTMF digits received from an RTP stream."""
@@ -170,6 +175,7 @@ class DTMFCollector:
             String of collected digits (e.g. "123#")
         """
         digits: list[str] = []
+        last_end_ts: int | None = None  # deduplicate repeated end-packets
         deadline = time.time() + self.timeout
 
         while len(digits) < self.max_digits:
@@ -191,6 +197,11 @@ class DTMFCollector:
 
             event = decode_dtmf_event(pkt.payload)
             if event.get("end"):
+                # RFC 4733: end-packet is sent 3 times with same timestamp.
+                # Only count the first one per timestamp.
+                if pkt.timestamp == last_end_ts:
+                    continue
+                last_end_ts = pkt.timestamp
                 digit = event_to_digit(event["event"])
                 if digit is not None:
                     digits.append(digit)
