@@ -96,16 +96,16 @@ from ._depends import (
 # ============================================================================
 
 from ._uri import SipURI
-from ._session_timer import SessionTimer, SessionTimerConfig
+from ._session_timer import AsyncSessionTimer, SessionTimer, SessionTimerConfig
 from ._routing import RouteSet
 from ._dns import SipResolver, ResolvedTarget
-from ._subscription import Subscription, SubscriptionState
+from ._subscription import AsyncSubscription, Subscription, SubscriptionState
 
 # ============================================================================
 # FSM
 # ============================================================================
 
-from ._fsm import Dialog, StateManager, TimerManager, Transaction
+from ._fsm import AsyncTimerManager, Dialog, StateManager, TimerManager, Transaction
 
 # ============================================================================
 # Transport
@@ -223,11 +223,13 @@ __all__ = [
     "AsyncClient",
     "SIPServer",
     "SipURI",
+    "AsyncSessionTimer",
     "SessionTimer",
     "SessionTimerConfig",
     "RouteSet",
     "SipResolver",
     "ResolvedTarget",
+    "AsyncSubscription",
     "Subscription",
     "SubscriptionState",
     "Events",
@@ -280,6 +282,7 @@ __all__ = [
     "AuthParser",
     "AsyncBaseTransport",
     "StateManager",
+    "AsyncTimerManager",
     "TimerManager",
     "Transaction",
     "Dialog",
