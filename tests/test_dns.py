@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from sipx._dns import ResolvedTarget, SipResolver
+from sipx.dns import ResolvedTarget, SipResolver
 
 
 class TestResolvedTarget:
@@ -45,7 +45,7 @@ class TestSipResolverResolve:
         resolver = SipResolver()
         # Force no dnspython
         resolver._dns_resolver = None
-        with patch("sipx._dns.socket.gethostbyname", return_value="93.184.216.34"):
+        with patch("sipx.dns._sync.socket.gethostbyname", return_value="93.184.216.34"):
             targets = resolver.resolve("example.com")
         assert len(targets) == 1
         assert targets[0].host == "93.184.216.34"
@@ -55,7 +55,7 @@ class TestSipResolverResolve:
     def test_resolve_a_record_with_transport_tcp(self):
         resolver = SipResolver()
         resolver._dns_resolver = None
-        with patch("sipx._dns.socket.gethostbyname", return_value="10.0.0.1"):
+        with patch("sipx.dns._sync.socket.gethostbyname", return_value="10.0.0.1"):
             targets = resolver.resolve("example.com", transport="TCP")
         assert targets[0].transport == "TCP"
         assert targets[0].port == 5060
@@ -63,7 +63,7 @@ class TestSipResolverResolve:
     def test_resolve_a_record_with_transport_tls(self):
         resolver = SipResolver()
         resolver._dns_resolver = None
-        with patch("sipx._dns.socket.gethostbyname", return_value="10.0.0.1"):
+        with patch("sipx.dns._sync.socket.gethostbyname", return_value="10.0.0.1"):
             targets = resolver.resolve("example.com", transport="TLS")
         assert targets[0].transport == "TLS"
         assert targets[0].port == 5061
@@ -73,7 +73,7 @@ class TestSipResolverResolve:
 
         resolver = SipResolver()
         resolver._dns_resolver = None
-        with patch("sipx._dns.socket.gethostbyname", side_effect=socket.gaierror):
+        with patch("sipx.dns._sync.socket.gethostbyname", side_effect=socket.gaierror):
             targets = resolver.resolve("nonexistent.example.com")
         assert len(targets) == 1
         assert targets[0].host == "nonexistent.example.com"
@@ -81,7 +81,7 @@ class TestSipResolverResolve:
     def test_resolve_ip_address_returns_as_is(self):
         resolver = SipResolver()
         resolver._dns_resolver = None
-        with patch("sipx._dns.socket.gethostbyname", return_value="192.168.1.1"):
+        with patch("sipx.dns._sync.socket.gethostbyname", return_value="192.168.1.1"):
             targets = resolver.resolve("192.168.1.1")
         assert targets[0].host == "192.168.1.1"
 
@@ -98,14 +98,14 @@ class TestSipResolverResolveURI:
     def test_resolve_uri_sips_scheme_defaults_tls(self):
         resolver = SipResolver()
         resolver._dns_resolver = None
-        with patch("sipx._dns.socket.gethostbyname", return_value="10.0.0.1"):
+        with patch("sipx.dns._sync.socket.gethostbyname", return_value="10.0.0.1"):
             targets = resolver.resolve_uri("sips:bob@secure.example.com")
         assert targets[0].transport == "TLS"
 
     def test_resolve_uri_transport_tcp_hint(self):
         resolver = SipResolver()
         resolver._dns_resolver = None
-        with patch("sipx._dns.socket.gethostbyname", return_value="10.0.0.1"):
+        with patch("sipx.dns._sync.socket.gethostbyname", return_value="10.0.0.1"):
             targets = resolver.resolve_uri("sip:alice@example.com;transport=tcp")
         assert targets[0].transport == "TCP"
 
@@ -203,7 +203,7 @@ class TestSipResolverSRV:
         resolver._dns_resolver = mock_dns_resolver
 
         with patch.dict("sys.modules", patches):
-            with patch("sipx._dns.socket.gethostbyname", return_value="10.0.0.1"):
+            with patch("sipx.dns._sync.socket.gethostbyname", return_value="10.0.0.1"):
                 targets = resolver.resolve("example.com")
         assert len(targets) >= 1
 

@@ -98,7 +98,7 @@ from ._depends import (
 from ._uri import SipURI
 from .session import AsyncSessionTimer, SessionTimer, SessionTimerConfig
 from ._routing import RouteSet
-from ._dns import SipResolver, ResolvedTarget
+from .dns import SipResolver, ResolvedTarget
 from .session import AsyncSubscription, Subscription, SubscriptionState
 
 # ============================================================================
