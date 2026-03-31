@@ -2,7 +2,6 @@
 """
 sipx — IVR: Bidirectional RTP + 3 DTMF Methods (100% async API)
 
-Uses AsyncSIPServer, AsyncClient, AsyncRTPSession, AsyncCallSession.
 
     sngrep port 15080
     sudo tcpdump -i lo udp port 19010
@@ -32,7 +31,6 @@ from sipx._utils import console
 from sipx.media import (
     RTPSession,
     AsyncRTPSession,
-    AsyncCallSession,
     ToneGenerator,
     DTMFToneGenerator,
 )
@@ -76,9 +74,15 @@ def on_invite(
 ) -> Response:
     console.print(f"\n  [bold green]IVR: call from {caller}[/bold green]")
 
-    # Wrap sync RTP in async and schedule on the main event loop
-    async_rtp = AsyncRTPSession.__new__(AsyncRTPSession)
-    async_rtp._sync = rtp
+    # Create native async RTP from sync RTP's parameters
+    async_rtp = AsyncRTPSession(
+        local_ip=rtp.local_ip,
+        local_port=rtp.local_port,
+        remote_ip=rtp.remote_ip,
+        remote_port=rtp.remote_port,
+        payload_type=rtp.payload_type,
+        clock_rate=rtp.clock_rate,
+    )
     if _loop:
         _loop.call_soon_threadsafe(asyncio.ensure_future, _ivr_flow(async_rtp))
 
@@ -207,12 +211,18 @@ async def main():
 
             # DTMF (3 methods)
             console.rule("3. DTMF (3 methods)")
-            async with AsyncCallSession(client._sync, r, rtp_port=RTP_CLIENT) as call:
+            call = AsyncRTPSession(
+                local_ip=HOST,
+                local_port=RTP_CLIENT,
+                remote_ip=HOST,
+                remote_port=RTP_SERVER,
+            )
+            async with call:
                 await asyncio.sleep(2)
 
                 # Method 1: RFC 4733
                 console.print("  [bold]RFC 4733 (RTP telephone-event)[/bold]")
-                await call.send_dtmf("123")
+                await call.dtmf.send("123")
                 console.print("  [green]Sent '123' (15 RTP packets)[/green]")
                 await asyncio.sleep(1)
 
@@ -230,14 +240,14 @@ async def main():
 
                 # Method 3: Inband
                 console.print("  [bold]Inband (dual-tone audio)[/bold]")
-                await call.play(dtmf_gen.generate_digit("9", duration_ms=200))
+                await call.send_audio(dtmf_gen.generate_digit("9", duration_ms=200))
                 results["dtmf_inband"] = True
                 console.print("  [green]Sent '9' as 697+1477Hz tone[/green]")
                 await asyncio.sleep(1)
 
                 # Bidirectional audio
                 console.print("  [bold]Bidirectional audio[/bold]")
-                await call.play_tone(freq=880, duration_ms=500)
+                await call.send_audio(ToneGenerator(880).generate(500))
                 console.print("  [green]Client -> Server: 880Hz tone[/green]")
                 await asyncio.sleep(1)
 
