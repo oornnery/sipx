@@ -491,24 +491,38 @@ class Client:
         logger.debug(request.to_string())
 
         try:
+            import time as _time
+
             # Send request
             self._transport.send(request.to_bytes(), destination)
 
-            # Receive responses
+            # Receive responses with short timeout polling.
+            # This allows FSM timers (Timer A/E) to retransmit in background
+            # while we wait for a response. Total deadline = Timer B/F (32s).
             parser = MessageParser()
             final_response = None
+            deadline = _time.monotonic() + self._transport.config.read_timeout
+            poll_interval = 0.5  # 500ms — matches Timer A initial value
 
-            while True:
-                response_data, source = self._transport.receive(
-                    timeout=self._transport.config.read_timeout
-                )
+            while _time.monotonic() < deadline:
+                try:
+                    response_data, source = self._transport.receive(
+                        timeout=poll_interval
+                    )
+                except Exception:
+                    # Timeout on this poll — loop again (timers retransmit in background)
+                    if transaction.is_terminated():
+                        logger.debug("Transaction terminated by timer")
+                        break
+                    continue
 
                 response = parser.parse(response_data)
 
                 # Skip incoming requests (e.g. re-INVITE from server)
                 if not isinstance(response, Response):
                     logger.debug(
-                        f"Skipped incoming {type(response).__name__}, waiting for Response"
+                        "Skipped incoming %s, waiting for Response",
+                        type(response).__name__,
                     )
                     continue
 
@@ -529,7 +543,7 @@ class Client:
                 )
                 logger.debug(response.to_string())
 
-                # Update transaction (triggers state change which cancels timers)
+                # Update transaction (triggers state change, cancels retransmit timers)
                 self._state_manager.update_transaction(transaction.id, response)
 
                 # Update context
@@ -552,11 +566,14 @@ class Client:
                 if final_response is None:
                     final_response = response
 
+            if final_response is None:
+                logger.warning("Request timed out after %.0fs", self._transport.config.read_timeout)
+                return None
+
             # Auto-retry on 401/407 if auth is set
             if (
                 self._auto_auth
                 and self._auth
-                and final_response
                 and final_response.status_code in (401, 407)
             ):
                 retry_result = self.retry_with_auth(final_response)
