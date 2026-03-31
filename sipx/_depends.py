@@ -176,14 +176,11 @@ class AutoRTP(Extractor):
 
     def extract(self, request: Request, source: TransportAddress) -> Any:
         from .media._rtp import RTPSession
+        from .models._body import SDPBody
 
         body = request.body
-        if body and hasattr(body, "get_rtp_params"):
-            from sipx.models._body import SDPBody as _SDPBody
-
-            return RTPSession.from_sdp(
-                body if isinstance(body, _SDPBody) else body, source.host, self.port
-            )  # type: ignore[arg-type]
+        if isinstance(body, SDPBody):
+            return RTPSession.from_sdp(body, source.host, self.port)
         return None
 
 
