@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
 """
-sipx — IVR Demo with REAL RTP and DTMF (no Asterisk required)
+sipx — IVR Demo with REAL RTP + DTMF (no Asterisk)
 
-sipx acts as both SIP server (IVR) and client in the same process.
-After SIP signaling, real RTP packets and DTMF (RFC 4733) flow over
-UDP between the two endpoints. Visible in sngrep/tcpdump.
+sipx as both server (IVR) and client. Real RTP audio and DTMF RFC 4733.
 
-    sngrep port 15070                   # SIP signaling
-    sudo tcpdump -i lo udp port 19000   # RTP server side
-    sudo tcpdump -i lo udp port 19002   # RTP client side
+    sngrep port 15070                    # SIP
+    sudo tcpdump -i lo udp port 19000   # RTP
 
 Usage:
     uv run python examples/ivr.py
 """
 
-import struct
 import sys
 import threading
 import time
 from pathlib import Path
+from typing import Annotated
 
 from rich import box
 from rich.table import Table
@@ -26,199 +23,111 @@ from rich.table import Table
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sipx import (
-    Client,
-    Events,
+    SIPServer,
     Request,
     Response,
     SDPBody,
+    FromHeader,
+    AutoRTP,
     console,
     on,
+    Client,
+    Events,
 )
-from sipx._media._dtmf import DTMFCollector, DTMFSender
-from sipx._media._rtp import RTPSession
-from sipx._media._tts import BaseTTS
-from sipx._server import SIPServer
-from sipx._types import TransportAddress
+from sipx.media import (
+    RTPSession,
+    ToneGenerator,
+    CallSession,
+)
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-SERVER_HOST = "127.0.0.1"
-SERVER_PORT = 15070
+HOST = "127.0.0.1"
+SIP_PORT = 15070
 CLIENT_PORT = 15071
-RTP_PORT_SERVER = 19000
-RTP_PORT_CLIENT = 19002
-
-
-# ---------------------------------------------------------------------------
-# TTS — generates real PCM audio (sine wave tone)
-# ---------------------------------------------------------------------------
-
-
-class ToneTTS(BaseTTS):
-    """TTS that generates a short tone as PCM audio and sends it via RTP."""
-
-    @property
-    def language(self) -> str:
-        return "pt-BR"
-
-    @property
-    def sample_rate(self) -> int:
-        return 8000
-
-    def synthesize(self, text: str) -> bytes:
-        """Generate 0.5s of 440Hz tone as 16-bit PCM (real audio)."""
-        console.print(f'  [cyan]TTS: "{text}"[/cyan]')
-        import math
-
-        duration = 0.5
-        freq = 440  # Hz
-        samples = int(self.sample_rate * duration)
-        pcm = bytearray()
-        for i in range(samples):
-            val = int(16000 * math.sin(2 * math.pi * freq * i / self.sample_rate))
-            pcm.extend(struct.pack("<h", max(-32768, min(32767, val))))
-        return bytes(pcm)
-
+RTP_SERVER = 19000
+RTP_CLIENT = 19002
 
 # ---------------------------------------------------------------------------
-# IVR Server — answers calls, plays RTP audio, collects real DTMF
+# IVR Server
 # ---------------------------------------------------------------------------
 
+server = SIPServer(local_host=HOST, local_port=SIP_PORT)
+tone = ToneGenerator(440)
 
-class IVRCallHandler:
-    """Handles incoming INVITE: answers, sends RTP, collects DTMF."""
+# Shared state for results
+ivr_state = {
+    "dtmf": None,
+    "rtp_packets": 0,
+    "active": False,
+}
 
-    def __init__(self):
-        self.tts = ToneTTS()
-        self.call_active = False
-        self.ivr_result: str | None = None
-        self.rtp_session: RTPSession | None = None
-        self.rtp_packets_sent = 0
-        self.dtmf_received: str | None = None
 
-    def handle_invite(self, request: Request, source: TransportAddress) -> Response:
-        """Answer INVITE with SDP and start IVR with real RTP."""
-        console.print(f"\n  [bold green]IVR: incoming call from {source}[/bold green]")
+@server.invite
+def on_invite(
+    request: Request,
+    caller: Annotated[str, FromHeader],
+    rtp: Annotated[RTPSession, AutoRTP(port=RTP_SERVER)],
+) -> Response:
+    """Handle incoming INVITE — answer and run IVR."""
+    console.print(f"\n  [bold green]IVR: call from {caller}[/bold green]")
 
-        # Parse caller SDP to know their RTP port
-        caller_rtp_port = RTP_PORT_CLIENT
-        if request.content:
-            from sipx._models._body import BodyParser
+    ivr_state["active"] = True
 
-            try:
-                caller_sdp = BodyParser.parse_sdp(request.content)
-                ports = caller_sdp.get_media_ports()
-                caller_rtp_port = ports.get("audio", RTP_PORT_CLIENT)
-                console.print(
-                    f"  [dim]Caller RTP: {source.host}:{caller_rtp_port}[/dim]"
-                )
-            except Exception:
-                pass
+    # Start IVR in background (after response is sent)
+    threading.Thread(target=_run_ivr, args=(rtp,), daemon=True).start()
 
-        # Build answer SDP
-        answer_sdp = SDPBody.create_offer(
-            session_name="sipx-IVR",
-            origin_username="ivr",
-            origin_address=SERVER_HOST,
-            connection_address=SERVER_HOST,
-            media_specs=[
-                {
-                    "media": "audio",
-                    "port": RTP_PORT_SERVER,
-                    "codecs": [
-                        {"payload": "0", "name": "PCMU", "rate": "8000"},
-                        {
-                            "payload": "101",
-                            "name": "telephone-event",
-                            "rate": "8000",
-                        },
-                    ],
-                }
-            ],
-        )
+    answer = SDPBody.audio(ip=HOST, port=RTP_SERVER)
+    return Response(
+        status_code=200,
+        headers={
+            "Via": request.via or "",
+            "From": request.from_header or "",
+            "To": (request.to_header or "") + ";tag=ivr-tag",
+            "Call-ID": request.call_id or "",
+            "CSeq": request.cseq or "",
+            "Contact": f"<sip:ivr@{HOST}:{SIP_PORT}>",
+            "Content-Type": "application/sdp",
+        },
+        content=answer.to_string(),
+    )
 
-        # Create RTP session (server side: listens on RTP_PORT_SERVER, sends to caller's RTP port)
-        self.rtp_session = RTPSession(
-            local_ip=SERVER_HOST,
-            local_port=RTP_PORT_SERVER,
-            remote_ip=SERVER_HOST,
-            remote_port=caller_rtp_port,
-            payload_type=0,
-            clock_rate=8000,
-        )
 
-        response = Response(
-            status_code=200,
-            reason_phrase="OK",
-            headers={
-                "Via": request.via or "",
-                "From": request.from_header or "",
-                "To": (request.to_header or "") + ";tag=ivr-server-tag",
-                "Call-ID": request.call_id or "",
-                "CSeq": request.cseq or "",
-                "Contact": f"<sip:ivr@{SERVER_HOST}:{SERVER_PORT}>",
-                "Content-Type": "application/sdp",
-            },
-            content=answer_sdp.to_string(),
-        )
+def _run_ivr(rtp: RTPSession):
+    """IVR flow: play greeting, collect DTMF, play response."""
+    time.sleep(0.5)
+    rtp.start()
 
-        self.call_active = True
+    console.print("\n  [bold yellow]--- IVR Started ---[/bold yellow]")
+    try:
+        # Play greeting tone
+        console.print('  [cyan]TTS: "Press 1 for sales, 2 for support"[/cyan]')
+        pcm = tone.generate(500)
+        rtp.send_audio(pcm)
+        ivr_state["rtp_packets"] = len(pcm) // 320
 
-        # Start IVR with real RTP in background
-        threading.Thread(target=self._run_ivr, daemon=True).start()
+        # Collect DTMF (real RFC 4733)
+        console.print("  [dim]Listening for DTMF...[/dim]")
+        digits = rtp.dtmf.collect(max_digits=3, timeout=5.0)
 
-        return response
+        if digits:
+            ivr_state["dtmf"] = digits
+            console.print(f"  [yellow]DTMF received: '{digits}'[/yellow]")
+        else:
+            console.print("  [dim]No DTMF (timeout)[/dim]")
 
-    def _run_ivr(self):
-        """Run IVR with real RTP audio and DTMF collection."""
-        time.sleep(0.5)  # wait for ACK
+        # Play response tone
+        console.print(f'  [cyan]TTS: "You entered {digits or "nothing"}"[/cyan]')
+        pcm2 = tone.generate(300)
+        rtp.send_audio(pcm2)
+        ivr_state["rtp_packets"] += len(pcm2) // 320
 
-        assert self.rtp_session is not None
-        self.rtp_session.start()
-
-        console.print(
-            "\n  [bold yellow]--- IVR Session Started (real RTP) ---[/bold yellow]"
-        )
-
-        try:
-            # Step 1: Play greeting via RTP (real audio packets)
-            greeting = "Welcome to sipx IVR. Press 1 for sales, 2 for support."
-            pcm_data = self.tts.synthesize(greeting)
-            console.print(
-                f"  [dim]Sending {len(pcm_data)} bytes PCM as RTP "
-                f"({len(pcm_data) // 320} packets)...[/dim]"
-            )
-            self.rtp_session.send_audio(pcm_data)
-            self.rtp_packets_sent = len(pcm_data) // 320
-
-            # Step 2: Collect DTMF via RFC 4733 (real RTP telephone-event)
-            console.print("  [dim]IVR: listening for DTMF on RTP...[/dim]")
-            collector = DTMFCollector(self.rtp_session, max_digits=3, timeout=5.0)
-            digit = collector.collect()
-
-            if digit:
-                self.dtmf_received = digit
-                console.print(
-                    f"  [yellow]IVR: received DTMF '{digit}' via RFC 4733[/yellow]"
-                )
-            else:
-                self.dtmf_received = None
-                console.print("  [dim]IVR: no DTMF received (timeout)[/dim]")
-
-            # Step 3: Play response based on collected digits
-            self.ivr_result = digit or "none"
-
-            response_text = f"You entered {self.ivr_result}."
-            pcm_resp = self.tts.synthesize(response_text)
-            self.rtp_session.send_audio(pcm_resp)
-            self.rtp_packets_sent += len(pcm_resp) // 320
-
-        finally:
-            self.rtp_session.stop()
-            console.print("  [bold yellow]--- IVR Session Ended ---[/bold yellow]")
-            self.call_active = False
+    finally:
+        rtp.stop()
+        ivr_state["active"] = False
+        console.print("  [bold yellow]--- IVR Ended ---[/bold yellow]")
 
 
 # ---------------------------------------------------------------------------
@@ -227,17 +136,14 @@ class IVRCallHandler:
 
 
 class CallerEvents(Events):
-    """Client-side event handlers."""
-
     def __init__(self):
         super().__init__()
-        self.got_200 = False
+        self.connected = False
 
     @on("INVITE", status=200)
-    def on_call_accepted(self, request, response, context):
-        self.got_200 = True
-        if response.body:
-            console.print("  [green]Caller: call accepted, SDP received[/green]")
+    def on_ok(self, request, response, context):
+        self.connected = True
+        console.print("  [green]Call accepted[/green]")
 
 
 # ---------------------------------------------------------------------------
@@ -246,173 +152,72 @@ class CallerEvents(Events):
 
 
 def main():
-    console.print("\n[bold]sipx — IVR Demo with REAL RTP + DTMF[/bold]")
-    console.print(f"SIP Server: {SERVER_HOST}:{SERVER_PORT}")
-    console.print(f"SIP Client: {SERVER_HOST}:{CLIENT_PORT}")
-    console.print(f"RTP Server: {SERVER_HOST}:{RTP_PORT_SERVER}")
-    console.print(f"RTP Client: {SERVER_HOST}:{RTP_PORT_CLIENT}\n")
-    console.print(
-        "[dim]Capture RTP: sudo tcpdump -i lo udp port 19000 or port 19002[/dim]\n"
-    )
+    console.print("\n[bold]sipx — IVR Demo (real RTP + DTMF)[/bold]")
+    console.print(f"SIP: {HOST}:{SIP_PORT}  RTP: {RTP_SERVER}/{RTP_CLIENT}\n")
 
-    ivr_handler = IVRCallHandler()
-    server = SIPServer(local_host=SERVER_HOST, local_port=SERVER_PORT)
-    server.register_handler("INVITE", ivr_handler.handle_invite)
-
-    # --- Start server ---
-    console.rule("Starting IVR Server")
     server.start()
     time.sleep(0.5)
 
     try:
-        console.rule("Client Calling IVR")
         events = CallerEvents()
+        sdp = SDPBody.audio(ip=HOST, port=RTP_CLIENT)
 
-        with Client(local_host=SERVER_HOST, local_port=CLIENT_PORT) as client:
+        with Client(local_host=HOST, local_port=CLIENT_PORT) as client:
             client.events = events
 
-            sdp = SDPBody.create_offer(
-                session_name="Caller",
-                origin_username="caller",
-                origin_address=SERVER_HOST,
-                connection_address=SERVER_HOST,
-                media_specs=[
-                    {
-                        "media": "audio",
-                        "port": RTP_PORT_CLIENT,
-                        "codecs": [
-                            {"payload": "0", "name": "PCMU", "rate": "8000"},
-                            {
-                                "payload": "101",
-                                "name": "telephone-event",
-                                "rate": "8000",
-                            },
-                        ],
-                    }
-                ],
-            )
-
             # 1. INVITE
-            console.print("\n[bold]1. INVITE[/bold]")
-            response = client.invite(
-                to_uri=f"sip:ivr@{SERVER_HOST}:{SERVER_PORT}",
-                from_uri=f"sip:caller@{SERVER_HOST}",
+            console.rule("1. INVITE")
+            r = client.invite(
+                to_uri=f"sip:ivr@{HOST}:{SIP_PORT}",
+                from_uri=f"sip:caller@{HOST}",
                 body=sdp.to_string(),
-                headers={
-                    "Contact": f"<sip:caller@{SERVER_HOST}:{CLIENT_PORT}>",
-                },
-                host=SERVER_HOST,
-                port=SERVER_PORT,
+                headers={"Contact": f"<sip:caller@{HOST}:{CLIENT_PORT}>"},
+                host=HOST,
+                port=SIP_PORT,
             )
-
-            if response.status_code != 200:
-                console.print(f"  [red]Call failed: {response.status_code}[/red]")
+            if r.status_code != 200:
+                console.print(f"  [red]Failed: {r.status_code}[/red]")
                 return
 
-            console.print("  [green]Call established (200 OK)[/green]")
-
             # 2. ACK
-            console.print("\n[bold]2. ACK[/bold]")
-            client.ack(response=response, host=SERVER_HOST, port=SERVER_PORT)
-            console.print("  [green]ACK sent[/green]")
+            console.rule("2. ACK")
+            client.ack(response=r, host=HOST, port=SIP_PORT)
 
-            # 3. Open client-side RTP to send DTMF
-            console.print("\n[bold]3. RTP + DTMF[/bold]")
-            client_rtp = RTPSession(
-                local_ip=SERVER_HOST,
-                local_port=RTP_PORT_CLIENT,
-                remote_ip=SERVER_HOST,
-                remote_port=RTP_PORT_SERVER,
-                payload_type=0,
-                clock_rate=8000,
-            )
-            client_rtp.start()
+            # 3. Send DTMF via real RTP
+            console.rule("3. DTMF")
+            with CallSession(client, r, rtp_port=RTP_CLIENT) as call:
+                time.sleep(2)  # wait for IVR greeting
+                console.print("  [yellow]Sending DTMF '123'...[/yellow]")
+                call.send_dtmf("123")
+                console.print("  [green]DTMF sent (15 RTP packets)[/green]")
+                time.sleep(2)  # wait for IVR to process
 
-            try:
-                # Wait for server to finish playing greeting and start listening
-                console.print("  [dim]Waiting for IVR greeting + DTMF listener...[/dim]")
-                time.sleep(2.5)
+            # 4. BYE
+            console.rule("4. BYE")
+            bye_r = client.bye(response=r, host=HOST, port=SIP_PORT)
+            console.print(f"  BYE -> {bye_r.status_code}")
 
-                # Send DTMF digits '1', '2', '3' via RFC 4733
-                digits_to_send = "123"
-                console.print(
-                    f"  [yellow]Sending DTMF '{digits_to_send}' via RFC 4733 (real RTP)...[/yellow]"
-                )
-                dtmf_sender = DTMFSender(client_rtp)
-                for d in digits_to_send:
-                    dtmf_sender.send_digit(d, duration_ms=160)
-                    time.sleep(0.05)  # inter-digit gap
-                console.print(
-                    f"  [green]DTMF '{digits_to_send}' sent ({len(digits_to_send) * 5} RTP packets)[/green]"
-                )
-
-                # Wait for IVR to process
-                time.sleep(2)
-
-            finally:
-                client_rtp.stop()
-
-            # 4. Results
-            console.print("\n[bold]4. IVR Result[/bold]")
-            console.print(
-                f"  DTMF received by server: [bold cyan]{ivr_handler.dtmf_received}[/bold cyan]"
-            )
-            console.print(
-                f"  IVR choice: [bold cyan]{ivr_handler.ivr_result}[/bold cyan]"
-            )
-            console.print(
-                f"  RTP packets sent by server: [bold]{ivr_handler.rtp_packets_sent}[/bold]"
-            )
-
-            # 5. BYE
-            console.print("\n[bold]5. BYE[/bold]")
-            bye_r = client.bye(response=response, host=SERVER_HOST, port=SERVER_PORT)
-            console.print(f"  [green]BYE -> {bye_r.status_code}[/green]")
-
-        # --- Summary ---
+        # Summary
         console.rule("Summary")
+        table = Table(box=box.SIMPLE_HEAVY)
+        table.add_column("Test", style="bold", width=16)
+        table.add_column("Result", width=45)
 
-        table = Table(box=box.SIMPLE_HEAVY, show_lines=False)
-        table.add_column("Component", style="bold", width=18)
-        table.add_column("Result", width=50)
-
-        sip_ok = events.got_200
-        rtp_ok = ivr_handler.rtp_packets_sent > 0
-        dtmf_ok = ivr_handler.dtmf_received == "123"
-        ivr_ok = ivr_handler.ivr_result is not None
-
-        def r(ok: bool, msg: str) -> str:
+        def p(ok, msg):
             return f"[green]PASS[/green] — {msg}" if ok else f"[red]FAIL[/red] — {msg}"
 
-        table.add_row("SIP Signaling", r(sip_ok, "INVITE -> 200 -> ACK -> BYE -> 200"))
-        table.add_row(
-            "RTP Audio",
-            r(
-                rtp_ok,
-                f"{ivr_handler.rtp_packets_sent} packets sent via UDP:{RTP_PORT_SERVER}",
-            ),
-        )
-        table.add_row(
-            "DTMF RFC 4733", r(dtmf_ok, f"digit '{ivr_handler.dtmf_received}' via RTP")
-        )
-        table.add_row("IVR Menu", r(ivr_ok, f"choice='{ivr_handler.ivr_result}'"))
-        table.add_row("TTS", r(rtp_ok, "440Hz tone PCM -> PCMU -> RTP"))
-        table.add_row("B2BUA", r(sip_ok, "sipx as UAC + UAS in same process"))
+        sip_ok = events.connected
+        rtp_ok = (ivr_state.get("rtp_packets") or 0) > 0
+        dtmf_ok = ivr_state.get("dtmf") == "123"
 
+        table.add_row("SIP", p(sip_ok, "INVITE->200->ACK->BYE->200"))
+        table.add_row("RTP", p(rtp_ok, f"{ivr_state['rtp_packets']} packets"))
+        table.add_row("DTMF", p(dtmf_ok, f"'{ivr_state['dtmf']}' via RFC 4733"))
+        table.add_row("B2BUA", p(sip_ok, "sipx as UAC + UAS"))
         console.print(table)
 
-        all_ok = sip_ok and rtp_ok and dtmf_ok and ivr_ok
-        if all_ok:
-            console.print(
-                "\n[bold green]All components working with real RTP/DTMF![/bold green]\n"
-            )
-        else:
-            console.print(
-                "\n[bold yellow]Some components need attention.[/bold yellow]\n"
-            )
-
     except Exception as e:
-        console.print(f"\n[red]Error: {e}[/red]")
+        console.print(f"\n[red]{e}[/red]")
         raise
     finally:
         server.stop()

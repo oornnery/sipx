@@ -159,6 +159,19 @@ class RTPSession:
         self._recv_thread: Optional[threading.Thread] = None
 
     # ------------------------------------------------------------------
+    # DTMF convenience
+    # ------------------------------------------------------------------
+
+    @property
+    def dtmf(self):
+        """Auto-created DTMFHelper for send/collect."""
+        if not hasattr(self, "_dtmf_helper") or self._dtmf_helper is None:
+            from ._session import DTMFHelper
+
+            self._dtmf_helper = DTMFHelper(self)
+        return self._dtmf_helper
+
+    # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
