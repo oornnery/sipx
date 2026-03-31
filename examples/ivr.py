@@ -1,25 +1,23 @@
 #!/usr/bin/env python3
 """
-sipx — IVR Demo: Bidirectional RTP + 3 DTMF Methods
+sipx — IVR: Bidirectional RTP + 3 DTMF Methods (100% async API)
 
-sipx as both server (IVR) and client. Real RTP + real DTMF.
+Uses AsyncSIPServer, AsyncClient, AsyncRTPSession, AsyncCallSession.
 
-    sngrep port 15080                    # SIP + SIP INFO
-    sudo tcpdump -i lo udp port 19010   # RTP
+    sngrep port 15080
+    sudo tcpdump -i lo udp port 19010
 
 Usage:
     uv run python examples/ivr.py
 """
 
-import threading
-import time
+import asyncio
 from typing import Annotated
 
 from rich import box
 from rich.table import Table
 from sipx import (
-    Client,
-    SIPServer,
+    AsyncClient,
     Request,
     Response,
     SDPBody,
@@ -29,8 +27,15 @@ from sipx import (
     on,
     Events,
 )
+from sipx._server import AsyncSIPServer
 from sipx._utils import console
-from sipx.media import RTPSession, ToneGenerator, DTMFToneGenerator, CallSession
+from sipx.media import (
+    RTPSession,
+    AsyncRTPSession,
+    AsyncCallSession,
+    ToneGenerator,
+    DTMFToneGenerator,
+)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -46,7 +51,7 @@ RTP_CLIENT = 19012
 # Shared state
 # ---------------------------------------------------------------------------
 
-server = SIPServer(local_host=HOST, local_port=SIP_PORT)
+server = AsyncSIPServer(local_host=HOST, local_port=SIP_PORT)
 tone = ToneGenerator(440)
 tone_low = ToneGenerator(330)
 
@@ -56,9 +61,10 @@ results: dict[str, object] = {
     "dtmf_inband": False,
     "rtp_sent": 0,
 }
+_loop: asyncio.AbstractEventLoop | None = None
 
 # ---------------------------------------------------------------------------
-# Server handlers (run in SIPServer thread)
+# Server handlers
 # ---------------------------------------------------------------------------
 
 
@@ -70,8 +76,11 @@ def on_invite(
 ) -> Response:
     console.print(f"\n  [bold green]IVR: call from {caller}[/bold green]")
 
-    # Start IVR in background
-    threading.Thread(target=_ivr_flow, args=(rtp,), daemon=True).start()
+    # Wrap sync RTP in async and schedule on the main event loop
+    async_rtp = AsyncRTPSession.__new__(AsyncRTPSession)
+    async_rtp._sync = rtp
+    if _loop:
+        _loop.call_soon_threadsafe(asyncio.ensure_future, _ivr_flow(async_rtp))
 
     answer = SDPBody.audio(ip=HOST, port=RTP_SERVER)
     return Response(
@@ -109,22 +118,22 @@ def on_info(request: Request, source: Annotated[object, Source]) -> Response:
     )
 
 
-def _ivr_flow(rtp: RTPSession):
-    """IVR: play greeting -> collect DTMF -> play response."""
-    time.sleep(0.5)
-    rtp.start()
+async def _ivr_flow(rtp: AsyncRTPSession):
+    """Async IVR: play greeting -> collect DTMF -> play response."""
+    await asyncio.sleep(0.5)
+    await rtp.start()
 
     console.print("\n  [bold yellow]--- IVR Started ---[/bold yellow]")
     try:
         # Play greeting
         console.print("  [cyan]Server -> Client: 440Hz greeting[/cyan]")
         pcm = tone.generate(500)
-        rtp.send_audio(pcm)
+        await rtp.send_audio(pcm)
         results["rtp_sent"] = len(pcm) // 320
 
         # Collect DTMF
         console.print("  [dim]Listening for DTMF...[/dim]")
-        digits = rtp.dtmf.collect(max_digits=3, timeout=8.0)
+        digits = await rtp.dtmf.collect(max_digits=3, timeout=8.0)
         if digits:
             results["dtmf_rfc4733"] = digits
             console.print(f"  [yellow]DTMF RFC 4733: '{digits}'[/yellow]")
@@ -132,10 +141,10 @@ def _ivr_flow(rtp: RTPSession):
         # Play response
         console.print("  [cyan]Server -> Client: response tone[/cyan]")
         pcm2 = tone_low.generate(300)
-        rtp.send_audio(pcm2)
+        await rtp.send_audio(pcm2)
         results["rtp_sent"] = int(results["rtp_sent"] or 0) + len(pcm2) // 320
     finally:
-        rtp.stop()
+        await rtp.stop()
         console.print("  [bold yellow]--- IVR Ended ---[/bold yellow]")
 
 
@@ -160,24 +169,27 @@ class CallerEvents(Events):
 # ---------------------------------------------------------------------------
 
 
-def main():
-    console.print("\n[bold]sipx — IVR: Bidirectional RTP + 3 DTMF Methods[/bold]")
+async def main():
+    global _loop
+    _loop = asyncio.get_running_loop()
+
+    console.print("\n[bold]sipx — IVR: Bidirectional RTP + 3 DTMF (async API)[/bold]")
     console.print(f"SIP: {HOST}:{SIP_PORT}  RTP: {RTP_SERVER}/{RTP_CLIENT}\n")
 
-    server.start()
-    time.sleep(0.5)
+    await server.start()
+    await asyncio.sleep(0.5)
 
     try:
         events = CallerEvents()
         dtmf_gen = DTMFToneGenerator()
+        sdp = SDPBody.audio(ip=HOST, port=RTP_CLIENT)
 
-        with Client(local_host=HOST, local_port=CLIENT_PORT) as client:
+        async with AsyncClient(local_host=HOST, local_port=CLIENT_PORT) as client:
             client.events = events
-            sdp = SDPBody.audio(ip=HOST, port=RTP_CLIENT)
 
             # INVITE
             console.rule("1. INVITE")
-            r = client.invite(
+            r = await client.invite(
                 to_uri=f"sip:ivr@{HOST}:{SIP_PORT}",
                 from_uri=f"sip:caller@{HOST}",
                 body=sdp.to_string(),
@@ -191,22 +203,22 @@ def main():
 
             # ACK
             console.rule("2. ACK")
-            client.ack(response=r, host=HOST, port=SIP_PORT)
+            await client.ack(response=r, host=HOST, port=SIP_PORT)
 
-            # RTP + DTMF
+            # DTMF (3 methods)
             console.rule("3. DTMF (3 methods)")
-            with CallSession(client, r, rtp_port=RTP_CLIENT) as call:
-                time.sleep(2)
+            async with AsyncCallSession(client._sync, r, rtp_port=RTP_CLIENT) as call:
+                await asyncio.sleep(2)
 
                 # Method 1: RFC 4733
                 console.print("  [bold]RFC 4733 (RTP telephone-event)[/bold]")
-                call.send_dtmf("123")
+                await call.send_dtmf("123")
                 console.print("  [green]Sent '123' (15 RTP packets)[/green]")
-                time.sleep(1)
+                await asyncio.sleep(1)
 
                 # Method 2: SIP INFO
                 console.print("  [bold]SIP INFO (out-of-band)[/bold]")
-                client.info(
+                await client.info(
                     uri=f"sip:ivr@{HOST}:{SIP_PORT}",
                     content="Signal=5\r\nDuration=160\r\n",
                     content_type="application/dtmf-relay",
@@ -214,26 +226,27 @@ def main():
                     port=SIP_PORT,
                 )
                 console.print("  [green]Sent '5' via SIP INFO[/green]")
-                time.sleep(1)
+                await asyncio.sleep(1)
 
                 # Method 3: Inband
                 console.print("  [bold]Inband (dual-tone audio)[/bold]")
-                call.play(dtmf_gen.generate_digit("9", duration_ms=200))
+                await call.play(dtmf_gen.generate_digit("9", duration_ms=200))
                 results["dtmf_inband"] = True
                 console.print("  [green]Sent '9' as 697+1477Hz tone[/green]")
-                time.sleep(1)
+                await asyncio.sleep(1)
 
                 # Bidirectional audio
                 console.print("  [bold]Bidirectional audio[/bold]")
-                call.play_tone(freq=880, duration_ms=500)
+                await call.play_tone(freq=880, duration_ms=500)
                 console.print("  [green]Client -> Server: 880Hz tone[/green]")
-                time.sleep(1)
+                await asyncio.sleep(1)
 
             # BYE
             console.rule("4. BYE")
-            client.bye(response=r, host=HOST, port=SIP_PORT)
+            await client.bye(response=r, host=HOST, port=SIP_PORT)
 
         # Summary
+        await asyncio.sleep(0.5)
         console.rule("Summary")
         table = Table(box=box.SIMPLE_HEAVY)
         table.add_column("Test", style="bold", width=20)
@@ -262,8 +275,8 @@ def main():
         console.print(f"\n[red]{e}[/red]")
         raise
     finally:
-        server.stop()
+        await server.stop()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
