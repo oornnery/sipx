@@ -6,9 +6,8 @@ not actual network behavior (which requires a real socket).
 
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from sipx._server import SIPServer
 from sipx._models._message import Response

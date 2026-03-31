@@ -5,15 +5,14 @@ Uses MockTransport from conftest.py to avoid real network calls.
 
 from __future__ import annotations
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pytest
 
 from sipx._client import Client
-from sipx._events import Events, EventContext, event_handler
-from sipx._models._auth import Auth, SipAuthCredentials
-from sipx._models._message import Request, Response
-from sipx._types import TransportAddress, TransportConfig
+from sipx._events import Events
+from sipx._models._auth import Auth
+from sipx._models._message import Request
+from sipx._types import TransportAddress
 from sipx._transports._base import BaseTransport
 
 

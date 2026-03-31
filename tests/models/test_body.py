@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from sipx._models._body import SDPBody, RawBody, BodyParser
 
@@ -625,3 +624,63 @@ class TestRawBody:
         assert "RawBody" in r
         assert "text/plain" in r
         assert "4 bytes" in r
+
+
+# ============================================================================
+# SDPBody.audio() classmethod
+# ============================================================================
+
+
+class TestSDPBodyAudio:
+    def test_audio_basic(self):
+        sdp = SDPBody.audio("192.168.1.100", 49170)
+        assert sdp.session_name == "sipx"
+        assert sdp.origin_address == "192.168.1.100"
+        assert sdp.connection == "IN IP4 192.168.1.100"
+        assert len(sdp.media_descriptions) == 1
+        assert sdp.media_descriptions[0]["media"] == "audio"
+        assert sdp.media_descriptions[0]["port"] == 49170
+
+    def test_audio_default_codecs(self):
+        sdp = SDPBody.audio("10.0.0.1", 8000)
+        summary = sdp.get_codecs_summary()
+        assert "audio" in summary
+        assert "PCMU" in summary["audio"]
+        assert "PCMA" in summary["audio"]
+        assert "telephone-event" in summary["audio"]
+
+    def test_audio_custom_codecs(self):
+        sdp = SDPBody.audio("10.0.0.1", 8000, codecs=["G722", "PCMU"])
+        summary = sdp.get_codecs_summary()
+        assert "G722" in summary["audio"]
+        assert "PCMU" in summary["audio"]
+        assert "PCMA" not in summary["audio"]
+
+    def test_audio_valid_sdp_string(self):
+        sdp = SDPBody.audio("192.168.1.100", 49170)
+        text = sdp.to_string()
+        assert "v=0" in text
+        assert "m=audio 49170 RTP/AVP" in text
+        assert "c=IN IP4 192.168.1.100" in text
+
+    def test_audio_get_rtp_params(self):
+        sdp = SDPBody.audio("10.0.0.1", 8000)
+        params = sdp.get_rtp_params()
+        assert params is not None
+        assert params["ip"] == "10.0.0.1"
+        assert params["port"] == 8000
+        assert params["codec_name"] == "PCMU"
+        assert params["payload_type"] == 0
+        assert params["clock_rate"] == 8000
+
+    def test_audio_custom_username(self):
+        sdp = SDPBody.audio("10.0.0.1", 8000, username="alice")
+        assert sdp.origin_username == "alice"
+
+    def test_audio_custom_session_name(self):
+        sdp = SDPBody.audio("10.0.0.1", 8000, session_name="My Call")
+        assert sdp.session_name == "My Call"
+
+    def test_audio_content_type(self):
+        sdp = SDPBody.audio("10.0.0.1", 8000)
+        assert sdp.content_type == "application/sdp"

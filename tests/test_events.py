@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from sipx._events import Events, EventContext, event_handler
 from sipx._models._message import Request, Response
