@@ -2,21 +2,22 @@
 """sipx — SDP creation and analysis."""
 
 from sipx import SDPBody
+from sipx._utils import console
 
 # Simple audio SDP (1 line)
 sdp = SDPBody.audio(ip="192.168.1.100", port=8000)
-print("=== Simple Audio SDP ===")
-print(sdp.to_string())
+console.print("=== Simple Audio SDP ===")
+console.print(sdp.to_string())
 
 # Custom codecs
 sdp2 = SDPBody.audio(
     ip="10.0.0.1", port=9000, codecs=["PCMU", "PCMA"], username="alice"
 )
-print("=== Custom Codecs ===")
-print(f"Codecs: {sdp2.get_codecs_summary()}")
-print(f"Ports: {sdp2.get_media_ports()}")
-print(f"Connection: {sdp2.get_connection_address()}")
-print(f"RTP params: {sdp2.get_rtp_params()}")
+console.print("=== Custom Codecs ===")
+console.print(f"Codecs: {sdp2.get_codecs_summary()}")
+console.print(f"Ports: {sdp2.get_media_ports()}")
+console.print(f"Connection: {sdp2.get_connection_address()}")
+console.print(f"RTP params: {sdp2.get_rtp_params()}")
 
 # Full offer with video
 full = SDPBody.create_offer(
@@ -47,8 +48,8 @@ full = SDPBody.create_offer(
         },
     ],
 )
-print("\n=== Full Offer (audio + video) ===")
-print(full.to_string())
+console.print("\n=== Full Offer (audio + video) ===")
+console.print(full.to_string())
 
 # Create answer from offer
 answer = SDPBody.create_answer(
@@ -61,7 +62,7 @@ answer = SDPBody.create_answer(
         {"index": 1, "port": 0, "codecs": []},  # reject video
     ],
 )
-print("=== Answer (accept audio, reject video) ===")
-print(f"Audio rejected: {answer.is_media_rejected(0)}")
-print(f"Video rejected: {answer.is_media_rejected(1)}")
-print(f"Accepted codecs: {answer.get_accepted_codecs(0)}")
+console.print("=== Answer (accept audio, reject video) ===")
+console.print(f"Audio rejected: {answer.is_media_rejected(0)}")
+console.print(f"Video rejected: {answer.is_media_rejected(1)}")
+console.print(f"Accepted codecs: {answer.get_accepted_codecs(0)}")

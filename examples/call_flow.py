@@ -3,13 +3,14 @@
 
 import time
 from sipx import Client, SDPBody
+from sipx._utils import console
 
 with Client(local_port=5061) as client:
     client.auth = ("1111", "1111xxx")
 
     # Register
     r = client.register("sip:1111@127.0.0.1")
-    print(f"REGISTER: {r.status_code}")
+    console.print(f"REGISTER: {r.status_code}")
 
     # Call
     sdp = SDPBody.audio(ip=client.local_address.host, port=8000)
@@ -20,14 +21,14 @@ with Client(local_port=5061) as client:
             "Contact": f"<sip:1111@{client.local_address.host}:{client.local_address.port}>"
         },
     )
-    print(f"INVITE: {r.status_code}")
+    console.print(f"INVITE: {r.status_code}")
 
     if r.status_code == 200:
         client.ack(response=r)
-        print("ACK sent, call active...")
+        console.print("ACK sent, call active...")
         time.sleep(3)
         bye_r = client.bye(response=r)
-        print(f"BYE: {bye_r.status_code}")
+        console.print(f"BYE: {bye_r.status_code}")
 
     # Unregister
     client.unregister("sip:1111@127.0.0.1")

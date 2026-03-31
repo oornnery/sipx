@@ -2,6 +2,7 @@
 """sipx — Parse raw SIP messages and headers."""
 
 from sipx import MessageParser, Headers
+from sipx._utils import console
 
 # --- Parse a raw SIP request ---
 raw = (
@@ -18,12 +19,12 @@ raw = (
 )
 
 msg = MessageParser.parse(raw)
-print(f"Type: {type(msg).__name__}")
-print(f"Method: {msg.method}, URI: {msg.uri}")
-print(f"Via: {msg.via}")
-print(f"From: {msg.from_header}")
-print(f"Call-ID: {msg.call_id}")
-print(f"is_invite={msg.is_invite}, valid_branch={msg.has_valid_via_branch()}")
+console.print(f"Type: {type(msg).__name__}")
+console.print(f"Method: {msg.method}, URI: {msg.uri}")
+console.print(f"Via: {msg.via}")
+console.print(f"From: {msg.from_header}")
+console.print(f"Call-ID: {msg.call_id}")
+console.print(f"is_invite={msg.is_invite}, valid_branch={msg.has_valid_via_branch()}")
 
 # --- Parse a raw SIP response ---
 raw_resp = (
@@ -38,16 +39,16 @@ raw_resp = (
 )
 
 resp = MessageParser.parse(raw_resp)
-print(f"\nResponse: {resp.status_code} {resp.reason_phrase}")
-print(f"is_error={resp.is_error}, is_client_error={resp.is_client_error}")
+console.print(f"\nResponse: {resp.status_code} {resp.reason_phrase}")
+console.print(f"is_error={resp.is_error}, is_client_error={resp.is_client_error}")
 
 # --- Headers (case-insensitive + compact forms) ---
 h = Headers({"via": "SIP/2.0/UDP x", "f": "alice@x", "i": "call-123"})
-print(
+console.print(
     f"\nHeaders: h['Via']={h['Via']}, h['From']={h['From']}, h['Call-ID']={h['Call-ID']}"
 )
-print(f"Compact: h['f']=={h['f']}, h['i']=={h['i']}")
+console.print(f"Compact: h['f']=={h['f']}, h['i']=={h['i']}")
 
 # --- URI parsing ---
 uri = MessageParser.parse_uri("sip:alice@atlanta.com:5060;transport=tcp")
-print(f"\nURI: {uri}")
+console.print(f"\nURI: {uri}")
