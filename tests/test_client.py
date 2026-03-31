@@ -8,7 +8,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 
-from sipx._client import Client
+from sipx.client import Client
 from sipx._events import Events
 from sipx.models._auth import Auth
 from sipx.models._message import Request
@@ -50,7 +50,7 @@ class MockTransport(BaseTransport):
 
 
 class TestClientCreation:
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_defaults(self, mock_create):
         mock_create.return_value = MockTransport()
         client = Client()
@@ -61,7 +61,7 @@ class TestClientCreation:
         assert client._auth is None
         assert client._closed is False
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_custom_params(self, mock_create):
         mock_create.return_value = MockTransport()
         client = Client(
@@ -73,14 +73,14 @@ class TestClientCreation:
         assert client.config.local_port == 5080
         assert client.transport_protocol == "TCP"
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_with_events(self, mock_create):
         mock_create.return_value = MockTransport()
         ev = Events()
         client = Client(events=ev)
         assert client._events is ev
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_with_auth(self, mock_create):
         mock_create.return_value = MockTransport()
         creds = Auth.Digest("alice", "secret")
@@ -94,14 +94,14 @@ class TestClientCreation:
 
 
 class TestEventsProperty:
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_get_events(self, mock_create):
         mock_create.return_value = MockTransport()
         ev = Events()
         client = Client(events=ev)
         assert client.events is ev
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_set_events(self, mock_create):
         mock_create.return_value = MockTransport()
         client = Client()
@@ -110,7 +110,7 @@ class TestEventsProperty:
         client.events = ev
         assert client.events is ev
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_set_events_to_none(self, mock_create):
         mock_create.return_value = MockTransport()
         ev = Events()
@@ -125,14 +125,14 @@ class TestEventsProperty:
 
 
 class TestAuthProperty:
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_get_auth(self, mock_create):
         mock_create.return_value = MockTransport()
         creds = Auth.Digest("alice", "secret")
         client = Client(auth=creds)
         assert client.auth is creds
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_set_auth(self, mock_create):
         mock_create.return_value = MockTransport()
         client = Client()
@@ -148,7 +148,7 @@ class TestAuthProperty:
 
 
 class TestClientContextManager:
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_enter_returns_client(self, mock_create):
         mock_create.return_value = MockTransport()
         client = Client()
@@ -156,7 +156,7 @@ class TestClientContextManager:
         assert result is client
         client.__exit__(None, None, None)
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_exit_closes_transport(self, mock_create):
         mt = MockTransport()
         mock_create.return_value = mt
@@ -165,7 +165,7 @@ class TestClientContextManager:
         client.__exit__(None, None, None)
         assert client._closed is True
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_with_statement(self, mock_create):
         mt = MockTransport()
         mock_create.return_value = mt
@@ -184,7 +184,7 @@ class TestEnsureRequiredHeaders:
     def _make_client_with_mock(self):
         """Create a Client with injected MockTransport."""
         mt = MockTransport()
-        with patch("sipx._client._create_sync_transport", return_value=mt):
+        with patch("sipx.client._sync._create_sync_transport", return_value=mt):
             client = Client()
         client._transport = mt
         return client
@@ -273,7 +273,7 @@ class TestEnsureRequiredHeaders:
 class TestExtractHostPort:
     def _make_client(self):
         mt = MockTransport()
-        with patch("sipx._client._create_sync_transport", return_value=mt):
+        with patch("sipx.client._sync._create_sync_transport", return_value=mt):
             client = Client()
         client._transport = mt
         return client
@@ -315,7 +315,7 @@ class TestExtractHostPort:
 class TestBuildAuthHeader:
     def _make_client(self):
         mt = MockTransport()
-        with patch("sipx._client._create_sync_transport", return_value=mt):
+        with patch("sipx.client._sync._create_sync_transport", return_value=mt):
             client = Client()
         client._transport = mt
         return client
@@ -345,7 +345,7 @@ class TestBuildAuthHeader:
 
 
 class TestTupleAuth:
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_tuple_auth_converts_to_credentials(self, mock_create):
         mock_create.return_value = MockTransport()
         client = Client(local_port=0)
@@ -355,7 +355,7 @@ class TestTupleAuth:
         assert client.auth.password == "secret"
         client.close()
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_auth_digest_still_works(self, mock_create):
         mock_create.return_value = MockTransport()
         client = Client(local_port=0)
@@ -364,14 +364,14 @@ class TestTupleAuth:
         assert client.auth.username == "alice"
         client.close()
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_auto_auth_default_true(self, mock_create):
         mock_create.return_value = MockTransport()
         client = Client(local_port=0)
         assert client._auto_auth is True
         client.close()
 
-    @patch("sipx._client._create_sync_transport")
+    @patch("sipx.client._sync._create_sync_transport")
     def test_auto_auth_false(self, mock_create):
         mock_create.return_value = MockTransport()
         client = Client(local_port=0, auto_auth=False)

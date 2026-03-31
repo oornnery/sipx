@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 
 
-from sipx._fsm import Dialog, StateManager, Transaction
+from sipx.fsm import Dialog, StateManager, Transaction
 from sipx.models._message import Request, Response
 from sipx._types import DialogState, TransactionState, TransactionType
 
@@ -444,7 +444,7 @@ class TestStateManager:
 
 class TestTimerManager:
     def test_start_timer_fires_callback(self):
-        from sipx._fsm import TimerManager
+        from sipx.fsm import TimerManager
 
         result = []
         tm = TimerManager()
@@ -454,7 +454,7 @@ class TestTimerManager:
         tm.cancel_all()
 
     def test_cancel_timer(self):
-        from sipx._fsm import TimerManager
+        from sipx.fsm import TimerManager
 
         result = []
         tm = TimerManager()
@@ -464,7 +464,7 @@ class TestTimerManager:
         assert result == []
 
     def test_cancel_all(self):
-        from sipx._fsm import TimerManager
+        from sipx.fsm import TimerManager
 
         tm = TimerManager()
         tm.start_timer("a", 0.5, lambda: None)
@@ -473,7 +473,7 @@ class TestTimerManager:
         assert len(tm.active_timers) == 0
 
     def test_start_timer_replaces_existing(self):
-        from sipx._fsm import TimerManager
+        from sipx.fsm import TimerManager
 
         result = []
         tm = TimerManager()

@@ -27,7 +27,7 @@ from sipx import (
     on,
     Events,
 )
-from sipx._server import AsyncSIPServer
+from sipx.server import AsyncSIPServer
 from sipx._utils import console
 from sipx.media import (
     RTPSession,

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Optional
 from ._rtp import RTPPacket
 
 if TYPE_CHECKING:
-    from sipx._client import Client
+    from sipx.client import Client
     from sipx.models._body import SDPBody
     from sipx.models._message import Response
     from sipx.media._codecs import Codec

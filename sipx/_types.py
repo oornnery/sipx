@@ -16,7 +16,7 @@ from typing import Any, Optional
 if typing.TYPE_CHECKING:
     from .models._header import Headers
     from .models._message import Request, Response
-    from ._fsm import Transaction, Dialog
+    from .fsm import Transaction, Dialog
 
 
 # =============================================================================

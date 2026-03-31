@@ -32,7 +32,7 @@ from sipx import (
     DialogState,
     TransportAddress,
 )
-from sipx._server import SIPServer
+from sipx.server import SIPServer
 from sipx._utils import console
 from sipx._utils import (
     EOL,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from sipx._subscription import Subscription, SubscriptionState
+from sipx.session import Subscription, SubscriptionState
 from sipx.models._message import Response
 
 

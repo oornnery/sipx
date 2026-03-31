@@ -26,8 +26,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
-    from ._client import AsyncClient, Client
-    from .models._message import Response
+    from ..client import AsyncClient, Client
+    from ..models._message import Response
 
 
 @dataclass
@@ -176,7 +176,7 @@ class SessionTimer:
                 self.on_refresh(refresh_response)
 
         except Exception:
-            pass  # silently continue — next refresh will retry
+            pass  # silently continue -- next refresh will retry
 
         # Schedule next refresh
         self._schedule_next()
@@ -345,6 +345,3 @@ class AsyncSessionTimer:
     def add_min_se(request, min_se: int = 90) -> None:
         """Add Min-SE header to a request."""
         SessionTimer.add_min_se(request, min_se)
-
-
-__all__ = ["AsyncSessionTimer", "SessionTimer", "SessionTimerConfig"]

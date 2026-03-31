@@ -1,58 +1,25 @@
-"""
-SIP Client implementation with simplified Events and Auth API.
-
-This module provides a high-level SIP client with:
-- Declarative event handling via Events class
-- Simple authentication via Auth.Digest()
-- Automatic transaction and dialog state management
-- Multiple transport protocols (UDP, TCP, TLS)
-"""
+"""Synchronous SIP Client implementation."""
 
 from __future__ import annotations
 
-import asyncio
 import threading
 import uuid
 from typing import Optional, Union, Callable
-from urllib.parse import urlparse
 
-from ._utils import logger
-from .models._auth import SipAuthCredentials, DigestCredentials, DigestAuth
-from ._events import Events, EventContext
-from ._fsm import StateManager, TimerManager
-from .models._message import Request, Response, MessageParser
-from .transports import (
-    TransportAddress,
-    TransportConfig,
-    UDPTransport,
-    TCPTransport,
-    TLSTransport,
+from .._utils import logger
+from ..models._auth import SipAuthCredentials
+from .._events import Events, EventContext
+from ..fsm import StateManager, TimerManager
+from ..models._message import Request, Response, MessageParser
+from ..transports import TransportAddress, TransportConfig
+from ._base import (
+    _create_sync_transport,
+    _extract_host_port,
+    _build_auth_header,
+    _get_default_from_uri,
+    _ensure_required_headers,
+    _detect_auth_challenge,
 )
-from .transports._udp import AsyncUDPTransport
-from .transports._tcp import AsyncTCPTransport
-from .transports._tls import AsyncTLSTransport
-
-
-def _create_sync_transport(protocol: str, config: TransportConfig):
-    """Create a sync transport based on protocol name."""
-    if protocol == "UDP":
-        return UDPTransport(config)
-    elif protocol == "TCP":
-        return TCPTransport(config)
-    elif protocol == "TLS":
-        return TLSTransport(config)
-    raise ValueError(f"Unsupported transport: {protocol}")
-
-
-def _create_async_transport(protocol: str, config: TransportConfig):
-    """Create an async transport based on protocol name."""
-    if protocol == "UDP":
-        return AsyncUDPTransport(config)
-    elif protocol == "TCP":
-        return AsyncTCPTransport(config)
-    elif protocol == "TLS":
-        return AsyncTLSTransport(config)
-    raise ValueError(f"Unsupported transport: {protocol}")
 
 
 class Client:
@@ -104,7 +71,7 @@ class Client:
         self.transport_protocol = transport.upper()
 
         # Initialize transport
-        self._transport = self._create_transport()
+        self._transport = _create_sync_transport(self.transport_protocol, self.config)
 
         # State management (internal)
         self._state_manager = StateManager()
@@ -132,23 +99,40 @@ class Client:
         self._reregister_aor: Optional[str] = None
         self._reregister_callback: Optional[Callable] = None
 
-    def _create_transport(self):
-        """Create transport based on protocol."""
-        return _create_sync_transport(self.transport_protocol, self.config)
+    # ------------------------------------------------------------------
+    # Thin wrappers around standalone helpers (backward compat)
+    # ------------------------------------------------------------------
+
+    def _extract_host_port(self, uri: str) -> tuple[str, int]:
+        """Extract host and port from SIP URI."""
+        return _extract_host_port(uri)
+
+    def _build_auth_header(
+        self, challenge, credentials: SipAuthCredentials, method: str, uri: str
+    ) -> str:
+        """Build Authorization header from challenge and credentials."""
+        return _build_auth_header(challenge, credentials, method, uri)
 
     def _get_default_from_uri(self) -> str:
-        """
-        Get default FROM URI, using auth username if available.
+        """Get default FROM URI, using auth username if available."""
+        return _get_default_from_uri(self._auth, self._transport.local_address.host)
 
-        Returns:
-            SIP URI like "sip:username@host" or "sip:user@host" if no auth.
-        """
-        host = self._transport.local_address.host
-        if self._auth and hasattr(self._auth, "username"):
-            username = self._auth.username
-        else:
-            username = "user"
-        return f"sip:{username}@{host}"
+    def _ensure_required_headers(
+        self, request: Request, host: str, port: int
+    ) -> Request:
+        """Ensure all required SIP headers are present."""
+        _ensure_required_headers(
+            method=request.method,
+            uri=request.uri,
+            headers=request.headers,
+            local_addr=self._transport.local_address,
+            transport_protocol=self.transport_protocol,
+            auth=self._auth,
+        )
+        # Content-Length
+        content_length = len(request.content) if request.content else 0
+        request.headers["Content-Length"] = str(content_length)
+        return request
 
     @property
     def events(self) -> Optional[Events]:
@@ -246,7 +230,7 @@ class Client:
             return None
 
         # Parse challenge
-        from .models._auth import AuthParser
+        from ..models._auth import AuthParser
 
         parser = AuthParser()
         challenge = parser.parse_from_headers(response.headers)
@@ -256,11 +240,11 @@ class Client:
             return None
 
         # Extract host/port from original request
-        host, port = self._extract_host_port(request.uri)
+        host, port = _extract_host_port(request.uri)
 
         try:
             # Build authorization header
-            auth_header = self._build_auth_header(
+            auth_header = _build_auth_header(
                 challenge, credentials, request.method, request.uri
             )
 
@@ -363,49 +347,6 @@ class Client:
             logger.error(f"Auth retry failed: {e}")
             return None
 
-    def _extract_host_port(self, uri: str) -> tuple[str, int]:
-        """Extract host and port from SIP URI."""
-        if not uri.startswith("sip:") and not uri.startswith("sips:"):
-            uri = f"sip:{uri}"
-
-        parsed = urlparse(uri)
-        host = parsed.hostname or parsed.path.split("@")[-1].split(":")[0]
-        port = parsed.port or 5060
-
-        return host, port
-
-    def _build_auth_header(
-        self, challenge, credentials: SipAuthCredentials, method: str, uri: str
-    ) -> str:
-        """Build Authorization header from challenge and credentials."""
-        digest_credentials = DigestCredentials(
-            username=credentials.username,
-            password=credentials.password,
-            realm=credentials.realm,
-        )
-
-        digest_auth = DigestAuth(
-            credentials=digest_credentials,
-            challenge=challenge,
-        )
-
-        return digest_auth.build_authorization(method=method, uri=uri)
-
-    def _detect_auth_challenge(self, response: Response, context: EventContext) -> None:
-        """Detect and parse authentication challenges."""
-        if response.status_code in (401, 407):
-            from .models._auth import AuthParser
-
-            parser = AuthParser()
-            challenge = parser.parse_from_headers(response.headers)
-
-            if challenge:
-                context.metadata["needs_auth"] = True
-                context.metadata["auth_challenge"] = challenge
-                logger.debug(
-                    f"Authentication challenge detected: {response.status_code}"
-                )
-
     def request(
         self,
         method: str,
@@ -433,7 +374,7 @@ class Client:
         """
         # Auto-extract host/port from URI if not provided
         if host is None:
-            host, extracted_port = self._extract_host_port(uri)
+            host, extracted_port = _extract_host_port(uri)
             port = port if port is not None else extracted_port
         else:
             port = port if port is not None else 5060
@@ -448,7 +389,18 @@ class Client:
         )
 
         # Ensure required headers
-        request = self._ensure_required_headers(request, host, port)
+        _ensure_required_headers(
+            method=request.method,
+            uri=request.uri,
+            headers=request.headers,
+            local_addr=self._transport.local_address,
+            transport_protocol=self.transport_protocol,
+            auth=self._auth,
+        )
+
+        # Content-Length (depends on request.content which is set above)
+        content_length = len(request.content) if request.content else 0
+        request.headers["Content-Length"] = str(content_length)
 
         # Create destination
         destination = TransportAddress(
@@ -502,7 +454,7 @@ class Client:
             parser = MessageParser()
             final_response = None
             deadline = _time.monotonic() + self._transport.config.read_timeout
-            poll_interval = 0.5  # 500ms — matches Timer A initial value
+            poll_interval = 0.5  # 500ms -- matches Timer A initial value
 
             while _time.monotonic() < deadline:
                 try:
@@ -510,7 +462,7 @@ class Client:
                         timeout=poll_interval
                     )
                 except Exception:
-                    # Timeout on this poll — loop again (timers retransmit in background)
+                    # Timeout on this poll -- loop again (timers retransmit in background)
                     if transaction.is_terminated():
                         logger.debug("Transaction terminated by timer")
                         break
@@ -551,7 +503,7 @@ class Client:
                 context.source = source
 
                 # Detect auth challenges
-                self._detect_auth_challenge(response, context)
+                _detect_auth_challenge(response, context)
 
                 # Call events on_response
                 if self._events:
@@ -589,55 +541,6 @@ class Client:
             # Clean up all timers for this transaction
             timer_manager.cancel_all()
 
-    def _ensure_required_headers(
-        self, request: Request, host: str, port: int
-    ) -> Request:
-        """Ensure all required SIP headers are present."""
-        headers = request.headers
-
-        # Via
-        if "Via" not in headers:
-            branch = f"z9hG4bK{uuid.uuid4().hex[:16]}"
-            local_addr = self._transport.local_address
-            headers["Via"] = (
-                f"SIP/2.0/{self.transport_protocol} {local_addr.host}:{local_addr.port};"
-                f"branch={branch};rport"
-            )
-
-        # From
-        if "From" not in headers:
-            headers["From"] = (
-                f"<{self._get_default_from_uri()}>;tag={uuid.uuid4().hex[:8]}"
-            )
-
-        # To
-        if "To" not in headers:
-            headers["To"] = f"<{request.uri}>"
-
-        # Call-ID
-        if "Call-ID" not in headers:
-            headers["Call-ID"] = (
-                f"{uuid.uuid4().hex}@{self._transport.local_address.host}"
-            )
-
-        # CSeq
-        if "CSeq" not in headers:
-            headers["CSeq"] = f"1 {request.method}"
-
-        # Max-Forwards
-        if "Max-Forwards" not in headers:
-            headers["Max-Forwards"] = "70"
-
-        # Content-Length
-        content_length = len(request.content) if request.content else 0
-        headers["Content-Length"] = str(content_length)
-
-        # User-Agent (if auth provides it)
-        if self._auth and self._auth.user_agent and "User-Agent" not in headers:
-            headers["User-Agent"] = self._auth.user_agent
-
-        return request
-
     def invite(
         self,
         to_uri: str,
@@ -663,7 +566,7 @@ class Client:
         """
         # Auto-generate from_uri if not provided
         if from_uri is None:
-            from_uri = self._get_default_from_uri()
+            from_uri = _get_default_from_uri(self._auth, self._transport.local_address.host)
 
         # Build headers
         headers = kwargs.pop("headers", {})
@@ -705,7 +608,7 @@ class Client:
         """
         # Extract registrar from aor if not provided
         if registrar is None:
-            registrar, _ = self._extract_host_port(aor)
+            registrar, _ = _extract_host_port(aor)
 
         # Build headers
         headers = kwargs.pop("headers", {})
@@ -763,7 +666,7 @@ class Client:
         port = kwargs.pop("port", 5060)
 
         if host is None:
-            host, port = self._extract_host_port(request.uri)
+            host, port = _extract_host_port(request.uri)
 
         # Build ACK request
         headers = kwargs.pop("headers", {})
@@ -893,7 +796,7 @@ class Client:
             >>> response = client.message('sip:bob@example.com', content='Hello!')
         """
         if from_uri is None:
-            from_uri = self._get_default_from_uri()
+            from_uri = _get_default_from_uri(self._auth, self._transport.local_address.host)
 
         headers = kwargs.pop("headers", {})
         headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
@@ -1188,168 +1091,3 @@ class Client:
         return (
             f"Client(local={self.local_address}, transport={self.transport_protocol})"
         )
-
-
-class AsyncClient:
-    """
-    Asynchronous SIP client.
-
-    Wraps the sync Client and runs all blocking I/O in a thread pool
-    via ``asyncio.to_thread``. Same API as Client but with ``await``.
-
-    Example::
-
-        async with AsyncClient() as client:
-            client.auth = ("alice", "secret")
-            r = await client.register("sip:alice@pbx.com")
-            r = await client.invite("sip:bob@pbx.com", body=sdp)
-    """
-
-    def __init__(
-        self,
-        local_host: str = "0.0.0.0",
-        local_port: int = 0,
-        transport: str = "UDP",
-        events: Optional[Events] = None,
-        auth: Optional[Union[SipAuthCredentials, tuple]] = None,
-        auto_auth: bool = True,
-    ):
-        self._sync = Client(
-            local_host=local_host,
-            local_port=local_port,
-            transport=transport,
-            events=events,
-            auth=auth,
-            auto_auth=auto_auth,
-        )
-        self._reregister_task: Optional[asyncio.Task] = None
-
-    # --- Properties (delegate to sync client) ---
-
-    @property
-    def events(self) -> Optional[Events]:
-        return self._sync.events
-
-    @events.setter
-    def events(self, v):
-        self._sync.events = v
-
-    @property
-    def auth(self):
-        return self._sync.auth
-
-    @auth.setter
-    def auth(self, v):
-        self._sync.auth = v
-
-    @property
-    def local_address(self):
-        return self._sync.local_address
-
-    @property
-    def is_closed(self):
-        return self._sync.is_closed
-
-    @property
-    def transport(self):
-        return self._sync.transport
-
-    # --- Async SIP methods (delegate to sync via to_thread) ---
-
-    async def request(self, method, uri, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.request, method, uri, **kwargs)
-
-    async def invite(self, to_uri, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.invite, to_uri, **kwargs)
-
-    async def register(self, aor, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.register, aor, **kwargs)
-
-    async def options(self, uri, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.options, uri, **kwargs)
-
-    async def ack(self, **kwargs) -> None:
-        return await asyncio.to_thread(self._sync.ack, **kwargs)
-
-    async def bye(self, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.bye, **kwargs)
-
-    async def cancel(self, response, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.cancel, response, **kwargs)
-
-    async def message(self, to_uri, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.message, to_uri, **kwargs)
-
-    async def subscribe(self, uri, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.subscribe, uri, **kwargs)
-
-    async def notify(self, uri, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.notify, uri, **kwargs)
-
-    async def refer(self, uri, refer_to, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.refer, uri, refer_to, **kwargs)
-
-    async def info(self, uri, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.info, uri, **kwargs)
-
-    async def update(self, uri, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.update, uri, **kwargs)
-
-    async def prack(self, response, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.prack, response, **kwargs)
-
-    async def publish(self, uri, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.publish, uri, **kwargs)
-
-    async def retry_with_auth(self, response, auth=None) -> Optional[Response]:
-        return await asyncio.to_thread(self._sync.retry_with_auth, response, auth)
-
-    async def unregister(self, aor, **kwargs) -> Response:
-        return await asyncio.to_thread(self._sync.unregister, aor, **kwargs)
-
-    # --- Auto re-registration (async) ---
-
-    def enable_auto_reregister(self, aor, interval, callback=None):
-        self._sync._reregister_aor = aor
-        self._sync._reregister_interval = interval
-        self._sync._reregister_callback = callback
-        if self._reregister_task:
-            self._reregister_task.cancel()
-        self._reregister_task = asyncio.create_task(self._reregister_loop())
-
-    def disable_auto_reregister(self):
-        if self._reregister_task:
-            self._reregister_task.cancel()
-            self._reregister_task = None
-        self._sync.disable_auto_reregister()
-
-    async def _reregister_loop(self):
-        while not self._sync._closed and self._sync._reregister_aor:
-            try:
-                await asyncio.sleep(self._sync._reregister_interval or 300)
-                r = await self.register(
-                    aor=self._sync._reregister_aor,
-                    expires=(self._sync._reregister_interval or 300) + 30,
-                )
-                if self._sync._reregister_callback and r:
-                    self._sync._reregister_callback(r)
-            except asyncio.CancelledError:
-                break
-            except Exception:
-                await asyncio.sleep(30)
-
-    # --- Lifecycle ---
-
-    async def close(self):
-        if self._reregister_task:
-            self._reregister_task.cancel()
-        self._sync.close()
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *_):
-        await self.close()
-
-    def __repr__(self):
-        return f"AsyncClient({self._sync!r})"

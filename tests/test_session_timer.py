@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from sipx._session_timer import SessionTimer, SessionTimerConfig
+from sipx.session import SessionTimer, SessionTimerConfig
 from sipx.models._message import Request, Response
 
 

@@ -37,8 +37,8 @@ from typing import Optional
 # Client / Server
 # ============================================================================
 
-from ._client import Client, AsyncClient
-from ._server import SIPServer
+from .client import Client, AsyncClient
+from .server import SIPServer
 
 # ============================================================================
 # Events
@@ -96,16 +96,16 @@ from ._depends import (
 # ============================================================================
 
 from ._uri import SipURI
-from ._session_timer import AsyncSessionTimer, SessionTimer, SessionTimerConfig
+from .session import AsyncSessionTimer, SessionTimer, SessionTimerConfig
 from ._routing import RouteSet
 from ._dns import SipResolver, ResolvedTarget
-from ._subscription import AsyncSubscription, Subscription, SubscriptionState
+from .session import AsyncSubscription, Subscription, SubscriptionState
 
 # ============================================================================
 # FSM
 # ============================================================================
 
-from ._fsm import AsyncTimerManager, Dialog, StateManager, TimerManager, Transaction
+from .fsm import AsyncTimerManager, Dialog, StateManager, TimerManager, Transaction
 
 # ============================================================================
 # Transport

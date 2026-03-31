@@ -34,8 +34,8 @@ def _get_app():
     typer = _import_typer()
     from rich.console import Console
 
-    from ._client import Client
-    from ._server import SIPServer
+    from .client import Client
+    from .server import SIPServer
 
     console = Console()
     app = typer.Typer(

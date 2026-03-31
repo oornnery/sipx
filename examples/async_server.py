@@ -4,7 +4,7 @@
 import asyncio
 from typing import Annotated
 from sipx import AsyncClient, Request, Response, FromHeader
-from sipx._server import AsyncSIPServer
+from sipx.server import AsyncSIPServer
 from sipx._utils import console
 
 HOST = "127.0.0.1"
