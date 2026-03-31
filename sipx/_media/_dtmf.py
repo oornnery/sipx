@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import struct
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -39,32 +40,66 @@ DTMF_EVENTS: dict[str, int] = {
 DTMF_PAYLOAD_TYPE = 101
 
 
+@dataclass
+class DTMFEvent:
+    """RFC 4733 telephone-event payload (4 bytes)."""
+
+    event: int = 0
+    end: bool = False
+    volume: int = 10
+    duration: int = 0
+
+    def to_bytes(self) -> bytes:
+        """Encode to 4-byte RFC 4733 payload."""
+        byte1 = self.event & 0xFF
+        byte2 = ((1 if self.end else 0) << 7) | (self.volume & 0x3F)
+        return struct.pack("!BBH", byte1, byte2, self.duration & 0xFFFF)
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> DTMFEvent:
+        """Decode from 4-byte RFC 4733 payload."""
+        if len(data) < 4:
+            return cls()
+        byte1, byte2, duration = struct.unpack("!BBH", data[:4])
+        return cls(
+            event=byte1,
+            end=bool(byte2 & 0x80),
+            volume=byte2 & 0x3F,
+            duration=duration,
+        )
+
+    @property
+    def digit(self) -> str | None:
+        """Convert event code to DTMF digit character."""
+        for d, code in DTMF_EVENTS.items():
+            if code == self.event:
+                return d
+        return None
+
+    @classmethod
+    def from_digit(cls, digit: str, **kwargs) -> DTMFEvent:
+        """Create from digit character ('0'-'9', '*', '#', 'A'-'D')."""
+        code = DTMF_EVENTS.get(digit.upper())
+        if code is None:
+            raise ValueError(f"Invalid DTMF digit: {digit}")
+        return cls(event=code, **kwargs)
+
+
+# Backward compat
 def encode_dtmf_event(event: int, end: bool, volume: int, duration: int) -> bytes:
-    """Encode a single RFC 4733 telephone-event payload (4 bytes)."""
-    byte1 = event & 0xFF
-    byte2 = ((1 if end else 0) << 7) | (volume & 0x3F)
-    return struct.pack("!BBH", byte1, byte2, duration & 0xFFFF)
+    """Backward compat — use DTMFEvent.to_bytes() instead."""
+    return DTMFEvent(event=event, end=end, volume=volume, duration=duration).to_bytes()
 
 
 def decode_dtmf_event(data: bytes) -> dict:
-    """Decode a RFC 4733 telephone-event payload."""
-    if len(data) < 4:
-        return {}
-    byte1, byte2, duration = struct.unpack("!BBH", data[:4])
-    return {
-        "event": byte1,
-        "end": bool(byte2 & 0x80),
-        "volume": byte2 & 0x3F,
-        "duration": duration,
-    }
+    """Backward compat — use DTMFEvent.from_bytes() instead."""
+    e = DTMFEvent.from_bytes(data)
+    return {"event": e.event, "end": e.end, "volume": e.volume, "duration": e.duration}
 
 
 def event_to_digit(event: int) -> Optional[str]:
-    """Convert RFC 4733 event code to DTMF digit character."""
-    for digit, code in DTMF_EVENTS.items():
-        if code == event:
-            return digit
-    return None
+    """Backward compat — use DTMFEvent(event=N).digit instead."""
+    return DTMFEvent(event=event).digit
 
 
 class DTMFSender:

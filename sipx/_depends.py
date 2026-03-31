@@ -44,16 +44,56 @@ class Extractor(ABC):
 
     @abstractmethod
     def extract(self, request: Request, source: TransportAddress) -> Any:
-        """Extract a value from a SIP request and transport source.
-
-        Args:
-            request: The incoming SIP request.
-            source: The transport address the request arrived from.
-
-        Returns:
-            The extracted value to inject into the handler.
-        """
+        """Extract a value from a SIP request and transport source."""
         ...
+
+    @classmethod
+    def resolve_handler(
+        cls, handler: Any, request: Request, source: TransportAddress
+    ) -> Any:
+        """Inspect handler type hints and inject dependencies.
+
+        Resolves ``Annotated[X, <Extractor>]`` metadata, ``Request`` and
+        ``TransportAddress`` type hints. Falls back to ``handler(request, source)``.
+        """
+        import inspect
+
+        hints = typing.get_type_hints(handler, include_extras=True)
+        kwargs: dict[str, Any] = {}
+
+        for name, hint in hints.items():
+            if name == "return":
+                continue
+            if hint is Request or (
+                hasattr(hint, "__name__") and hint.__name__ == "Request"
+            ):
+                kwargs[name] = request
+                continue
+            if hint is TransportAddress:
+                kwargs[name] = source
+                continue
+            if hasattr(hint, "__metadata__"):
+                for meta in hint.__metadata__:
+                    if isinstance(meta, cls):
+                        kwargs[name] = meta.extract(request, source)
+                        break
+                    if isinstance(meta, type) and issubclass(meta, cls):
+                        kwargs[name] = meta().extract(request, source)
+                        break
+
+        if not kwargs:
+            return handler(request, source)
+
+        sig = inspect.signature(handler)
+        positional = [p.name for p in sig.parameters.values() if p.name != "return"]
+        for i, name in enumerate(positional):
+            if name not in kwargs:
+                if i == 0:
+                    kwargs[name] = request
+                elif i == 1:
+                    kwargs[name] = source
+
+        return handler(**kwargs)
 
 
 # ============================================================================
@@ -148,77 +188,9 @@ class AutoRTP(Extractor):
 # ============================================================================
 
 
-def resolve_handler(
-    handler: Any,
-    request: Request,
-    source: TransportAddress,
-) -> Any:
-    """Inspect handler type hints and inject dependencies.
-
-    Reads ``typing.get_type_hints(handler, include_extras=True)`` and
-    resolves each parameter:
-
-    * ``Request`` -> the request itself
-    * ``TransportAddress`` -> the source address
-    * ``Annotated[X, <Extractor>]`` -> calls ``extractor.extract(...)``
-
-    Falls back to ``handler(request, source)`` when no hints match.
-
-    Args:
-        handler: The user-defined request handler callable.
-        request: The incoming SIP request.
-        source: The transport address the request arrived from.
-
-    Returns:
-        The return value of the handler invocation.
-    """
-    hints = typing.get_type_hints(handler, include_extras=True)
-    kwargs: dict[str, Any] = {}
-
-    for name, hint in hints.items():
-        if name == "return":
-            continue
-
-        # Direct type match: Request
-        if hint is Request or (
-            hasattr(hint, "__name__") and hint.__name__ == "Request"
-        ):
-            kwargs[name] = request
-            continue
-
-        # Direct type match: TransportAddress
-        if hint is TransportAddress:
-            kwargs[name] = source
-            continue
-
-        # Annotated[X, extractor] — look for Extractor in metadata
-        if hasattr(hint, "__metadata__"):
-            for meta in hint.__metadata__:
-                # Accept both instances and classes
-                if isinstance(meta, Extractor):
-                    kwargs[name] = meta.extract(request, source)
-                    break
-                if isinstance(meta, type) and issubclass(meta, Extractor):
-                    kwargs[name] = meta().extract(request, source)
-                    break
-
-    if not kwargs:
-        # No type hints matched — old-style handler(request, source)
-        return handler(request, source)
-
-    # Fill unresolved params by position (request, source)
-    import inspect
-
-    sig = inspect.signature(handler)
-    positional = [p.name for p in sig.parameters.values() if p.name != "return"]
-    for i, name in enumerate(positional):
-        if name not in kwargs:
-            if i == 0:
-                kwargs[name] = request
-            elif i == 1:
-                kwargs[name] = source
-
-    return handler(**kwargs)
+def resolve_handler(handler: Any, request: Request, source: TransportAddress) -> Any:
+    """Backward compat — use Extractor.resolve_handler() instead."""
+    return Extractor.resolve_handler(handler, request, source)
 
 
 # ============================================================================

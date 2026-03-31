@@ -75,55 +75,60 @@ SIP_TO_ISUP_CAUSE: dict[int, int] = {
 
 
 # ---------------------------------------------------------------------------
-# Conversion helpers
+# SIP-I Helper
 # ---------------------------------------------------------------------------
 
 
+class SipI:
+    """SIP-I / ISUP interworking helper (ITU-T Q.1912.5)."""
+
+    @staticmethod
+    def isup_to_sip(cause: int) -> int:
+        """Convert ISUP cause code to SIP status code (500 if unknown)."""
+        return ISUP_CAUSE_TO_SIP.get(cause, 500)
+
+    @staticmethod
+    def sip_to_isup(status: int) -> int:
+        """Convert SIP status code to ISUP cause code (127 if unknown)."""
+        return SIP_TO_ISUP_CAUSE.get(status, 127)
+
+    @staticmethod
+    def add_pai(request: "Request", identity: str) -> None:
+        """Add P-Asserted-Identity header."""
+        request.headers["P-Asserted-Identity"] = identity
+
+    @staticmethod
+    def get_pai(message: Union["Request", "Response"]) -> str | None:
+        """Extract P-Asserted-Identity header value."""
+        return message.headers.get("P-Asserted-Identity")
+
+    @staticmethod
+    def add_charging_vector(
+        request: "Request",
+        icid: str,
+        orig_ioi: str | None = None,
+        term_ioi: str | None = None,
+    ) -> None:
+        """Add P-Charging-Vector header."""
+        value = f"icid-value={icid}"
+        if orig_ioi:
+            value += f";orig-ioi={orig_ioi}"
+        if term_ioi:
+            value += f";term-ioi={term_ioi}"
+        request.headers["P-Charging-Vector"] = value
+
+
+# Backward compat
 def isup_to_sip(cause: int) -> int:
-    """
-    Convert an ISUP cause code to a SIP status code.
-
-    Args:
-        cause: ISUP cause code (ITU-T Q.850).
-
-    Returns:
-        Corresponding SIP status code.  Returns 500 when no mapping exists.
-    """
-    return ISUP_CAUSE_TO_SIP.get(cause, 500)
+    return SipI.isup_to_sip(cause)
 
 
 def sip_to_isup(status: int) -> int:
-    """
-    Convert a SIP status code to an ISUP cause code.
-
-    Args:
-        status: SIP response status code.
-
-    Returns:
-        Corresponding ISUP cause code.  Returns 127 (Interworking) when
-        no mapping exists.
-    """
-    return SIP_TO_ISUP_CAUSE.get(status, 127)
+    return SipI.sip_to_isup(status)
 
 
-# ---------------------------------------------------------------------------
-# SIP-I header helpers
-# ---------------------------------------------------------------------------
-
-
-def add_pai_header(
-    request: "Request",
-    identity: str,
-) -> None:
-    """
-    Add a P-Asserted-Identity header to a SIP request.
-
-    Args:
-        request: The SIP request to modify.
-        identity: Identity value, typically a SIP or tel URI
-                  (e.g. ``"sip:alice@example.com"`` or ``"tel:+15551234567"``).
-    """
-    request.headers["P-Asserted-Identity"] = identity
+def add_pai_header(request: "Request", identity: str) -> None:
+    SipI.add_pai(request, identity)
 
 
 def add_charging_vector(
@@ -132,39 +137,15 @@ def add_charging_vector(
     orig_ioi: str | None = None,
     term_ioi: str | None = None,
 ) -> None:
-    """
-    Add a P-Charging-Vector header to a SIP request.
-
-    Args:
-        request: The SIP request to modify.
-        icid: IMS Charging Identifier value (just the ID, not "icid-value=...").
-        orig_ioi: Originating Inter-Operator Identifier (optional).
-        term_ioi: Terminating Inter-Operator Identifier (optional).
-    """
-    value = f"icid-value={icid}"
-    if orig_ioi:
-        value += f";orig-ioi={orig_ioi}"
-    if term_ioi:
-        value += f";term-ioi={term_ioi}"
-    request.headers["P-Charging-Vector"] = value
+    SipI.add_charging_vector(request, icid, orig_ioi, term_ioi)
 
 
-def get_pai(
-    message: Union["Request", "Response"],
-) -> str | None:
-    """
-    Extract the P-Asserted-Identity header value from a SIP message.
-
-    Args:
-        message: A SIP request or response.
-
-    Returns:
-        The header value, or ``None`` if the header is not present.
-    """
-    return message.headers.get("P-Asserted-Identity")
+def get_pai(message: Union["Request", "Response"]) -> str | None:
+    return SipI.get_pai(message)
 
 
 __all__ = [
+    "SipI",
     "ISUP_CAUSE_TO_SIP",
     "SIP_TO_ISUP_CAUSE",
     "isup_to_sip",
