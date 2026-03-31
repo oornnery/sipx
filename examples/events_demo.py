@@ -9,11 +9,6 @@ Usage:
     uv run python examples/events_demo.py
 """
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from sipx import Client, Events, on, SDPBody
 from sipx._utils import console
 

@@ -16,16 +16,11 @@ Usage:
 """
 
 import asyncio
-import sys
 import time
-from pathlib import Path
 from typing import Annotated
 
 from rich import box
 from rich.table import Table
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from sipx import (
     Client,
     SIPServer,
@@ -170,8 +165,6 @@ async def _async_ivr(rtp: RTPSession):
 # ---------------------------------------------------------------------------
 # Client Events
 # ---------------------------------------------------------------------------
-
-
 class CallerEvents(Events):
     def __init__(self):
         super().__init__()
@@ -186,8 +179,6 @@ class CallerEvents(Events):
 # ---------------------------------------------------------------------------
 # Client Flow
 # ---------------------------------------------------------------------------
-
-
 async def run_client() -> CallerEvents:
     events = CallerEvents()
     sdp = SDPBody.audio(ip=HOST, port=RTP_CLIENT)
@@ -280,8 +271,6 @@ async def run_client() -> CallerEvents:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-
-
 async def main():
     global main_loop
     main_loop = asyncio.get_running_loop()

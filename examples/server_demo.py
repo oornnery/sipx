@@ -15,13 +15,8 @@ Test with:
     uv run python -c "import sipx; print(sipx.send('sip:test@127.0.0.1:15090', 'Hello!').status_code)"
 """
 
-import sys
 import time
-from pathlib import Path
 from typing import Annotated
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from sipx import (
     SIPServer,
     Request,
@@ -39,8 +34,6 @@ from sipx._types import TransportAddress
 # ---------------------------------------------------------------------------
 # Custom Extractor (user-defined)
 # ---------------------------------------------------------------------------
-
-
 class UserAgent(Extractor):
     """Extract User-Agent header — shows how to create custom extractors."""
 
@@ -145,8 +138,6 @@ def on_subscribe(
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-
-
 def main():
     console.print("\n[bold]sipx — SIP Server Demo (decorators + DI)[/bold]")
     console.print("Listening on 127.0.0.1:15090")

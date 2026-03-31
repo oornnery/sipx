@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 """sipx — Complete call flow: REGISTER → INVITE → ACK → BYE."""
 
-import sys
 import time
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from sipx import Client, SDPBody
 
 with Client(local_port=5061) as client:

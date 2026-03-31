@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 """sipx — Send DTMF digits (all 3 methods)."""
 
-import sys
 import time
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from sipx import Client, SDPBody
 from sipx.media import CallSession, DTMFToneGenerator
 

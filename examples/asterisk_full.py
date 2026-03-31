@@ -11,13 +11,8 @@ Requires:
     cd docker/asterisk && docker-compose up -d
 """
 
-import sys
 import time
 from dataclasses import dataclass
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from sipx import (
     Client,
     Events,
@@ -77,8 +72,6 @@ USERS = [
 # ---------------------------------------------------------------------------
 # Events — full showcase
 # ---------------------------------------------------------------------------
-
-
 class FullEvents(Events):
     def __init__(self):
         super().__init__()
@@ -136,8 +129,6 @@ class FullEvents(Events):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
 def make_sdp(client: Client, username: str, port: int = 8000) -> SDPBody:
     return SDPBody.audio(ip=client.local_address.host, port=port)
 
@@ -150,8 +141,6 @@ def contact(username: str, client: Client) -> dict:
 # ---------------------------------------------------------------------------
 # Section 0: Offline tests (no network)
 # ---------------------------------------------------------------------------
-
-
 def demo_offline() -> dict:
     results = {}
 
@@ -226,8 +215,6 @@ def demo_offline() -> dict:
 # ---------------------------------------------------------------------------
 # Section S: SIPServer
 # ---------------------------------------------------------------------------
-
-
 def demo_server() -> dict:
     results = {}
     server = SIPServer(local_host="127.0.0.1", local_port=15060)
@@ -270,8 +257,6 @@ def demo_server() -> dict:
 # ---------------------------------------------------------------------------
 # Section 1-3: Asterisk per-user tests
 # ---------------------------------------------------------------------------
-
-
 def test_user(user: User, test_id: int) -> dict:
     results = {}
     u = user.username
@@ -350,8 +335,6 @@ def test_user(user: User, test_id: int) -> dict:
 # ---------------------------------------------------------------------------
 # Section A: Advanced
 # ---------------------------------------------------------------------------
-
-
 def test_advanced(user: User) -> dict:
     results = {}
     u = user.username
@@ -406,8 +389,6 @@ def test_advanced(user: User) -> dict:
 # ---------------------------------------------------------------------------
 # Section L: Late offer
 # ---------------------------------------------------------------------------
-
-
 def test_late_offer(user: User) -> dict:
     results = {}
     u = user.username
@@ -445,8 +426,6 @@ def test_late_offer(user: User) -> dict:
 # ---------------------------------------------------------------------------
 # Summary + Main
 # ---------------------------------------------------------------------------
-
-
 def print_summary(all_results: dict[str, dict]):
     table = Table(title="sipx Demo Results", box=box.SIMPLE_HEAVY)
     table.add_column("Section", style="bold", width=18)

@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 """sipx — SDP creation and analysis."""
 
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from sipx import SDPBody
 
 # Simple audio SDP (1 line)
