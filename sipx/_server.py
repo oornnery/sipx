@@ -11,7 +11,7 @@ import asyncio
 import threading
 from typing import Callable, Dict, Optional
 
-from ._utils import console, logger
+from ._utils import logger
 from ._models._message import MessageParser, Request, Response
 from ._transports._udp import UDPTransport
 from ._types import TransportConfig, TransportAddress, TransactionType, TransactionState
@@ -72,11 +72,8 @@ class SIPServer:
 
         def handle_bye(request: Request, source: TransportAddress) -> Response:
             """Handle BYE request - respond with 200 OK."""
-            console.print(
-                f"\n[bold yellow]<<< RECEIVED BYE from {source.host}:{source.port}[/bold yellow]"
-            )
-            console.print(request.to_string())
-            console.print("=" * 80)
+            logger.debug("<<< RECEIVED BYE from %s:%s", source.host, source.port)
+            logger.debug(request.to_string())
 
             response = Response(
                 status_code=200,
@@ -94,11 +91,8 @@ class SIPServer:
 
         def handle_cancel(request: Request, source: TransportAddress) -> Response:
             """Handle CANCEL request - respond with 200 OK."""
-            console.print(
-                f"\n[bold yellow]<<< RECEIVED CANCEL from {source.host}:{source.port}[/bold yellow]"
-            )
-            console.print(request.to_string())
-            console.print("=" * 80)
+            logger.debug("<<< RECEIVED CANCEL from %s:%s", source.host, source.port)
+            logger.debug(request.to_string())
 
             response = Response(
                 status_code=200,
@@ -116,11 +110,8 @@ class SIPServer:
 
         def handle_options(request: Request, source: TransportAddress) -> Response:
             """Handle OPTIONS request - respond with 200 OK."""
-            console.print(
-                f"\n[bold cyan]<<< RECEIVED OPTIONS from {source.host}:{source.port}[/bold cyan]"
-            )
-            console.print(request.to_string())
-            console.print("=" * 80)
+            logger.debug("<<< RECEIVED OPTIONS from %s:%s", source.host, source.port)
+            logger.debug(request.to_string())
 
             response = Response(
                 status_code=200,
@@ -260,10 +251,9 @@ class SIPServer:
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
         logger.info(
-            f"SIP Server started on {self.config.local_host}:{self.config.local_port}"
-        )
-        console.print(
-            f"\n[bold green][SERVER] Started on {self.config.local_host}:{self.config.local_port}[/bold green]"
+            "SIP Server started on %s:%s",
+            self.config.local_host,
+            self.config.local_port,
         )
 
     def stop(self) -> None:
@@ -277,7 +267,6 @@ class SIPServer:
 
         self._transport.close()
         logger.info("SIP Server stopped")
-        console.print("\n[bold red][SERVER] Stopped[/bold red]")
 
     def _create_server_transaction(self, request: Request) -> None:
         """
@@ -324,12 +313,10 @@ class SIPServer:
 
                 # ACK doesn't get a response
                 if request.method == "ACK":
-                    console.print(
-                        f"\n[bold magenta]<<< RECEIVED ACK from {source.host}:{source.port}[/bold magenta]"
+                    logger.debug(
+                        "<<< RECEIVED ACK from %s:%s", source.host, source.port
                     )
-                    console.print(request.to_string())
-                    console.print("=" * 80)
-                    logger.info(f"Received ACK from {source.host}:{source.port}")
+                    logger.debug(request.to_string())
                     txn.transition_to(TransactionState.CONFIRMED)
                     continue
 
@@ -354,11 +341,14 @@ class SIPServer:
                             },
                         )
 
-                    console.print(
-                        f"\n[bold green]>>> SENDING {response.status_code} {response.reason_phrase} to {source.host}:{source.port}[/bold green]"
+                    logger.debug(
+                        ">>> SENDING %s %s to %s:%s",
+                        response.status_code,
+                        response.reason_phrase,
+                        source.host,
+                        source.port,
                     )
-                    console.print(response.to_string())
-                    console.print("=" * 80)
+                    logger.debug(response.to_string())
 
                     response_data = response.to_bytes()
                     self._transport.send(response_data, source)
@@ -368,11 +358,13 @@ class SIPServer:
                     self._emit("response_sent", txn, response)
                 else:
                     # No handler - send 501 Not Implemented
-                    console.print(
-                        f"\n[bold red]<<< RECEIVED {request.method} from {source.host}:{source.port} (no handler)[/bold red]"
+                    logger.warning(
+                        "<<< RECEIVED %s from %s:%s (no handler)",
+                        request.method,
+                        source.host,
+                        source.port,
                     )
-                    console.print(request.to_string())
-                    console.print("=" * 80)
+                    logger.debug(request.to_string())
 
                     response = Response(
                         status_code=501,
@@ -387,11 +379,12 @@ class SIPServer:
                         },
                     )
 
-                    console.print(
-                        f"\n[bold red]>>> SENDING 501 Not Implemented to {source.host}:{source.port}[/bold red]"
+                    logger.debug(
+                        ">>> SENDING 501 Not Implemented to %s:%s",
+                        source.host,
+                        source.port,
                     )
-                    console.print(response.to_string())
-                    console.print("=" * 80)
+                    logger.debug(response.to_string())
 
                     response_data = response.to_bytes()
                     self._transport.send(response_data, source)

@@ -16,7 +16,7 @@ import uuid
 from typing import Optional, Union, Callable
 from urllib.parse import urlparse
 
-from ._utils import console, logger
+from ._utils import logger
 from ._models._auth import SipAuthCredentials, DigestCredentials, DigestAuth
 from ._events import Events, EventContext
 from ._fsm import StateManager
@@ -292,12 +292,14 @@ class Client:
                 )
 
             # Log retry
-            console.print(
-                f"\n[bold yellow]>>> AUTH RETRY {request.method} "
-                f"({self._transport.local_address} → {host}:{port}):[/bold yellow]"
+            logger.debug(
+                ">>> AUTH RETRY %s (%s -> %s:%s)",
+                request.method,
+                self._transport.local_address,
+                host,
+                port,
             )
-            console.print(request.to_string())
-            console.print("=" * 80)
+            logger.debug(request.to_string())
 
             # Send authenticated request
             destination = TransportAddress(
@@ -328,12 +330,14 @@ class Client:
                     "remote": str(source),
                 }
 
-                console.print(
-                    f"\n[bold green]<<< RECEIVED {auth_response.status_code} "
-                    f"{auth_response.reason_phrase} ({source} → {self._transport.local_address}):[/bold green]"
+                logger.debug(
+                    "<<< RECEIVED %s %s (%s -> %s)",
+                    auth_response.status_code,
+                    auth_response.reason_phrase,
+                    source,
+                    self._transport.local_address,
                 )
-                console.print(auth_response.to_string())
-                console.print("=" * 80)
+                logger.debug(auth_response.to_string())
 
                 # Call events on response
                 if self._events:
@@ -469,11 +473,14 @@ class Client:
             request = self._events._call_request_handlers(request, context)
 
         # Log request
-        console.print(
-            f"\n[bold cyan]>>> SENDING {method} ({self._transport.local_address} → {host}:{port}):[/bold cyan]"
+        logger.debug(
+            ">>> SENDING %s (%s -> %s:%s)",
+            method,
+            self._transport.local_address,
+            host,
+            port,
         )
-        console.print(request.to_string())
-        console.print("=" * 80)
+        logger.debug(request.to_string())
 
         try:
             # Send request
@@ -505,12 +512,14 @@ class Client:
                     "remote": str(source),
                 }
 
-                console.print(
-                    f"\n[bold green]<<< RECEIVED {response.status_code} {response.reason_phrase} "
-                    f"({source} → {self._transport.local_address}):[/bold green]"
+                logger.debug(
+                    "<<< RECEIVED %s %s (%s -> %s)",
+                    response.status_code,
+                    response.reason_phrase,
+                    source,
+                    self._transport.local_address,
                 )
-                console.print(response.to_string())
-                console.print("=" * 80)
+                logger.debug(response.to_string())
 
                 # Update transaction
                 self._state_manager.update_transaction(transaction.id, response)
@@ -748,11 +757,10 @@ class Client:
         )
         self._transport.send(ack_request.to_bytes(), destination)
 
-        console.print(
-            f"\n[bold cyan]>>> SENDING ACK ({self._transport.local_address} → {host}:{port}):[/bold cyan]"
+        logger.debug(
+            ">>> SENDING ACK (%s -> %s:%s)", self._transport.local_address, host, port
         )
-        console.print(ack_request.to_string())
-        console.print("=" * 80)
+        logger.debug(ack_request.to_string())
 
     def bye(
         self,
