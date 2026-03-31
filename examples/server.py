@@ -20,7 +20,6 @@ from typing import Annotated
 from sipx import (
     SIPServer,
     Request,
-    Response,
     FromHeader,
     CallID,
     Header,
@@ -49,21 +48,10 @@ server = SIPServer(local_host="127.0.0.1", local_port=15090)
 
 
 @server.options
-def on_options(request: Request) -> Response:
+def on_options(request: Request):
     """Simple handler — just request, no DI."""
     console.print("  [green]OPTIONS received[/green]")
-    return Response(
-        status_code=200,
-        headers={
-            "Via": request.via or "",
-            "From": request.from_header or "",
-            "To": request.to_header or "",
-            "Call-ID": request.call_id or "",
-            "CSeq": request.cseq or "",
-            "Allow": "INVITE,ACK,BYE,CANCEL,OPTIONS,MESSAGE,REGISTER",
-            "Content-Length": "0",
-        },
-    )
+    return request.ok({"Allow": "INVITE,ACK,BYE,CANCEL,OPTIONS,MESSAGE,REGISTER"})
 
 
 @server.register
@@ -72,21 +60,11 @@ def on_register(
     caller: Annotated[str, FromHeader],
     call_id: Annotated[str, CallID],
     source: Annotated[TransportAddress, Source],
-) -> Response:
+):
     """DI handler — headers auto-extracted."""
     console.print(f"  [green]REGISTER from {caller}[/green]")
     console.print(f"  [dim]Call-ID: {call_id}, Source: {source}[/dim]")
-    return Response(
-        status_code=200,
-        headers={
-            "Via": request.via or "",
-            "From": request.from_header or "",
-            "To": request.to_header or "",
-            "Call-ID": request.call_id or "",
-            "CSeq": request.cseq or "",
-            "Content-Length": "0",
-        },
-    )
+    return request.ok()
 
 
 @server.message
@@ -95,23 +73,13 @@ def on_message(
     caller: Annotated[str, FromHeader],
     ua: Annotated[str, UserAgent()],
     content_type: Annotated[str, Header("Content-Type")],
-) -> Response:
+):
     """DI with custom extractor."""
     body = request.content.decode("utf-8", errors="ignore") if request.content else ""
     console.print(f"  [green]MESSAGE from {caller}[/green]")
     console.print(f"  [dim]UA: {ua}, Content-Type: {content_type}[/dim]")
     console.print(f"  [cyan]Body: {body}[/cyan]")
-    return Response(
-        status_code=200,
-        headers={
-            "Via": request.via or "",
-            "From": request.from_header or "",
-            "To": request.to_header or "",
-            "Call-ID": request.call_id or "",
-            "CSeq": request.cseq or "",
-            "Content-Length": "0",
-        },
-    )
+    return request.ok()
 
 
 @server.handle("SUBSCRIBE")
@@ -119,20 +87,10 @@ def on_subscribe(
     request: Request,
     caller: Annotated[str, FromHeader],
     event: Annotated[str, Header("Event")],
-) -> Response:
+):
     """Generic handler via @server.handle()."""
     console.print(f"  [green]SUBSCRIBE from {caller}, event={event}[/green]")
-    return Response(
-        status_code=200,
-        headers={
-            "Via": request.via or "",
-            "From": request.from_header or "",
-            "To": request.to_header or "",
-            "Call-ID": request.call_id or "",
-            "CSeq": request.cseq or "",
-            "Content-Length": "0",
-        },
-    )
+    return request.ok()
 
 
 # ---------------------------------------------------------------------------

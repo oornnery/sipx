@@ -27,7 +27,7 @@ except ImportError:
     )
     raise SystemExit(1)
 
-from sipx import Client, SDPBody
+from sipx import Client
 
 # ---------------------------------------------------------------------------
 # Pydantic models for API
@@ -95,13 +95,13 @@ def call(req: CallRequest):
 
     with Client(local_port=0) as client:
         client.auth = (req.username, req.password)
-        sdp = SDPBody.audio(ip=client.local_address.host, port=0)
+        sdp = client.create_sdp()
         r = client.invite(to_uri=req.uri, body=sdp.to_string())
 
         if r.status_code == 200:
-            client.ack(response=r)
+            client.ack()
             time.sleep(req.duration)
-            client.bye(response=r)
+            client.bye()
 
         return SipResponse(status_code=r.status_code, reason=r.reason_phrase)
 

@@ -2,7 +2,7 @@
 """sipx — Complete call flow: REGISTER → INVITE → ACK → BYE."""
 
 import time
-from sipx import Client, SDPBody
+from sipx import Client
 from sipx._utils import console
 
 with Client(local_port=5061) as client:
@@ -13,7 +13,7 @@ with Client(local_port=5061) as client:
     console.print(f"REGISTER: {r.status_code}")
 
     # Call
-    sdp = SDPBody.audio(ip=client.local_address.host, port=8000)
+    sdp = client.create_sdp(port=8000)
     r = client.invite(
         to_uri="sip:100@127.0.0.1",
         body=sdp.to_string(),
@@ -24,10 +24,10 @@ with Client(local_port=5061) as client:
     console.print(f"INVITE: {r.status_code}")
 
     if r.status_code == 200:
-        client.ack(response=r)
+        client.ack()
         console.print("ACK sent, call active...")
         time.sleep(3)
-        bye_r = client.bye(response=r)
+        bye_r = client.bye()
         console.print(f"BYE: {bye_r.status_code}")
 
     # Unregister

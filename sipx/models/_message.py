@@ -395,6 +395,51 @@ class Request(SIPMessage):
         header_name = AuthParser.get_auth_header_name(challenge)
         self._headers[header_name] = auth_header
 
+    # ------------------------------------------------------------------
+    # Response builders (auto-copy headers from request)
+    # ------------------------------------------------------------------
+
+    def _create_response(
+        self,
+        code: int,
+        reason: str = "",
+        extra_headers: dict | None = None,
+        content: str | bytes | MessageBody | None = None,
+    ) -> Response:
+        """Create a Response with headers auto-copied from this request."""
+        if not reason:
+            reason = REASON_PHRASES.get(code, "")
+        h: dict[str, str] = {
+            "Via": self.via or "",
+            "From": self.from_header or "",
+            "To": self.to_header or "",
+            "Call-ID": self.call_id or "",
+            "CSeq": self.cseq or "",
+        }
+        if extra_headers:
+            h.update(extra_headers)
+        return Response(status_code=code, reason_phrase=reason, headers=h, content=content)
+
+    def ok(self, headers: dict | None = None, content: str | bytes | MessageBody | None = None) -> Response:
+        """Create 200 OK response."""
+        return self._create_response(200, "OK", headers, content)
+
+    def trying(self) -> Response:
+        """Create 100 Trying response."""
+        return self._create_response(100, "Trying")
+
+    def ringing(self) -> Response:
+        """Create 180 Ringing response."""
+        return self._create_response(180, "Ringing")
+
+    def error(self, code: int, headers: dict | None = None) -> Response:
+        """Create error response (4xx, 5xx, 6xx)."""
+        return self._create_response(code, headers=headers)
+
+    def redirect(self, contact_uri: str) -> Response:
+        """Create 302 Moved Temporarily response."""
+        return self._create_response(302, "Moved Temporarily", {"Contact": f"<{contact_uri}>"})
+
     def __repr__(self) -> str:
         return f"<Request({self.method!r}, {self.uri!r})>"
 

@@ -9,7 +9,7 @@ Usage:
     uv run python examples/events_demo.py
 """
 
-from sipx import Client, Events, on, SDPBody
+from sipx import Client, Events, on
 from sipx._utils import console
 
 
@@ -80,7 +80,7 @@ def main():
 
         # Invite (triggers: on_request, on_ringing, on_call_accepted, on_any_success)
         console.rule("INVITE + ACK + BYE")
-        sdp = SDPBody.audio(ip=client.local_address.host, port=8000)
+        sdp = client.create_sdp(port=8000)
         r = client.invite(
             to_uri="sip:100@127.0.0.1",
             body=sdp.to_string(),
@@ -89,11 +89,11 @@ def main():
             },
         )
         if r.status_code == 200:
-            client.ack(response=r)
+            client.ack()
             import time
 
             time.sleep(1)
-            client.bye(response=r)
+            client.bye()
 
         # Unregister
         console.rule("UNREGISTER")

@@ -160,6 +160,12 @@ class SIPServer(SIPServerHandlerMixin):
                     txn.transition_to(TransactionState.CONFIRMED)
                     continue
 
+                # Auto 100 Trying for INVITE (RFC 3261 §8.2.6.1)
+                if request.method == "INVITE":
+                    trying = request.trying()
+                    self._transport.send(trying.to_bytes(), source)
+                    logger.debug(">>> AUTO 100 Trying to %s:%s", source.host, source.port)
+
                 # Find handler for this method
                 handler = self._handlers.get(request.method)
 
@@ -168,18 +174,8 @@ class SIPServer(SIPServerHandlerMixin):
                     try:
                         response = resolve_handler(handler, request, source)
                     except Exception as handler_err:
-                        logger.error(f"Handler error: {handler_err}")
-                        response = Response(
-                            status_code=500,
-                            headers={
-                                "Via": request.via or "",
-                                "From": request.from_header or "",
-                                "To": request.to_header or "",
-                                "Call-ID": request.call_id or "",
-                                "CSeq": request.cseq or "",
-                                "Content-Length": "0",
-                            },
-                        )
+                        logger.error("Handler error: %s", handler_err)
+                        response = request.error(500)
 
                     logger.debug(
                         ">>> SENDING %s %s to %s:%s",
@@ -206,18 +202,7 @@ class SIPServer(SIPServerHandlerMixin):
                     )
                     logger.debug(request.to_string())
 
-                    response = Response(
-                        status_code=501,
-                        reason_phrase="Not Implemented",
-                        headers={
-                            "Via": request.via or "",
-                            "From": request.from_header or "",
-                            "To": request.to_header or "",
-                            "Call-ID": request.call_id or "",
-                            "CSeq": request.cseq or "",
-                            "Content-Length": "0",
-                        },
-                    )
+                    response = request.error(501)
 
                     logger.debug(
                         ">>> SENDING 501 Not Implemented to %s:%s",

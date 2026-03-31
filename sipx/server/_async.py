@@ -6,7 +6,7 @@ import asyncio
 from typing import Callable, Dict
 
 from .._utils import logger
-from ..models._message import MessageParser, Request, Response
+from ..models._message import MessageParser, Request
 from .._types import TransportAddress
 from .._depends import resolve_handler
 from ._base import SIPServerHandlerMixin
@@ -70,35 +70,21 @@ class AsyncSIPServer(SIPServerHandlerMixin):
             logger.info("Received ACK from %s:%s", addr[0], addr[1])
             return
 
+        # Auto 100 Trying for INVITE (RFC 3261 §8.2.6.1)
+        if message.method == "INVITE" and transport:
+            trying = message.trying()
+            transport.sendto(trying.to_bytes(), addr)
+            logger.debug(">>> AUTO 100 Trying to %s:%s", addr[0], addr[1])
+
         handler = self._handlers.get(message.method)
         if handler:
             try:
                 response = resolve_handler(handler, message, source)
             except Exception as e:
                 logger.error("Handler error: %s", e)
-                response = Response(
-                    status_code=500,
-                    headers={
-                        "Via": message.via or "",
-                        "From": message.from_header or "",
-                        "To": message.to_header or "",
-                        "Call-ID": message.call_id or "",
-                        "CSeq": message.cseq or "",
-                        "Content-Length": "0",
-                    },
-                )
+                response = message.error(500)
         else:
-            response = Response(
-                status_code=501,
-                headers={
-                    "Via": message.via or "",
-                    "From": message.from_header or "",
-                    "To": message.to_header or "",
-                    "Call-ID": message.call_id or "",
-                    "CSeq": message.cseq or "",
-                    "Content-Length": "0",
-                },
-            )
+            response = message.error(501)
 
         if transport:
             transport.sendto(response.to_bytes(), addr)

@@ -3,7 +3,7 @@
 
 import asyncio
 from typing import Annotated
-from sipx import AsyncClient, Request, Response, FromHeader
+from sipx import AsyncClient, Request, FromHeader
 from sipx.server import AsyncSIPServer
 from sipx._utils import console
 
@@ -14,36 +14,16 @@ server = AsyncSIPServer(local_host=HOST, local_port=PORT)
 
 
 @server.register
-def on_register(request: Request, caller: Annotated[str, FromHeader]) -> Response:
+def on_register(request: Request, caller: Annotated[str, FromHeader]):
     console.print(f"  server: REGISTER from {caller}")
-    return Response(
-        status_code=200,
-        headers={
-            "Via": request.via or "",
-            "From": request.from_header or "",
-            "To": request.to_header or "",
-            "Call-ID": request.call_id or "",
-            "CSeq": request.cseq or "",
-            "Content-Length": "0",
-        },
-    )
+    return request.ok()
 
 
 @server.message
-def on_message(request: Request, caller: Annotated[str, FromHeader]) -> Response:
+def on_message(request: Request, caller: Annotated[str, FromHeader]):
     body = request.content.decode() if request.content else ""
     console.print(f"  server: MESSAGE from {caller}: {body}")
-    return Response(
-        status_code=200,
-        headers={
-            "Via": request.via or "",
-            "From": request.from_header or "",
-            "To": request.to_header or "",
-            "Call-ID": request.call_id or "",
-            "CSeq": request.cseq or "",
-            "Content-Length": "0",
-        },
-    )
+    return request.ok()
 
 
 async def main():

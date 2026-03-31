@@ -152,3 +152,36 @@ def _detect_auth_challenge(response: Response, context: EventContext) -> None:
             logger.debug(
                 f"Authentication challenge detected: {response.status_code}"
             )
+
+
+class DialogTracker:
+    """Tracks active dialog for implicit ack/bye."""
+
+    def __init__(self):
+        self._last_invite_response: Response | None = None
+        self._route_set = None
+
+    def track(self, response: Response) -> None:
+        """Track INVITE 200 OK for implicit ack/bye."""
+        if (
+            response.request
+            and response.request.method == "INVITE"
+            and response.status_code == 200
+        ):
+            self._last_invite_response = response
+            # Store route set if present
+            if "Record-Route" in response.headers:
+                from .._routing import RouteSet
+                self._route_set = RouteSet.from_response(response)
+
+    @property
+    def active(self) -> Response | None:
+        return self._last_invite_response
+
+    @property
+    def route_set(self):
+        return self._route_set
+
+    def clear(self) -> None:
+        self._last_invite_response = None
+        self._route_set = None

@@ -7,7 +7,7 @@ Requires: cd docker/asterisk && docker-compose up -d
 
 import asyncio
 
-from sipx import AsyncClient, SDPBody
+from sipx import AsyncClient
 from sipx._utils import console
 
 
@@ -30,7 +30,7 @@ async def main():
         console.print(f"OPTIONS: {r.status_code if r else 'timeout'}")
 
         # Call
-        sdp = SDPBody.audio(ip=client.local_address.host, port=8000)
+        sdp = client.create_sdp(port=8000)
         r = await client.invite(
             to_uri="sip:100@127.0.0.1",
             body=sdp.to_string(),
@@ -41,9 +41,9 @@ async def main():
         console.print(f"INVITE: {r.status_code if r else 'timeout'}")
 
         if r and r.status_code == 200:
-            await client.ack(response=r)
+            await client.ack()
             await asyncio.sleep(2)
-            bye_r = await client.bye(response=r)
+            bye_r = await client.bye()
             console.print(f"BYE: {bye_r.status_code if bye_r else 'timeout'}")
 
         # Message

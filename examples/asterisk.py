@@ -221,17 +221,7 @@ def demo_server() -> dict:
 
     @server.message
     def on_msg(request, source):
-        return Response(
-            status_code=200,
-            headers={
-                "Via": request.via or "",
-                "From": request.from_header or "",
-                "To": request.to_header or "",
-                "Call-ID": request.call_id or "",
-                "CSeq": request.cseq or "",
-                "Content-Length": "0",
-            },
-        )
+        return request.ok()
 
     server.start()
     time.sleep(0.5)
@@ -292,9 +282,9 @@ def test_user(user: User, test_id: int) -> dict:
         )
         if r and r.status_code == 200:
             results["invite"] = True
-            client.ack(response=r)
+            client.ack()
             time.sleep(2)
-            bye_r = client.bye(response=r)
+            bye_r = client.bye()
             results["bye"] = bye_r and bye_r.status_code == 200
         else:
             results["invite"] = False
@@ -411,9 +401,9 @@ def test_late_offer(user: User) -> dict:
         if r and r.status_code == 200 and r.body and isinstance(r.body, SDPBody):
             results["late_offer"] = True
             console.print(f"  codecs={r.body.get_codecs_summary()}")
-            client.ack(response=r)
+            client.ack()
             time.sleep(1)
-            client.bye(response=r)
+            client.bye()
         else:
             results["late_offer"] = False
 

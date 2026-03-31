@@ -13,3 +13,7 @@ wheels/
 .mypy_cache
 __pypackages__/
 .coverage
+htmlcov
+.coverage.*
+
+.claude/settings.json

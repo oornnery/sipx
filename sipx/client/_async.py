@@ -15,6 +15,7 @@ from ..models._auth import AuthParser, SipAuthCredentials
 from ..models._message import MessageParser, Request, Response
 from ..transports import TransportAddress, TransportConfig
 from ._base import (
+    DialogTracker,
     _build_auth_header,
     _create_async_transport,
     _detect_auth_challenge,
@@ -48,6 +49,7 @@ class AsyncClient:
         events: Optional[Events] = None,
         auth: Optional[Union[SipAuthCredentials, tuple]] = None,
         auto_auth: bool = True,
+        auto_dns: bool = True,
     ) -> None:
         self.config = TransportConfig(local_host=local_host, local_port=local_port)
         self.transport_protocol = transport.upper()
@@ -69,6 +71,10 @@ class AsyncClient:
             self._auth = auth
         else:
             self._auth = None
+
+        self._dialog = DialogTracker()
+        self._auto_dns = auto_dns
+        self._resolver = None
 
     # --- Properties ---
 
@@ -107,6 +113,32 @@ class AsyncClient:
     def is_closed(self) -> bool:
         return self._closed
 
+    def create_sdp(self, port: int = 0, **kwargs):
+        """Create SDP using client's local address."""
+        from ..models._body import SDPBody
+
+        return SDPBody.audio(ip=self._transport.local_address.host, port=port, **kwargs)
+
+    @staticmethod
+    def _is_ip(host: str) -> bool:
+        """Check if host is an IP address (not a hostname)."""
+        import ipaddress
+
+        try:
+            ipaddress.ip_address(host)
+            return True
+        except ValueError:
+            return False
+
+    async def _resolve_dns(self, host: str):
+        """Resolve hostname via async SIP DNS SRV (lazy init)."""
+        if self._resolver is None:
+            from ..dns._async import AsyncSipResolver
+
+            self._resolver = AsyncSipResolver()
+        targets = await self._resolver.resolve(host, self.transport_protocol)
+        return targets[0] if targets else None
+
     # --- Core request (native async with retransmission) ---
 
     async def request(
@@ -125,6 +157,13 @@ class AsyncClient:
             port = port if port is not None else extracted_port
         else:
             port = port if port is not None else 5060
+
+        # Auto DNS resolution for non-IP hostnames
+        if self._auto_dns and not self._is_ip(host):
+            resolved = await self._resolve_dns(host)
+            if resolved:
+                host = resolved.host
+                port = resolved.port
 
         request = Request(
             method=method, uri=uri, headers=headers or {}, content=content
@@ -229,6 +268,9 @@ class AsyncClient:
                 retry = await self.retry_with_auth(final_response)
                 if retry:
                     final_response = retry
+
+            # Track dialog state for implicit ack/bye
+            self._dialog.track(final_response)
 
             return final_response
 
@@ -351,7 +393,11 @@ class AsyncClient:
     async def options(self, uri: str, **kwargs) -> Optional[Response]:
         return await self.request(method="OPTIONS", uri=uri, **kwargs)
 
-    async def ack(self, response: Response, **kwargs) -> None:
+    async def ack(self, response: Optional[Response] = None, **kwargs) -> None:
+        if response is None:
+            response = self._dialog.active
+        if response is None:
+            raise ValueError("No response provided and no active dialog")
         request = response.request
         if request is None:
             raise ValueError("Response has no associated request")
@@ -366,6 +412,11 @@ class AsyncClient:
         headers["CSeq"] = f"{(request.headers.get('CSeq') or '1').split()[0]} ACK"
         headers["Via"] = request.headers.get("Via")
         ack = Request(method="ACK", uri=request.uri, headers=headers)
+
+        # Apply route set if present in dialog
+        if self._dialog.route_set:
+            self._dialog.route_set.apply(ack)
+
         dest = TransportAddress(host=host, port=port, protocol=self.transport_protocol)
         await self._transport.send(ack.to_bytes(), dest)
 
@@ -373,7 +424,9 @@ class AsyncClient:
         self, response: Optional[Response] = None, **kwargs
     ) -> Optional[Response]:
         if response is None:
-            raise ValueError("Response is required")
+            response = self._dialog.active
+        if response is None:
+            raise ValueError("No response provided and no active dialog")
         request = response.request
         if request is None:
             raise ValueError("Response has no associated request")
@@ -384,9 +437,20 @@ class AsyncClient:
         headers["CSeq"] = (
             f"{int((request.headers.get('CSeq') or '1').split()[0]) + 1} BYE"
         )
-        return await self.request(
+
+        # Apply route set if present
+        if self._dialog.route_set and not self._dialog.route_set.is_empty:
+            route_value = ", ".join(f"<{r}>" for r in self._dialog.route_set.routes)
+            headers["Route"] = route_value
+
+        result = await self.request(
             method="BYE", uri=request.uri, headers=headers, **kwargs
         )
+
+        # Clear dialog after BYE
+        self._dialog.clear()
+
+        return result
 
     async def cancel(self, response: Response, **kwargs) -> Optional[Response]:
         request = response.request

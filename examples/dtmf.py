@@ -2,14 +2,14 @@
 """sipx — Send DTMF digits (all 3 methods)."""
 
 import time
-from sipx import Client, SDPBody
+from sipx import Client
 from sipx._utils import console
 from sipx.media import CallSession, DTMFToneGenerator
 
 with Client(local_port=5061) as client:
     client.auth = ("1111", "1111xxx")
 
-    sdp = SDPBody.audio(ip=client.local_address.host, port=8000)
+    sdp = client.create_sdp(port=8000)
     r = client.invite(
         to_uri="sip:100@127.0.0.1",
         body=sdp.to_string(),
@@ -19,7 +19,7 @@ with Client(local_port=5061) as client:
     )
 
     if r.status_code == 200:
-        client.ack(response=r)
+        client.ack()
 
         # Method 1: RFC 4733 (RTP telephone-event)
         console.print("DTMF via RFC 4733:")
@@ -44,4 +44,4 @@ with Client(local_port=5061) as client:
             call.play(dtmf_gen.generate_digit("9", 200))
             console.print("  Sent '9' as 697+1477Hz tone")
 
-        client.bye(response=r)
+        client.bye()

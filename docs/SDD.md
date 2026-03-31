@@ -1,12 +1,12 @@
 # sipx - Software Design Document (SDD)
 
-> **Version:** 0.1.0
-> **Date:** 2026-03-30
-> **Status:** In development (v0.3.0)
-> **Main inspiration:** [httpx](https://www.python-httpx.org/) — Pythonic API, sync/async, extensible
+> **Version:** 0.4.0
+> **Date:** 2026-03-31
+> **Status:** In development
+> **Main inspiration:** [httpx](https://www.python-httpx.org/) -- Pythonic API, sync/async, extensible
 > **Implementation references:** [sipd](https://github.com/initbar/sipd), [sipmessage](https://github.com/spacinov/sipmessage), [sip-parser](https://github.com/alxgb/sip-parser), [PySipIvr](https://github.com/ersansrck/PySipIvr), [sip-resources](https://github.com/miconda/sip-resources)
 > **Other inspirations:** [pyVoIP](https://github.com/tayler6000/pyVoIP), [aiosip](https://github.com/Eyepea/aiosip), [pysipp](https://github.com/SIPp/pysipp), [PySIPio](https://pypi.org/project/PySIPio/), [b2bua](https://github.com/sippy/b2bua), [katariSIP](https://github.com/klocation/katarisip), [SIP-Auth-helper](https://github.com/pbertera/SIP-Auth-helper), [callsip.py](https://github.com/rundekugel/callsip.py)
-> **Python:** 3.13+
+> **Python:** 3.12+
 > **License:** MIT
 
 ---
@@ -17,16 +17,17 @@
 
 ### 1.1 Goals
 
-| Goal                       | Description                                                                       |
-| -------------------------- | --------------------------------------------------------------------------------- |
-| **Simplicity**             | Clean and intuitive API inspired by httpx (`client.invite()`, `client.register()`) |
-| **Sync + Async**           | `Client` and `AsyncClient` with the same API                                      |
-| **Declarative events**     | `@event_handler('INVITE', status=200)` as decorators                               |
-| **High performance**       | Zero-copy parsing, lazy body parsing, connection pooling                           |
-| **RFC Compliance**         | RFC 3261, 2617, 7616, 4566, 3264, 4733 and Brazilian extensions                   |
-| **Extensibility**          | Pluggable transports, body parsers, auth methods via ABCs                          |
-| **Multi-platform**         | CLI, FastAPI, TUI (Textual), automation scripts                                    |
-| **Voice automation**       | IVR, TTS, STT, DTMF, RTP support for AI integration                               |
+| Goal | Description |
+| --- | --- |
+| **Simplicity** | Clean API inspired by httpx (`client.invite()`) and FastAPI (`@server.invite`, `Annotated` DI) |
+| **Sync + Async** | `Client` / `AsyncClient` and `SIPServer` / `AsyncSIPServer` with the same API |
+| **Declarative events** | `@on('INVITE', status=200)` as decorators |
+| **FastAPI-style DI** | `Annotated[str, FromHeader]`, `Annotated[RTPSession, AutoRTP(port=8000)]` extractors |
+| **Response builders** | `request.ok()`, `request.trying()`, `request.ringing()`, `request.error(code)` |
+| **Dialog tracking** | `client.ack()` / `client.bye()` without passing response -- automatic dialog state |
+| **RFC Compliance** | RFC 3261, 2617, 7616, 4566, 3264, 4733, 3550, 3263, 4028 and Brazilian SIP-I |
+| **Media** | RTP, DTMF (3 methods), TTS/STT adapters, IVR builder, tone generators |
+| **Extensibility** | Pluggable transports, body parsers, auth methods, custom extractors |
 
 ### 1.2 Target Audience
 
@@ -34,7 +35,7 @@
 - AI-powered IVR systems (TTS/STT)
 - CLI tools for SIP testing and diagnostics
 - FastAPI applications with SIP signaling
-- TUIs for call monitoring
+- Brazilian telecom (SIP-I, ANATEL, ISUP-BR)
 
 ---
 
@@ -51,40 +52,55 @@ graph TB
     subgraph "sipx Public API"
         CLIENT[Client / AsyncClient]
         SERVER[SIPServer / AsyncSIPServer]
-        EVENTS[Events + @event_handler]
-        AUTH[Auth.Digest]
+        EVENTS[Events + @on decorator]
+        DI[DI: Annotated + Extractors]
     end
 
     subgraph "Core"
-        FSM[StateManager<br/>Transaction + Dialog FSM]
+        FSM[FSM<br/>StateManager + TimerManager]
         MODELS[Models<br/>Request / Response / Headers]
-        SDP_MOD[SDP<br/>SDPBody / Offer-Answer]
+        SDP_MOD[SDP<br/>SDPBody / ICE / SRTP / DTLS]
         AUTH_MOD[Auth<br/>DigestAuth / Challenge]
+        DNS[DNS<br/>SipResolver / AsyncSipResolver]
+        URI[SipURI Parser]
+        ROUTING[RouteSet / Record-Route]
+        SESSION[Session Timers / Subscription]
     end
 
     subgraph "Transport Layer"
         BASE[BaseTransport / AsyncBaseTransport]
-        UDP[UDPTransport]
-        TCP[TCPTransport]
-        TLS[TLSTransport]
-        WS[WebSocketTransport ❌]
+        UDP[UDPTransport + AsyncUDPTransport]
+        TCP[TCPTransport + AsyncTCPTransport]
+        TLS[TLSTransport + AsyncTLSTransport]
+        WS[WebSocketTransport]
     end
 
-    subgraph "Media Layer ❌ (Planned)"
-        RTP_MOD[RTP Engine]
-        DTMF_MOD[DTMF RFC 4733]
-        TTS[TTS Engine]
-        STT[STT Engine]
-        CODEC[Codecs G.711 / Opus]
+    subgraph "Media Layer"
+        RTP_MOD[RTPSession + AsyncRTPSession]
+        DTMF_MOD[DTMF: RFC 4733 + SIP INFO + Inband]
+        GEN[ToneGenerator / DTMFToneGenerator]
+        CALL[CallSession / AsyncCallSession]
+        TTS[TTS Adapter]
+        STT[STT Adapter]
+        CODEC[Codecs: G.711 + Opus]
+    end
+
+    subgraph "Contrib"
+        IVR[IVR / AsyncIVR]
+        SIPI[SIP-I: ISUP binary encoding]
+        SIPIBR[SIP-I BR: ANATEL + ATI]
     end
 
     APP --> CLIENT
     APP --> SERVER
     CLIENT --> EVENTS
-    CLIENT --> AUTH
+    CLIENT --> DI
     CLIENT --> FSM
     CLIENT --> MODELS
     CLIENT --> BASE
+    CLIENT --> DNS
+    CLIENT --> ROUTING
+    SERVER --> DI
     EVENTS --> MODELS
     FSM --> MODELS
     MODELS --> SDP_MOD
@@ -93,64 +109,105 @@ graph TB
     BASE --> TCP
     BASE --> TLS
     BASE --> WS
-    CLIENT -.-> RTP_MOD
-    RTP_MOD -.-> DTMF_MOD
-    RTP_MOD -.-> TTS
-    RTP_MOD -.-> STT
-    RTP_MOD -.-> CODEC
-
-    style WS fill:#ff6b6b,stroke:#333,color:#fff
-    style RTP_MOD fill:#ff6b6b,stroke:#333,color:#fff
-    style DTMF_MOD fill:#ff6b6b,stroke:#333,color:#fff
-    style TTS fill:#ff6b6b,stroke:#333,color:#fff
-    style STT fill:#ff6b6b,stroke:#333,color:#fff
-    style CODEC fill:#ff6b6b,stroke:#333,color:#fff
+    CLIENT --> RTP_MOD
+    RTP_MOD --> DTMF_MOD
+    RTP_MOD --> GEN
+    RTP_MOD --> CALL
+    IVR --> RTP_MOD
+    IVR --> TTS
+    SIPI --> MODELS
 ```
-
-> Red = Not implemented
 
 ### 2.2 Package Structure
 
 ```text
 sipx/
-├── __init__.py          # Public API exports
-├── _client.py           # Client + AsyncClient (high level)
-├── _server.py           # SIPServer + AsyncSIPServer
-├── _events.py           # Events + @event_handler decorator
-├── _fsm.py              # Transaction + Dialog + StateManager
-├── _types.py            # Enums, DataClasses, Exceptions, Type Aliases
-├── _utils.py            # Constants (EOL, HEADERS, REASON_PHRASES), logging
-├── main.py              # Entry point (empty)
+├── __init__.py            # Public API exports
+├── main.py                # CLI entry point
+├── _events.py             # Events + @on decorator
+├── _depends.py            # DI: Annotated extractors (FromHeader, AutoRTP, Source, etc.)
+├── _routing.py            # RouteSet / Record-Route processing (RFC 3261 Section 16)
+├── _uri.py                # SipURI parser (RFC 3986)
+├── _types.py              # Enums, DataClasses, Exceptions, Type Aliases
+├── _utils.py              # Constants, logging, reason phrases
 │
-├── _models/
-│   ├── __init__.py      # Re-exports
-│   ├── _message.py      # SIPMessage (ABC), Request, Response, MessageParser
-│   ├── _header.py       # HeaderContainer (ABC), Headers, HeaderParser
-│   ├── _body.py         # MessageBody (ABC), SDPBody, BodyParser
-│   └── _auth.py         # Auth, DigestAuth, DigestChallenge, AuthParser
+├── client/
+│   ├── __init__.py        # Re-exports: Client, AsyncClient
+│   ├── _base.py           # Shared helpers, DialogTracker
+│   ├── _sync.py           # Client (sync, with auto DNS, dialog tracking)
+│   └── _async.py          # AsyncClient (native asyncio, DatagramProtocol)
 │
-├── _transports/
-│   ├── __init__.py      # Lazy loading
-│   ├── _base.py         # BaseTransport (ABC), AsyncBaseTransport (ABC)
-│   ├── _udp.py          # UDPTransport, AsyncUDPTransport
-│   ├── _tcp.py          # TCPTransport, AsyncTCPTransport
-│   └── _tls.py          # TLSTransport, AsyncTLSTransport
+├── server/
+│   ├── __init__.py        # Re-exports: SIPServer, AsyncSIPServer
+│   ├── _base.py           # SIPServerHandlerMixin (decorators, DI)
+│   ├── _sync.py           # SIPServer (threading)
+│   └── _async.py          # AsyncSIPServer (asyncio.DatagramProtocol)
 │
-├── _media/              # ❌ PLANNED
-│   ├── __init__.py
-│   ├── _rtp.py          # RTP send/receive (RFC 3550)
-│   ├── _dtmf.py         # DTMF RFC 4733 + RFC 2833 + SIP INFO
-│   ├── _codecs.py       # G.711 (PCMU/PCMA), Opus, etc.
-│   ├── _tts.py          # Text-to-Speech adapter
-│   └── _stt.py          # Speech-to-Text adapter
+├── models/
+│   ├── __init__.py        # Re-exports
+│   ├── _message.py        # Request (with ok/error/trying/ringing), Response, MessageParser
+│   ├── _header.py         # Headers (case-insensitive, compact forms, RFC ordering)
+│   ├── _body.py           # SDPBody (ICE, SRTP crypto, DTLS, rtcp-fb, direction), RawBody
+│   └── _auth.py           # DigestAuth, DigestChallenge, AuthParser
 │
-├── _srtp/               # ❌ PLANNED
-│   └── _srtp.py         # SRTP (RFC 3711)
+├── transports/
+│   ├── __init__.py        # Re-exports, TransportConfig, TransportAddress
+│   ├── _base.py           # BaseTransport (ABC), AsyncBaseTransport (ABC)
+│   ├── _udp.py            # UDPTransport, AsyncUDPTransport
+│   ├── _tcp.py            # TCPTransport, AsyncTCPTransport
+│   ├── _tls.py            # TLSTransport, AsyncTLSTransport
+│   ├── _ws.py             # WebSocketTransport (RFC 7118)
+│   └── _utils.py          # Transport utilities
 │
-└── _contrib/            # ❌ PLANNED
-    ├── _ivr.py          # IVR builder
-    ├── _fastapi.py      # FastAPI integration
-    └── _cli.py          # CLI tools
+├── fsm/
+│   ├── __init__.py        # Re-exports: StateManager, TimerManager, AsyncTimerManager
+│   ├── _manager.py        # StateManager (transactions + dialogs)
+│   ├── _models.py         # Transaction, Dialog dataclasses
+│   └── _timer.py          # TimerManager (sync), AsyncTimerManager (async)
+│
+├── dns/
+│   ├── __init__.py        # Re-exports
+│   ├── _models.py         # ResolvedTarget dataclass
+│   ├── _sync.py           # SipResolver (SRV + A fallback)
+│   └── _async.py          # AsyncSipResolver (native async)
+│
+├── session/
+│   ├── __init__.py        # Re-exports
+│   ├── _timer.py          # SessionTimer, AsyncSessionTimer (RFC 4028)
+│   └── _subscription.py   # Subscription, AsyncSubscription
+│
+├── media/
+│   ├── __init__.py        # Re-exports: RTPSession, AsyncRTPSession, etc.
+│   ├── _rtp.py            # RTPPacket, RTPSession (sync)
+│   ├── _async.py          # AsyncRTPSession (DatagramProtocol), AsyncDTMFHelper
+│   ├── _dtmf.py           # DTMFEvent, DTMFSender, DTMFCollector
+│   ├── _session.py        # CallSession, AsyncCallSession
+│   ├── _generators.py     # ToneGenerator, DTMFToneGenerator
+│   ├── _codecs.py         # G.711 PCMU/PCMA encode/decode
+│   ├── _opus.py           # Opus codec adapter
+│   ├── _audio.py          # AudioPlayer, AudioRecorder
+│   ├── _tts.py            # BaseTTS adapter interface
+│   ├── _stt.py            # BaseSTT adapter interface
+│   ├── _pyaudio.py        # PyAudio adapter (mic/speaker I/O)
+│   ├── rtp/               # Re-export namespace
+│   ├── dtmf/              # Re-export namespace
+│   ├── session/           # Re-export namespace
+│   ├── audio/             # Re-export namespace
+│   └── codecs/            # Re-export namespace
+│
+└── contrib/
+    ├── __init__.py        # Re-exports
+    ├── _isup.py           # Real ISUP binary encoding (ITU-T Q.763)
+    ├── _sipi.py           # SIP-I international (multipart/mixed)
+    ├── _sipi_br.py        # SIP-I BR: ANATEL, ATI, AsyncATI, ISUP-BR
+    ├── _fastapi.py        # FastAPI integration adapter
+    ├── _tts_google.py     # Google TTS adapter
+    ├── _stt_whisper.py    # Whisper STT adapter
+    └── ivr/
+        ├── __init__.py    # Re-exports: IVR, AsyncIVR, Menu, Prompt
+        ├── _models.py     # Menu, MenuItem, Prompt dataclasses
+        ├── _sync.py       # IVR controller (sync)
+        └── _async.py      # AsyncIVR controller (native async)
 ```
 
 ---
@@ -159,52 +216,56 @@ sipx/
 
 ### 3.1 Implemented RFCs
 
-| RFC      | Title                             | Module                                  | Status               |
-| -------- | --------------------------------- | --------------------------------------- | -------------------- |
-| **3261** | SIP: Session Initiation Protocol  | `_client`, `_models`, `_fsm`, `_server` | ✅ Core implemented  |
-| **2617** | HTTP Digest Authentication        | `_models/_auth.py`                      | ✅ Complete          |
-| **7616** | HTTP Digest (SHA-256)             | `_models/_auth.py`                      | ✅ Complete          |
-| **8760** | Digest Algorithm Comparison       | `_models/_auth.py`                      | ⚠️ Partial           |
-| **4566** | SDP: Session Description Protocol | `_models/_body.py`                      | ✅ Complete          |
-| **3264** | Offer/Answer Model with SDP       | `_models/_body.py`                      | ✅ Complete          |
-| **3581** | Symmetric Response (rport)        | `_client.py` (Via header)               | ⚠️ Partial           |
+| RFC | Title | Module | Status |
+| --- | --- | --- | --- |
+| **3261** | SIP: Session Initiation Protocol | `client/`, `server/`, `models/`, `fsm/` | ✅ Core + auto 100 Trying |
+| **2617** | HTTP Digest Authentication | `models/_auth.py` | ✅ Complete |
+| **7616** | HTTP Digest (SHA-256) | `models/_auth.py` | ✅ Complete |
+| **8760** | Digest Algorithm Comparison | `models/_auth.py` | ✅ Complete |
+| **4566** | SDP: Session Description Protocol | `models/_body.py` | ✅ Complete + ICE/SRTP/DTLS |
+| **3264** | Offer/Answer Model with SDP | `models/_body.py` | ✅ Complete |
+| **3550** | RTP: Real-time Transport Protocol | `media/_rtp.py`, `media/_async.py` | ✅ Sync + Async |
+| **4733** | DTMF via RTP (telephone-event) | `media/_dtmf.py` | ✅ Send + Collect |
+| **2976** | SIP INFO Method | `client/` | ✅ DTMF via SIP INFO |
+| **3263** | SIP DNS/SRV Resolution | `dns/` | ✅ Sync + Async, auto in Client |
+| **4028** | Session Timers | `session/_timer.py` | ✅ Sync + Async |
+| **3581** | Symmetric Response (rport) | `client/` (Via header) | ✅ Complete |
+| **3986** | URI Syntax | `_uri.py` | ✅ SipURI parser |
 
-### 3.2 Required RFCs (Not Implemented)
+### 3.2 Partially Implemented
 
-| RFC      | Title                             | Priority   | Planned Module                |
-| -------- | --------------------------------- | ---------- | ----------------------------- |
-| **3550** | RTP: Real-time Transport Protocol | CRITICAL   | `_media/_rtp.py`              |
-| **3551** | RTP/AVP Profile                   | CRITICAL   | `_media/_codecs.py`           |
-| **4733** | DTMF via RTP (telephone-event)    | CRITICAL   | `_media/_dtmf.py`             |
-| **2833** | DTMF via RTP (legacy)             | HIGH       | `_media/_dtmf.py`             |
-| **3711** | SRTP: Secure RTP                  | HIGH       | `_srtp/_srtp.py`              |
-| **3263** | SIP: DNS/SRV Locating             | HIGH       | `_client.py`                  |
-| **3327** | SIP: Path Header                  | HIGH       | `_models/_header.py`          |
-| **3515** | SIP: REFER Method                 | HIGH       | `_client.py` (stub exists)    |
-| **3265** | SIP: SUBSCRIBE/NOTIFY             | HIGH       | `_client.py` (stub exists)    |
-| **3262** | SIP: PRACK (100rel)               | MEDIUM     | `_client.py` (stub exists)    |
-| **3311** | SIP: UPDATE Method                | MEDIUM     | `_client.py` (stub exists)    |
-| **3428** | SIP: MESSAGE Method               | MEDIUM     | `_client.py` (implemented)    |
-| **3903** | SIP: PUBLISH Method               | MEDIUM     | `_client.py` (stub exists)    |
-| **3323** | SIP: Privacy Mechanism            | MEDIUM     | `_models/_header.py`          |
-| **3325** | P-Asserted-Identity               | MEDIUM     | `_utils.py` (header defined)  |
-| **7118** | SIP over WebSocket                | MEDIUM     | `_transports/_ws.py`          |
-| **6665** | SIP: Event Framework              | MEDIUM     | `_events.py`                  |
-| **5765** | SIP-I (ISUP interworking)         | MEDIUM     | `_contrib/_sipi.py`           |
+| RFC | Title | Status | Notes |
+| --- | --- | --- | --- |
+| **3711** | SRTP | ⚠️ SDP attributes | Crypto attributes in SDP, no packet encryption |
+| **5765** | SIP-I (ISUP interworking) | ⚠️ Encoding done | Real ISUP binary, no full call flow |
+| **7118** | SIP over WebSocket | ⚠️ Transport exists | Basic implementation |
+| **3262** | PRACK (100rel) | ⚠️ Stub | Method exists, no full flow |
+| **3265** | SUBSCRIBE/NOTIFY | ⚠️ Stub + Subscription | Methods + async subscription model |
 
-### 3.3 SIP-I (Brazil/International Interworking)
+### 3.3 Not Yet Implemented
 
-| Spec            | Title                                    | Status                              |
-| --------------- | ---------------------------------------- | ----------------------------------- |
-| ITU-T Q.1912.5  | SIP-I: ISUP/SIP Interworking            | ❌ Not implemented                  |
-| ANATEL Res. 717 | Brazilian VoIP Regulation                | ❌ Not implemented                  |
-| SIP-I Headers   | P-Charging-Vector, P-Access-Network-Info | ⚠️ Headers defined in `_utils.py`   |
+| RFC | Title | Priority |
+| --- | --- | --- |
+| **3711** | SRTP packet encryption | HIGH |
+| **3550** | RTCP (control protocol) | MEDIUM |
+| **5765** | Full SIP-I call flow | MEDIUM |
+| **3327** | Path Header | LOW |
+| **6665** | Event Framework (full) | LOW |
+
+### 3.4 SIP-I (Brazil/International)
+
+| Spec | Title | Status |
+| --- | --- | --- |
+| ITU-T Q.1912.5 | SIP-I: ISUP/SIP Interworking | ✅ Real ISUP binary encoding (IAM/ACM/ANM/REL/RLC) |
+| ITU-T Q.763 | ISUP parameters/encoding | ✅ BCD phone encoding, parameter serialization |
+| ANATEL Res. 717 | Brazilian VoIP Regulation | ✅ SIP-I BR: ATI, AsyncATI, ISUP-BR headers |
+| SIP-I Headers | P-Charging-Vector, P-Access-Network, Reason Q.850 | ✅ Implemented |
 
 ---
 
 ## 4. Detailed Components
 
-### 4.1 Client (`_client.py`)
+### 4.1 Client (`client/`)
 
 ```mermaid
 classDiagram
@@ -213,880 +274,699 @@ classDiagram
         +transport_protocol: str
         -_transport: BaseTransport
         -_state_manager: StateManager
+        -_dialog: DialogTracker
         -_events: Events
         -_auth: SipAuthCredentials
-        -_closed: bool
+        -_auto_dns: bool
+        -_resolver: SipResolver
         +request(method, uri, ...) Response
         +invite(to_uri, from_uri, body) Response
         +register(aor, registrar, expires) Response
         +options(uri) Response
-        +ack(response) None
-        +bye(response) Response
+        +ack(response?) None
+        +bye(response?) Response
         +cancel(response) Response
         +message(to_uri, content) Response
-        +subscribe(uri, event) Response
-        +notify(uri, event) Response
-        +refer(uri, refer_to) Response
         +info(uri, content) Response
-        +update(uri, sdp) Response
-        +prack(response) Response
-        +publish(uri, event) Response
+        +create_sdp(port) SDPBody
         +retry_with_auth(response) Response
         +enable_auto_reregister(aor, interval) None
-        +unregister(aor) Response
-        +close() None
     }
 
     class AsyncClient {
-        -_client: Client
-        -_loop: asyncio.EventLoop
+        -_transport: AsyncUDPTransport
+        -_dialog: DialogTracker
+        -_resolver: AsyncSipResolver
         +async request(method, uri, ...) Response
         +async invite(to_uri, ...) Response
-        +async register(aor, ...) Response
-        +async close() None
+        +async ack(response?) None
+        +async bye(response?) Response
+        +create_sdp(port) SDPBody
     }
 
+    class DialogTracker {
+        -_last_invite_response: Response
+        -_route_set: RouteSet
+        +track(response) None
+        +active: Response
+        +route_set: RouteSet
+        +clear() None
+    }
+
+    Client --> DialogTracker
+    AsyncClient --> DialogTracker
     Client --> BaseTransport
-    Client --> StateManager
-    Client --> Events
-    Client --> SipAuthCredentials
-    AsyncClient --> Client
+    AsyncClient --> AsyncBaseTransport
 ```
 
-**API inspired by httpx:**
+**Key features:**
+
+- `client.ack()` / `client.bye()` without response param (uses tracked dialog)
+- `client.create_sdp(port=8000)` creates SDP from client's local address
+- Auto DNS SRV resolution (`auto_dns=True` by default)
+- RouteSet applied automatically in ack/bye
+- FSM Timer A/E retransmission with 500ms polling
+
+**API examples:**
 
 ```python
-# httpx style
-response = httpx.get("https://example.com")
+# httpx-style one-liners
+response = sipx.options("sip:pbx.example.com")
+response = sipx.register("sip:alice@pbx.com", auth=("alice", "secret"))
 
-# sipx style
-response = client.invite("sip:bob@example.com")
-response = client.register("sip:alice@pbx.com")
+# Client with dialog tracking
+with Client(local_port=5061) as client:
+    client.auth = ("alice", "secret")
+    sdp = client.create_sdp(port=8000)
+    r = client.invite("sip:bob@pbx.com", body=sdp.to_string())
+    client.ack()      # uses tracked dialog
+    time.sleep(5)
+    client.bye()      # uses tracked dialog
+
+# Native async (no threading wrapper)
+async with AsyncClient() as client:
+    r = await client.invite("sip:bob@pbx.com", body=sdp.to_string())
+    await client.ack()
+    await client.bye()
 ```
 
-### 4.2 Events System (`_events.py`)
+### 4.2 Server (`server/`)
 
 ```mermaid
 classDiagram
-    class Events {
-        -_handlers: list[tuple]
-        +on_request(request, context) Request
-        +on_response(response, context) Response
-        -_discover_handlers() None
-        -_call_request_handlers(request, context) Request
-        -_call_response_handlers(response, context) Response
+    class SIPServerHandlerMixin {
+        -_handlers: dict
+        +invite(fn) decorator
+        +register(fn) decorator
+        +message(fn) decorator
+        +options(fn) decorator
+        +handle(method)(fn) decorator
     }
 
-    class EventContext {
-        +request: Request
-        +response: Response
-        +destination: TransportAddress
-        +source: TransportAddress
-        +transaction_id: str
-        +dialog_id: str
-        +transaction: Transaction
-        +dialog: Dialog
-        +metadata: dict
+    class SIPServer {
+        +start() None
+        +stop() None
+        +auto 100 Trying for INVITE
     }
 
-    class event_handler {
-        +method: str | tuple
-        +status: int | tuple | range
-        +__call__(func) func
+    class AsyncSIPServer {
+        +async start() None
+        +async stop() None
+        +asyncio.DatagramProtocol
+        +auto 100 Trying for INVITE
     }
 
-    Events --> EventContext
-    Events --> event_handler
+    SIPServerHandlerMixin <|-- SIPServer
+    SIPServerHandlerMixin <|-- AsyncSIPServer
 ```
 
-**Declarative pattern:**
+**FastAPI-style handlers with DI:**
+
+```python
+server = SIPServer(local_host="0.0.0.0", local_port=5060)
+
+@server.invite
+def on_invite(
+    request: Request,
+    caller: Annotated[str, FromHeader],
+    rtp: Annotated[RTPSession, AutoRTP(port=8000)],
+):
+    return request.ok(
+        headers={"Content-Type": "application/sdp"},
+        content=SDPBody.audio(ip="10.0.0.1", port=8000).to_string(),
+    )
+
+@server.register
+def on_register(request: Request):
+    return request.ok()
+
+@server.handle("SUBSCRIBE")
+def on_subscribe(request: Request, event: Annotated[str, Header("Event")]):
+    return request.ok()
+```
+
+**Auto 100 Trying:** The server automatically sends `100 Trying` for INVITE requests before calling the handler (RFC 3261 Section 8.2.6.1).
+
+### 4.3 Request Response Builders
+
+```python
+# Before (6+ lines of boilerplate per handler):
+return Response(
+    status_code=200,
+    headers={
+        "Via": request.via or "",
+        "From": request.from_header or "",
+        "To": request.to_header or "",
+        "Call-ID": request.call_id or "",
+        "CSeq": request.cseq or "",
+        "Content-Length": "0",
+    },
+)
+
+# After (1 line):
+return request.ok()
+return request.ok(headers={"Contact": "<sip:x>"}, content=sdp)
+return request.trying()
+return request.ringing()
+return request.error(404)
+return request.redirect("sip:other@host")
+```
+
+### 4.4 Dependency Injection (`_depends.py`)
+
+Built-in extractors resolve handler parameters via `typing.Annotated`:
+
+| Extractor | Extracts | Example |
+| --- | --- | --- |
+| `FromHeader` | From header value | `caller: Annotated[str, FromHeader]` |
+| `ToHeader` | To header value | `dest: Annotated[str, ToHeader]` |
+| `CallID` | Call-ID header | `cid: Annotated[str, CallID]` |
+| `Header(name)` | Any header by name | `ua: Annotated[str, Header("User-Agent")]` |
+| `Source` | Source transport address | `src: Annotated[TransportAddress, Source]` |
+| `AutoRTP(port)` | RTPSession from SDP | `rtp: Annotated[RTPSession, AutoRTP(port=8000)]` |
+| Custom `Extractor` | User-defined | Subclass `Extractor` with `extract(request, source)` |
+
+### 4.5 Events System (`_events.py`)
 
 ```python
 class MyEvents(Events):
-    @event_handler('INVITE', status=200)
+    @on('INVITE', status=200)
     def on_call_accepted(self, request, response, context):
-        print("Call accepted!")
+        ...
 
-    @event_handler(status=(401, 407))
+    @on('INVITE', status=(180, 183))
+    def on_ringing(self, request, response, context):
+        ...
+
+    @on(status=(401, 407))
     def on_auth_required(self, request, response, context):
-        print("Auth required")
+        ...
 
-    @event_handler('INVITE', status=183)
-    def on_early_media(self, request, response, context):
-        if response.body and response.body.has_early_media():
-            print("Early media detected!")
+    @on(('REGISTER', 'INVITE'), status=200)
+    def on_any_success(self, request, response, context):
+        ...
 ```
 
-### 4.3 Models
+### 4.6 Models (`models/`)
 
 ```mermaid
 classDiagram
-    class SIPMessage {
-        <<abstract>>
-        +headers: Headers
-        +content: bytes
-        +body: MessageBody
-        +to_bytes() bytes
-        +via: str
-        +from_header: str
-        +to_header: str
-        +call_id: str
-        +cseq: str
-    }
-
     class Request {
         +method: str
         +uri: str
-        +version: str
-        +auth: Any
-        +is_invite: bool
-        +is_register: bool
-        +add_authorization(creds, challenge)
-        +has_valid_via_branch() bool
+        +headers: dict
+        +content: bytes
+        +ok(headers?, content?) Response
+        +trying() Response
+        +ringing() Response
+        +error(code, headers?) Response
+        +redirect(contact_uri) Response
     }
 
     class Response {
         +status_code: int
         +reason_phrase: str
         +request: Request
-        +is_provisional: bool
-        +is_success: bool
-        +is_error: bool
-        +is_final: bool
-        +requires_auth: bool
-        +auth_challenge: Challenge
-    }
-
-    class Headers {
-        -_store: dict
-        -_order: list
-        +case-insensitive access
-        +compact form support
-        +RFC 3261 ordering
-        +to_lines() list[str]
-        +raw() bytes
+        +body: SDPBody | RawBody
+        +is_provisional / is_success / is_error: bool
     }
 
     class SDPBody {
-        +session_name: str
-        +origin_*: str
-        +connection: str
-        +media_descriptions: list
-        +add_media(media, port, proto, formats)
-        +create_offer() SDPBody
-        +create_answer(offer) SDPBody
-        +get_accepted_codecs() list
-        +has_early_media() bool
+        +audio(ip, port, codecs?, ...) SDPBody
+        +to_string() str
+        +ICE candidates
+        +SRTP crypto attributes
+        +DTLS fingerprint
+        +rtcp-fb attributes
+        +direction (sendrecv, sendonly, recvonly)
     }
-
-    SIPMessage <|-- Request
-    SIPMessage <|-- Response
-    SIPMessage --> Headers
-    SIPMessage --> MessageBody
-    MessageBody <|-- SDPBody
 ```
 
-### 4.4 Transport Layer
+### 4.7 Transport Layer (`transports/`)
 
-```mermaid
-classDiagram
-    class BaseTransport {
-        <<abstract>>
-        +config: TransportConfig
-        +handle_request(request, dest) Response
-        +send(data, dest) None
-        +receive(timeout) tuple[bytes, TransportAddress]
-        +close() None
-        +local_address: TransportAddress
-    }
+| Transport | Sync | Async | Notes |
+| --- | --- | --- | --- |
+| UDP | `UDPTransport` | `AsyncUDPTransport` | Connectionless, max 65535 bytes |
+| TCP | `TCPTransport` | `AsyncTCPTransport` | Content-Length framing, keepalive |
+| TLS | `TLSTransport` | `AsyncTLSTransport` | TLS 1.2+, cert verification |
+| WebSocket | `WebSocketTransport` | -- | RFC 7118, basic |
 
-    class AsyncBaseTransport {
-        <<abstract>>
-        +async handle_request(request, dest) Response
-        +async send(data, dest) None
-        +async receive(timeout) tuple
-        +async close() None
-    }
-
-    class UDPTransport {
-        -_socket: socket
-        +connectionless
-        +max 65535 bytes
-        +retransmission loop
-    }
-
-    class TCPTransport {
-        -_socket: socket
-        -_connected_to: TransportAddress
-        +connection-oriented
-        +Content-Length framing
-        +keepalive
-    }
-
-    class TLSTransport {
-        -_ssl_context: SSLContext
-        +TLS 1.2+
-        +cert verification
-        +client certs
-    }
-
-    BaseTransport <|-- UDPTransport
-    BaseTransport <|-- TCPTransport
-    BaseTransport <|-- TLSTransport
-    AsyncBaseTransport <|-- AsyncUDPTransport
-    AsyncBaseTransport <|-- AsyncTCPTransport
-    AsyncBaseTransport <|-- AsyncTLSTransport
-```
-
-### 4.5 FSM -- State Machines (`_fsm.py`)
+### 4.8 FSM (`fsm/`)
 
 ```mermaid
 stateDiagram-v2
-    state "INVITE Client Transaction (ICT)" as ICT {
+    state "INVITE Client Transaction" as ICT {
         [*] --> CALLING: Send INVITE
         CALLING --> TRYING: 1xx received
         TRYING --> PROCEEDING: 1xx received
         PROCEEDING --> COMPLETED: 2xx-6xx received
         COMPLETED --> TERMINATED: Timer D
-        CALLING --> COMPLETED: 2xx-6xx received (direct)
     }
 
-    state "Non-INVITE Client Transaction (NICT)" as NICT {
+    state "Non-INVITE Client Transaction" as NICT {
         [*] --> TRYING_N: Send Request
-        TRYING_N --> PROCEEDING_N: 1xx received
-        PROCEEDING_N --> COMPLETED_N: 2xx-6xx received
+        TRYING_N --> COMPLETED_N: 2xx-6xx received
         COMPLETED_N --> TERMINATED_N: Timer K
-        TRYING_N --> COMPLETED_N: 2xx-6xx received (direct)
-    }
-
-    state "Dialog States" as DLG {
-        [*] --> EARLY: 1xx with To-tag
-        EARLY --> CONFIRMED: 2xx received
-        CONFIRMED --> TERMINATED_D: BYE or error
-        EARLY --> TERMINATED_D: Timeout/error
     }
 ```
 
-### 4.6 Authentication (`_models/_auth.py`)
+- `TimerManager` (sync) / `AsyncTimerManager` (async) for RFC 3261 Timer A/B/E/F
+- Automatic retransmission wired into Client.request()
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant S as SIP Server
+### 4.9 Media Layer (`media/`)
 
-    C->>S: INVITE sip:bob@example.com
-    S-->>C: 401 Unauthorized<br/>WWW-Authenticate: Digest realm="example.com", nonce="abc..."
+| Component | Sync | Async | Description |
+| --- | --- | --- | --- |
+| RTP | `RTPSession` | `AsyncRTPSession` | DatagramProtocol, send/receive packets |
+| DTMF | `DTMFSender` + `DTMFCollector` | `AsyncDTMFHelper` | RFC 4733 + SIP INFO + Inband |
+| Call Session | `CallSession` | `AsyncCallSession` | High-level call abstraction |
+| Tone Gen | `ToneGenerator` | -- | Sine wave PCM generation |
+| DTMF Gen | `DTMFToneGenerator` | -- | Dual-tone DTMF audio (697+1477Hz etc.) |
+| Codecs | G.711 PCMU/PCMA | -- | Encode/decode |
+| Opus | `OpusCodec` | -- | Optional (requires opuslib) |
+| TTS | `BaseTTS` | -- | Abstract adapter interface |
+| STT | `BaseSTT` | -- | Abstract adapter interface |
+| PyAudio | `PyAudioAdapter` | -- | Mic/speaker I/O (planned) |
 
-    Note over C: AuthParser.parse_from_headers()
-    Note over C: DigestAuth.build_authorization()
+### 4.10 Contrib
 
-    C->>S: INVITE sip:bob@example.com<br/>Authorization: Digest username="alice", response="..."
-    S-->>C: 200 OK
-```
+| Component | Description |
+| --- | --- |
+| `IVR` / `AsyncIVR` | Menu-driven IVR with TTS + DTMF collect |
+| `Menu` / `Prompt` / `MenuItem` | IVR data models |
+| `ISUPMessage` | Real ISUP binary encoding (ITU-T Q.763): IAM, ACM, ANM, REL, RLC |
+| `SipI` | International SIP-I with multipart/mixed body |
+| `SipIBR` | Brazilian SIP-I: ANATEL headers, ATI/AsyncATI portability |
+| `GoogleTTSAdapter` | Google Cloud TTS integration |
+| `WhisperSTTAdapter` | OpenAI Whisper STT integration |
 
 ---
 
 ## 5. Main Flows
 
-### 5.1 SIP Registration
-
-```mermaid
-sequenceDiagram
-    participant App as Application
-    participant C as sipx.Client
-    participant T as Transport
-    participant PBX as PBX/Registrar
-
-    App->>C: client.register("sip:alice@pbx.com")
-    C->>C: _ensure_required_headers()
-    C->>C: Events.on_request()
-    C->>T: send(REGISTER)
-    T->>PBX: UDP/TCP/TLS
-
-    PBX-->>T: 401 Unauthorized
-    T-->>C: Response(401)
-    C->>C: Events.on_response()
-    C-->>App: Response(401)
-
-    App->>C: client.retry_with_auth(response)
-    C->>C: AuthParser.parse_from_headers()
-    C->>C: DigestAuth.build_authorization()
-    C->>T: send(REGISTER + Authorization)
-    T->>PBX: UDP/TCP/TLS
-
-    PBX-->>T: 200 OK
-    T-->>C: Response(200)
-    C->>C: Events.on_response()
-    C-->>App: Response(200) ✅
-```
-
-### 5.2 Complete Call (INVITE -> ACK -> BYE)
+### 5.1 Complete Call (INVITE -> ACK -> BYE)
 
 ```mermaid
 sequenceDiagram
     participant App as Application
     participant C as sipx.Client
     participant PBX as PBX
-    participant B as Bob
 
     App->>C: client.invite("sip:bob@pbx.com", body=sdp)
+    C->>C: Auto DNS SRV resolution
     C->>PBX: INVITE + SDP Offer
 
     PBX-->>C: 100 Trying
-    PBX->>B: INVITE
-
-    B-->>PBX: 180 Ringing
     PBX-->>C: 180 Ringing
-    Note over C: Events: @event_handler('INVITE', status=180)
+    Note over C: Events: @on('INVITE', status=180)
 
-    B-->>PBX: 200 OK + SDP Answer
     PBX-->>C: 200 OK + SDP Answer
-    Note over C: Events: @event_handler('INVITE', status=200)
+    Note over C: DialogTracker.track(response)
+    Note over C: Events: @on('INVITE', status=200)
     C-->>App: Response(200)
 
-    App->>C: client.ack(response)
+    App->>C: client.ack()
+    Note over C: Uses DialogTracker.active
+    Note over C: Applies RouteSet if present
     C->>PBX: ACK
-    PBX->>B: ACK
 
-    Note over C,B: === Call in progress (RTP) ===
+    Note over C,PBX: RTP media session
 
-    App->>C: client.bye(response)
+    App->>C: client.bye()
+    Note over C: Uses DialogTracker.active
     C->>PBX: BYE
-    PBX->>B: BYE
-    B-->>PBX: 200 OK
     PBX-->>C: 200 OK
-    C-->>App: Response(200) ✅
+    Note over C: DialogTracker.clear()
+    C-->>App: Response(200)
 ```
 
-### 5.3 IVR Flow with AI (Planned)
+### 5.2 Server with Auto 100 Trying
 
 ```mermaid
 sequenceDiagram
-    participant Caller as Caller
+    participant UAC as UAC
+    participant S as sipx.Server
+    participant H as Handler
+
+    UAC->>S: INVITE
+    S-->>UAC: 100 Trying (automatic)
+    S->>H: resolve_handler(fn, request, source)
+    Note over H: DI resolves Annotated params
+    H-->>S: request.ok(content=sdp)
+    S-->>UAC: 200 OK + SDP
+```
+
+### 5.3 IVR Flow with DTMF
+
+```mermaid
+sequenceDiagram
+    participant Caller
     participant SIP as sipx.Server
-    participant IVR as IVR Engine
-    participant RTP as RTP Engine
-    participant TTS as TTS (AI)
-    participant STT as STT (AI)
-    participant AI as LLM/AI
+    participant IVR as AsyncIVR
+    participant RTP as AsyncRTPSession
 
     Caller->>SIP: INVITE
+    SIP-->>Caller: 100 Trying (auto)
     SIP-->>Caller: 200 OK + SDP
-    Caller->>SIP: ACK
 
-    SIP->>IVR: New call
-    IVR->>TTS: "Hello, how can I help you?"
-    TTS->>RTP: Audio stream (PCM)
-    RTP->>Caller: RTP packets
+    SIP->>IVR: Start IVR flow
+    IVR->>RTP: play_prompt(greeting)
+    RTP->>Caller: RTP audio (TTS)
 
-    Caller->>RTP: RTP (caller's voice)
-    RTP->>STT: Audio stream
-    STT->>IVR: "I want to check my balance"
+    Caller->>RTP: DTMF '1' (RFC 4733)
+    RTP->>IVR: dtmf.collect() -> "1"
 
-    IVR->>AI: user_message="I want to check my balance"
-    AI->>IVR: response="Your balance is $1,500.00"
-    IVR->>TTS: "Your balance is $1,500.00"
-    TTS->>RTP: Audio stream
-    RTP->>Caller: RTP packets
-
-    Note over Caller,AI: Conversation loop...
+    IVR->>RTP: play_prompt(response)
+    RTP->>Caller: RTP audio
 
     Caller->>SIP: BYE
     SIP-->>Caller: 200 OK
-    SIP->>IVR: Call ended
-```
-
-### 5.4 DTMF (Planned)
-
-```mermaid
-sequenceDiagram
-    participant Caller as Caller
-    participant SIP as sipx
-    participant App as Application
-
-    Note over Caller,App: Call established
-
-    rect rgb(240, 240, 255)
-        Note over Caller,App: Method 1: DTMF via RTP (RFC 4733)
-        Caller->>SIP: RTP telephone-event (payload 101)
-        SIP->>App: @event_handler('DTMF')<br/>digit='5', duration=160ms
-    end
-
-    rect rgb(255, 240, 240)
-        Note over Caller,App: Method 2: DTMF via SIP INFO (RFC 2976)
-        Caller->>SIP: INFO Content-Type: application/dtmf-relay<br/>Signal=5, Duration=160
-        SIP->>App: @event_handler('INFO')<br/>digit='5'
-    end
 ```
 
 ---
 
 ## 6. Requirements
 
-### 6.1 Functional Requirements
+### 6.1 SIP Signaling (Core)
 
-#### 6.1.1 SIP Signaling (Core)
+| ID | Requirement | Status |
+| --- | --- | --- |
+| RF-01 | Send/receive all SIP methods (14 methods) | ✅ |
+| RF-02 | Complete SIP message parsing | ✅ |
+| RF-03 | Case-insensitive headers with compact forms | ✅ |
+| RF-04 | Digest authentication (MD5, SHA-256) | ✅ |
+| RF-05 | SDP Offer/Answer model | ✅ |
+| RF-06 | Transaction FSM (ICT, NICT) | ✅ |
+| RF-07 | Dialog state management | ✅ |
+| RF-08 | Declarative event system | ✅ |
+| RF-09 | SIP Server (sync + async) | ✅ |
+| RF-10 | Transports UDP, TCP, TLS (sync + async) | ✅ |
+| RF-11 | Auto re-registration | ✅ |
+| RF-12 | Context manager (with/async with) | ✅ |
+| RF-13 | DNS SRV resolution (RFC 3263) | ✅ |
+| RF-14 | Route/Record-Route processing | ✅ |
+| RF-15 | Automatic retransmission (Timer A/E) | ✅ |
+| RF-16 | Session Timers (RFC 4028) | ✅ |
+| RF-17 | Complete SIP URI parser | ✅ |
+| RF-18 | Auto 100 Trying for INVITE | ✅ |
+| RF-19 | Dialog tracking (implicit ack/bye) | ✅ |
+| RF-20 | Response builders (request.ok/error/trying) | ✅ |
+| RF-21 | Auto DNS in Client | ✅ |
+| RF-22 | FastAPI-style DI with Annotated | ✅ |
 
-| ID    | Requirement                                                                                                                                        | Status      | Module                |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------- |
-| RF-01 | Send/receive all SIP methods (INVITE, REGISTER, BYE, ACK, CANCEL, OPTIONS, MESSAGE, SUBSCRIBE, NOTIFY, REFER, INFO, UPDATE, PRACK, PUBLISH)       | ✅ Implemented | `_client.py`          |
-| RF-02 | Complete SIP message parsing (Request + Response)                                                                                                  | ✅ Implemented | `_models/_message.py` |
-| RF-03 | Case-insensitive headers with compact forms                                                                                                        | ✅ Implemented | `_models/_header.py`  |
-| RF-04 | Digest authentication (MD5, SHA-256)                                                                                                               | ✅ Implemented | `_models/_auth.py`    |
-| RF-05 | SDP Offer/Answer model                                                                                                                             | ✅ Implemented | `_models/_body.py`    |
-| RF-06 | Transaction FSM (ICT, NICT)                                                                                                                        | ✅ Implemented | `_fsm.py`             |
-| RF-07 | Dialog state management                                                                                                                            | ✅ Implemented | `_fsm.py`             |
-| RF-08 | Declarative event system                                                                                                                           | ✅ Implemented | `_events.py`          |
-| RF-09 | SIP Server (listener)                                                                                                                              | ✅ Implemented | `_server.py`          |
-| RF-10 | Transports UDP, TCP, TLS (sync + async)                                                                                                            | ✅ Implemented | `_transports/`        |
-| RF-11 | Auto re-registration                                                                                                                               | ✅ Implemented | `_client.py`          |
-| RF-12 | Context manager (with/async with)                                                                                                                  | ✅ Implemented | `_client.py`          |
+### 6.2 SIP Signaling (Pending)
 
-#### 6.1.2 SIP Signaling (Pending)
+| ID | Requirement | Status | Priority |
+| --- | --- | --- | --- |
+| RF-23 | Server-side FSMs (IST, NIST) | ❌ | Medium |
+| RF-24 | Forking (multiple responses) | ❌ | Medium |
+| RF-25 | IPv6 support | ❌ | Medium |
+| RF-26 | 100rel / complete PRACK | ⚠️ Stub | Medium |
+| RF-27 | SCTP transport | ❌ | Low |
 
-| ID    | Requirement                           | Status     | Priority |
-| ----- | ------------------------------------- | ---------- | -------- |
-| RF-13 | Server-side FSMs (IST, NIST)         | ❌         | High     |
-| RF-14 | DNS SRV resolution (RFC 3263)        | ❌         | High     |
-| RF-15 | Route/Record-Route processing        | ❌         | High     |
-| RF-16 | Forking (multiple responses)         | ❌         | Medium   |
-| RF-17 | SIP over WebSocket (RFC 7118)        | ❌         | Medium   |
-| RF-18 | IPv6 support                         | ❌         | Medium   |
-| RF-19 | SCTP transport                       | ❌         | Low      |
-| RF-20 | Automatic retransmission (Timer A/E) | ❌         | High     |
-| RF-21 | 100rel / complete PRACK              | ⚠️ Stub    | Medium   |
-| RF-22 | Session Timers (RFC 4028)            | ❌         | Medium   |
-| RF-23 | Complete SIP URI parser (RFC 3986)   | ⚠️ Partial | High     |
+### 6.3 Media / RTP
 
-#### 6.1.3 Media / RTP
+| ID | Requirement | Status |
+| --- | --- | --- |
+| RF-30 | RTP send/receive (RFC 3550) | ✅ Sync + Async |
+| RF-31 | DTMF via RTP (RFC 4733) | ✅ Send + Collect |
+| RF-32 | DTMF via SIP INFO | ✅ |
+| RF-33 | DTMF via Inband audio | ✅ |
+| RF-34 | Codecs G.711 PCMU/PCMA | ✅ |
+| RF-35 | Codec Opus | ⚠️ Adapter exists |
+| RF-36 | Media negotiation | ✅ SDP + RTP |
+| RF-37 | Hold/Resume (sendonly/recvonly) | ✅ SDP attributes |
+| RF-38 | Early media (183) | ✅ Detection |
+| RF-39 | Tone generation (sine waves) | ✅ |
+| RF-40 | DTMF tone generation (dual-tone) | ✅ |
 
-| ID    | Requirement                             | Status                    | Priority |
-| ----- | --------------------------------------- | ------------------------- | -------- |
-| RF-30 | RTP send/receive (RFC 3550)             | ❌                        | CRITICAL |
-| RF-31 | DTMF via RTP telephone-event (RFC 4733) | ❌                        | CRITICAL |
-| RF-32 | DTMF via SIP INFO                       | ⚠️ Stub (`client.info()`) | High     |
-| RF-33 | Codecs G.711 PCMU/PCMA                  | ❌                        | CRITICAL |
-| RF-34 | Codec Opus                              | ❌                        | High     |
-| RF-35 | SRTP (RFC 3711)                         | ❌                        | High     |
-| RF-36 | Complete media negotiation              | ⚠️ SDP ok, RTP no         | High     |
-| RF-37 | Hold/Resume (a=sendonly/recvonly)       | ⚠️ SDP ok                 | Medium   |
-| RF-38 | Early media (183 Session Progress)      | ⚠️ Detection ok           | Medium   |
+### 6.4 Media (Pending)
 
-#### 6.1.4 Automation / AI
+| ID | Requirement | Status | Priority |
+| --- | --- | --- | --- |
+| RF-41 | SRTP packet encryption (RFC 3711) | ❌ | HIGH |
+| RF-42 | RTCP (RFC 3550) | ❌ | MEDIUM |
+| RF-43 | Jitter buffer | ❌ | MEDIUM |
+| RF-44 | Audio recording (RTP -> WAV) | ⚠️ Basic | Medium |
+| RF-45 | Conferencing (mixer) | ❌ | Low |
 
-| ID    | Requirement                              | Status | Priority |
-| ----- | ---------------------------------------- | ------ | -------- |
-| RF-40 | TTS adapter (text-to-speech -> RTP)      | ❌     | High     |
-| RF-41 | STT adapter (RTP -> speech-to-text)      | ❌     | High     |
-| RF-42 | IVR builder (menu, prompts, DTMF collection) | ❌     | High     |
-| RF-43 | Audio file playback (WAV/PCM -> RTP)     | ❌     | High     |
-| RF-44 | Audio recording (RTP -> WAV/PCM)         | ❌     | Medium   |
-| RF-45 | Conferencing (mixer)                     | ❌     | Low      |
+### 6.5 Automation / AI
 
-#### 6.1.5 SIP-I / Brazil
+| ID | Requirement | Status |
+| --- | --- | --- |
+| RF-50 | TTS adapter interface | ✅ BaseTTS |
+| RF-51 | STT adapter interface | ✅ BaseSTT |
+| RF-52 | IVR builder (menu, prompts, DTMF) | ✅ Sync + Async |
+| RF-53 | Audio file playback (WAV -> RTP) | ✅ |
+| RF-54 | Google TTS adapter | ✅ |
+| RF-55 | Whisper STT adapter | ✅ |
 
-| ID    | Requirement             | Status             | Priority |
-| ----- | ----------------------- | ------------------ | -------- |
-| RF-50 | P-Asserted-Identity     | ⚠️ Header defined  | Medium   |
-| RF-51 | P-Charging-Vector       | ⚠️ Header defined  | Medium   |
-| RF-52 | ISUP body encapsulation | ❌                 | Medium   |
-| RF-53 | Cause mapping SIP<->ISUP | ❌                 | Medium   |
+### 6.6 SIP-I / Brazil
 
-### 6.2 Non-Functional Requirements
+| ID | Requirement | Status |
+| --- | --- | --- |
+| RF-60 | Real ISUP binary encoding (Q.763) | ✅ IAM/ACM/ANM/REL/RLC |
+| RF-61 | SIP-I multipart/mixed body | ✅ |
+| RF-62 | ISUP-BR (Brazilian extensions) | ✅ |
+| RF-63 | ATI portability query (sync + async) | ✅ |
+| RF-64 | P-Charging-Vector | ✅ |
+| RF-65 | P-Access-Network-Info | ✅ |
+| RF-66 | Reason header (Q.850 cause) | ✅ |
 
-| ID     | Requirement                         | Status                              |
-| ------ | ----------------------------------- | ----------------------------------- |
-| RNF-01 | Python 3.13+                        | ✅                                  |
-| RNF-02 | Zero heavy dependencies (core)      | ✅ (only `rich`)                    |
-| RNF-03 | Sync and async with the same API    | ✅                                  |
-| RNF-04 | Type hints in 100% of the code      | ✅                                  |
-| RNF-05 | Documentation with docstrings       | ✅                                  |
-| RNF-06 | Lazy parsing (body, auth challenge) | ✅                                  |
-| RNF-07 | Unit tests with >80% coverage       | ❌ (no tests)                       |
-| RNF-08 | CI/CD (GitHub Actions)              | ❌                                  |
-| RNF-09 | PyPI publishable                    | ⚠️ (setuptools ok, not published)   |
-| RNF-10 | ABC-based extensibility             | ✅                                  |
+### 6.7 Non-Functional Requirements
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| RNF-01 | Python 3.12+ | ✅ |
+| RNF-02 | Zero heavy dependencies (core) | ✅ (only `rich`) |
+| RNF-03 | Sync and async with the same API | ✅ Native async |
+| RNF-04 | Type hints | ✅ |
+| RNF-05 | Logging (no print in core) | ✅ |
+| RNF-06 | Lazy parsing (body, auth challenge) | ✅ |
+| RNF-07 | Unit tests >60% coverage | ✅ 607 tests |
+| RNF-08 | CI/CD (GitHub Actions) | ❌ |
+| RNF-09 | PyPI publishable | ⚠️ (not published) |
+| RNF-10 | ABC-based extensibility | ✅ |
 
 ---
 
-## 7. Inventory -- What's Done vs What's Missing
+## 7. Inventory
 
 ### 7.1 Visual Summary
 
 ```mermaid
 pie title Progress by Area
-    "SIP Signaling (Core)" : 85
+    "SIP Signaling (Core)" : 95
     "Transport Layer" : 90
     "Authentication" : 95
-    "SDP/Offer-Answer" : 90
-    "Events System" : 90
-    "FSM/State" : 75
-    "Server" : 60
-    "Async" : 40
-    "RTP/Media" : 0
-    "DTMF" : 0
-    "TTS/STT" : 0
-    "IVR" : 0
-    "Tests" : 0
-    "SIP-I" : 10
+    "SDP/Offer-Answer" : 95
+    "Events + DI" : 95
+    "FSM/Timers" : 85
+    "Server (sync+async)" : 85
+    "Client (sync+async)" : 95
+    "DNS/Routing" : 90
+    "RTP/Media" : 85
+    "DTMF (3 methods)" : 95
+    "TTS/STT" : 70
+    "IVR" : 85
+    "SIP-I" : 85
+    "Tests" : 60
 ```
 
-### 7.2 Breakdown by Module
+### 7.2 Statistics
 
-#### COMPLETE (>80%)
-
-| Module                 | LOC  | Status | Notes                                                   |
-| ---------------------- | ---- | ------ | ------------------------------------------------------- |
-| `_models/_auth.py`     | 799  | 95%    | Digest MD5/SHA-256, challenge parsing, nonce count, qop |
-| `_models/_header.py`   | 536  | 95%    | Case-insensitive, compact forms, RFC ordering           |
-| `_models/_message.py`  | 914  | 90%    | Request, Response, MessageParser, URI parser            |
-| `_models/_body.py`     | 922  | 90%    | Complete SDPBody, Offer/Answer, media info              |
-| `_events.py`           | 336  | 90%    | Decorator pattern, method/status filtering              |
-| `_transports/_udp.py`  | 435  | 90%    | Sync + Async, timeout, buffer                           |
-| `_transports/_tcp.py`  | 570  | 85%    | Content-Length framing, connection pooling              |
-| `_transports/_tls.py`  | 675  | 85%    | TLS 1.2+, cert verification, async                      |
-| `_transports/_base.py` | 236  | 95%    | ABCs sync + async                                       |
-| `_client.py`           | ~950 | 85%    | 14 SIP methods, auth retry, auto-reregister             |
-| `_utils.py`            | 187  | 95%    | 50+ headers, 16 compact forms, 60+ reason phrases       |
-| `_types.py`            | 272  | 90%    | Enums, dataclasses, exceptions, type aliases            |
-
-#### PARTIAL (30-80%)
-
-| Module        | LOC  | Status | What's missing                                                    |
-| ------------- | ---- | ------ | ----------------------------------------------------------------- |
-| `_fsm.py`     | 670  | 70%    | IST/NIST (server FSMs), active retransmission timers, timer tasks |
-| `_server.py`  | 310  | 55%    | UDP only, no FSM, no routing, async is sync wrapper               |
-| `AsyncClient` | ~400 | 40%    | Wrapper over sync Client with threading, not native async         |
-| `BodyParser`  | --   | 50%    | SDP only; multipart, PIDF, ISUP need implementation              |
-
-#### NOT IMPLEMENTED (0%)
-
-| Module                 | Description                        | Dependency       |
-| ---------------------- | ---------------------------------- | ---------------- |
-| `_media/_rtp.py`       | RTP engine (send/receive packets)  | None             |
-| `_media/_dtmf.py`      | DTMF via RTP (RFC 4733) + SIP INFO | RTP engine       |
-| `_media/_codecs.py`    | G.711, Opus encode/decode          | None             |
-| `_media/_tts.py`       | Text-to-Speech adapter             | RTP + codecs     |
-| `_media/_stt.py`       | Speech-to-Text adapter             | RTP + codecs     |
-| `_srtp/_srtp.py`       | SRTP encryption                    | RTP engine       |
-| `_contrib/_ivr.py`     | IVR builder                        | RTP + DTMF + TTS |
-| `_contrib/_fastapi.py` | FastAPI integration                | Core             |
-| `_contrib/_cli.py`     | CLI tools                          | Core             |
-| `_transports/_ws.py`   | WebSocket transport                | Core             |
-| Tests                  | pytest suite                       | All              |
-| CI/CD                  | GitHub Actions                     | None             |
+| Metric | Value |
+| --- | --- |
+| Python source files | ~65 |
+| Total LOC (excluding tests) | ~15,600 |
+| Test files | 26 |
+| Tests | 607 |
+| Coverage | ~60% |
+| Examples | 17 |
 
 ---
 
-## 8. API Design (httpx Style)
+## 8. API Surface
 
-### 8.1 httpx vs sipx Comparison
+### 8.1 Top-level Exports (`sipx/`)
 
 ```python
-# ═══════════════════════════════════════
-# httpx
-# ═══════════════════════════════════════
-import httpx
+# Core
+sipx.Client                    # Sync SIP client
+sipx.AsyncClient               # Async SIP client (native asyncio)
+sipx.Request                   # SIP Request (with ok/error/trying/ringing)
+sipx.Response                  # SIP Response
+sipx.SDPBody                   # SDP body builder
 
-# Sync
-response = httpx.get("https://example.com")
-with httpx.Client() as client:
-    r = client.post("/api", json={"key": "val"})
+# Server
+sipx.SIPServer                 # Sync SIP server
+sipx.AsyncSIPServer            # Async SIP server (DatagramProtocol)
 
-# Async
-async with httpx.AsyncClient() as client:
-    r = await client.get("https://example.com")
+# Events
+sipx.Events                    # Event handler base class
+sipx.on                        # @on('INVITE', status=200) decorator
 
+# DI Extractors
+sipx.FromHeader                # Extract From header
+sipx.ToHeader                  # Extract To header
+sipx.CallID                    # Extract Call-ID
+sipx.Header                    # Extract any header by name
+sipx.Source                    # Extract source address
+sipx.AutoRTP                   # Extract RTPSession from SDP
+sipx.Extractor                 # Base class for custom extractors
 
-# ═══════════════════════════════════════
-# sipx (current)
-# ═══════════════════════════════════════
-import sipx
+# Auth
+sipx.Auth                      # Auth factory
 
-# Sync
-with sipx.Client() as client:
-    client.auth = sipx.Auth.Digest("alice", "secret")
-    r = client.register("sip:alice@pbx.com")
-    r = client.invite("sip:bob@pbx.com", body=sdp)
-
-# Async
-async with sipx.AsyncClient() as client:
-    r = await client.register("sip:alice@pbx.com")
-
-
-# ═══════════════════════════════════════
-# sipx (future vision with media)
-# ═══════════════════════════════════════
-from sipx import Client, Auth, Events, event_handler, SDPBody
-from sipx.media import RTPSession, DTMFCollector
-from sipx.contrib.ivr import IVR, Menu, Prompt
-from sipx.contrib.tts import GoogleTTS  # or ElevenLabsTTS, etc.
-from sipx.contrib.stt import WhisperSTT
-
-class CallHandler(Events):
-    @event_handler('INVITE', status=200)
-    def on_call(self, request, response, context):
-        rtp = RTPSession.from_sdp(response.body)
-
-        # TTS
-        tts = GoogleTTS(language="pt-BR")
-        rtp.play(tts.synthesize("Hello! Press 1 for sales."))
-
-        # DTMF collect
-        dtmf = DTMFCollector(rtp, max_digits=1, timeout=10)
-        digit = dtmf.collect()
-
-        # STT
-        stt = WhisperSTT()
-        rtp.play(tts.synthesize("Say your name after the beep."))
-        text = stt.transcribe(rtp.record(max_duration=10))
-
-        print(f"User said: {text}")
+# One-liners
+sipx.options(uri)              # Send OPTIONS
+sipx.register(uri, auth=...)   # Send REGISTER
+sipx.send(uri, text, auth=...) # Send MESSAGE
+sipx.call(uri, auth=..., body=...) # Send INVITE
 ```
 
-### 8.2 Planned API Surface
+### 8.2 Media (`sipx.media/`)
 
 ```python
-# ═══ Top-level exports (sipx/) ═══
-sipx.Client            # Sync SIP client
-sipx.AsyncClient       # Async SIP client
-sipx.Events            # Event handler base class
-sipx.event_handler     # Decorator
-sipx.Auth              # Auth factory (Auth.Digest, Auth.Basic)
-sipx.Request           # SIP Request
-sipx.Response          # SIP Response
-sipx.SDPBody           # SDP body
-sipx.Headers           # SIP headers
+sipx.media.RTPSession          # Sync RTP send/receive
+sipx.media.AsyncRTPSession     # Async RTP (DatagramProtocol)
+sipx.media.CallSession         # Sync call session
+sipx.media.AsyncCallSession    # Async call session
+sipx.media.DTMFSender          # Send DTMF digits
+sipx.media.DTMFCollector       # Collect DTMF digits
+sipx.media.ToneGenerator       # Generate sine wave tones
+sipx.media.DTMFToneGenerator   # Generate dual-tone DTMF audio
+```
 
-# ═══ Media (sipx.media/) ═══
-sipx.media.RTPSession      # RTP send/receive
-sipx.media.DTMFSender      # Send DTMF digits
-sipx.media.DTMFCollector   # Collect DTMF digits
-sipx.media.AudioPlayer     # Play WAV/PCM files
-sipx.media.AudioRecorder   # Record to WAV/PCM
-sipx.media.Codec           # Codec negotiation
+### 8.3 Contrib (`sipx.contrib/`)
 
-# ═══ Contrib (sipx.contrib/) ═══
-sipx.contrib.IVR           # IVR builder
-sipx.contrib.Menu          # IVR menu
-sipx.contrib.Prompt        # IVR prompt
-sipx.contrib.tts.*         # TTS adapters
-sipx.contrib.stt.*         # STT adapters
-sipx.contrib.fastapi.*     # FastAPI integration
+```python
+sipx.contrib.IVR               # Sync IVR controller
+sipx.contrib.AsyncIVR          # Async IVR controller
+sipx.contrib.Menu              # IVR menu model
+sipx.contrib.Prompt            # IVR prompt model
+sipx.contrib.SipI              # International SIP-I
+sipx.contrib.SipIBR            # Brazilian SIP-I
+sipx.contrib.ISUPMessage       # Real ISUP binary encoding
 ```
 
 ---
 
-## 9. Implementation Roadmap
+## 9. Roadmap
 
-### Phase 1 -- Core Consolidation (Priority: CRITICAL)
+### Done (Phases 1-3)
 
-```mermaid
-gantt
-    title Phase 1 — Core Consolidation
-    dateFormat YYYY-MM-DD
-    section Core
-        Unit tests (pytest)                     :t1, 2026-04-01, 14d
-        Native AsyncClient (not wrapper)         :t2, after t1, 10d
-        Server FSMs (IST/NIST)                   :t3, after t1, 7d
-        Active retransmission timers             :t4, after t3, 5d
-        DNS SRV resolution                       :t5, after t2, 5d
-        Complete SIP URI parser                  :t6, after t1, 3d
-    section Quality
-        CI/CD (GitHub Actions)                   :q1, 2026-04-01, 3d
-        Ruff + pre-commit                        :q2, after q1, 2d
-        Coverage >80%                            :q3, after t1, 14d
-```
+- Core SIP signaling (14 methods, all sync + async)
+- Native AsyncClient (not wrapper)
+- FSM timers with automatic retransmission
+- DNS SRV resolution (auto in Client)
+- SIP URI parser
+- SDP with ICE, SRTP crypto, DTLS, rtcp-fb
+- RTP engine (sync + async)
+- DTMF (3 methods: RFC 4733, SIP INFO, Inband)
+- IVR builder (sync + async)
+- TTS/STT adapter interfaces
+- SIP-I (international + Brazilian) with real ISUP binary
+- Session Timers (RFC 4028)
+- Route/Record-Route processing
+- Auto 100 Trying
+- Response builders (request.ok/error/trying/ringing)
+- Dialog tracking (implicit ack/bye)
+- 607 tests, 60% coverage
 
-### Phase 2 -- Media Layer (Priority: CRITICAL)
+### Remaining Work
 
-```mermaid
-gantt
-    title Phase 2 — Media Layer
-    dateFormat YYYY-MM-DD
-    section RTP
-        RTP engine (send/receive)                :r1, 2026-04-20, 14d
-        G.711 PCMU/PCMA codec                    :r2, after r1, 7d
-        DTMF via RTP (RFC 4733)                  :r3, after r2, 7d
-        DTMF via SIP INFO                        :r4, after r3, 3d
-        Audio playback (WAV → RTP)               :r5, after r2, 5d
-        Audio recording (RTP → WAV)              :r6, after r5, 5d
-    section Security
-        SRTP (RFC 3711)                          :s1, after r1, 10d
-```
-
-### Phase 3 -- Automation / AI (Priority: HIGH)
-
-```mermaid
-gantt
-    title Phase 3 — Automation and AI
-    dateFormat YYYY-MM-DD
-    section TTS/STT
-        TTS adapter interface                    :a1, 2026-05-15, 5d
-        Google TTS adapter                       :a2, after a1, 3d
-        ElevenLabs TTS adapter                   :a3, after a1, 3d
-        STT adapter interface                    :a4, after a1, 5d
-        Whisper STT adapter                      :a5, after a4, 3d
-        Google STT adapter                       :a6, after a4, 3d
-    section IVR
-        IVR builder core                         :i1, after a2, 7d
-        Menu / Prompt / Collect                  :i2, after i1, 5d
-        Conferencing (mixer)                     :i3, after i2, 10d
-```
-
-### Phase 4 -- Extensions (Priority: MEDIUM)
-
-```mermaid
-gantt
-    title Phase 4 — Extensions
-    dateFormat YYYY-MM-DD
-    section Transports
-        WebSocket transport (RFC 7118)           :w1, 2026-06-01, 10d
-    section Integrations
-        FastAPI integration                      :f1, 2026-06-01, 7d
-        CLI tools (typer)                        :c1, after f1, 5d
-        TUI dashboard (textual)                  :c2, after c1, 7d
-    section SIP-I
-        SIP-I headers                            :s1, after f1, 5d
-        ISUP body encapsulation                  :s2, after s1, 7d
-        Cause mapping SIP↔ISUP                   :s3, after s2, 5d
-    section Advanced
-        Opus codec                               :o1, after w1, 7d
-        IPv6 support                             :v6, after w1, 5d
-        Session Timers (RFC 4028)                :st, after v6, 3d
-```
+| Feature | Priority | Complexity |
+| --- | --- | --- |
+| SRTP packet encryption | HIGH | High |
+| RTCP (control protocol) | MEDIUM | Medium |
+| Jitter buffer | MEDIUM | High |
+| Server-side FSMs (IST/NIST) | MEDIUM | Medium |
+| WebSocket transport (full) | MEDIUM | Medium |
+| CI/CD (GitHub Actions) | MEDIUM | Low |
+| Coverage >80% | MEDIUM | Medium |
+| PyPI publishing | LOW | Low |
+| IPv6 | LOW | Low |
+| Conferencing (mixer) | LOW | High |
 
 ---
 
 ## 10. Design Patterns
 
-### 10.1 Patterns Used
-
-| Pattern                 | Where          | Description                                             |
-| ----------------------- | -------------- | ------------------------------------------------------- |
-| **Strategy**            | Transports     | `BaseTransport` -> pluggable UDP/TCP/TLS                |
-| **Observer**            | Events         | `@event_handler` + `Events._call_*_handlers()`          |
-| **State Machine**       | FSM            | `Transaction.transition_to()`, `Dialog.transition_to()` |
-| **Factory**             | Auth           | `Auth.Digest()` returns `SipAuthCredentials`            |
-| **Template Method**     | SIPMessage ABC | `to_bytes()`, `content`, `headers`                      |
-| **Lazy Initialization** | Body parsing   | `response.body` parses on first access                  |
-| **Context Manager**     | Client/Server  | `with Client() as c:` / `async with AsyncClient()`      |
-| **Decorator**           | event_handler  | `@event_handler('INVITE', status=200)`                  |
-| **Builder**             | SDPBody        | `SDPBody.create_offer()`, `.add_media()`                |
-
-### 10.2 Principles
-
-1. **Explicit > Implicit** -- Authentication is manual (`retry_with_auth()`), not automatic
-2. **Lazy by default** -- Bodies are parsed on demand
-3. **Extensible via ABCs** -- All main components have abstract base classes
-4. **httpx-compatible** -- Familiar API surface for Pythonistas
-5. **Batteries included** -- Constants, reason phrases, compact forms included
+| Pattern | Where | Description |
+| --- | --- | --- |
+| **Strategy** | Transports | `BaseTransport` -> pluggable UDP/TCP/TLS |
+| **Observer** | Events | `@on()` + `Events._call_*_handlers()` |
+| **State Machine** | FSM | `Transaction.transition_to()`, `Dialog.transition_to()` |
+| **Factory** | Auth | `Auth.Digest()` returns `SipAuthCredentials` |
+| **Builder** | Response | `request.ok()`, `request.error()`, `SDPBody.audio()` |
+| **Template Method** | SIPMessage | `to_bytes()`, `to_string()` |
+| **Lazy Initialization** | Body parsing, DNS | `response.body` parses on demand, DNS resolver lazy-inits |
+| **Context Manager** | Client/Server | `with Client()` / `async with AsyncClient()` |
+| **Decorator** | Events, Server | `@on('INVITE')`, `@server.invite` |
+| **Dependency Injection** | Server handlers | `Annotated[str, FromHeader]` extractors |
+| **Tracker** | Dialog | `DialogTracker` tracks INVITE 200 OK + RouteSet |
 
 ---
 
 ## 11. Dependencies
 
-### 11.1 Current
+### Current
 
-| Package   | Version  | Use                     | Required                             |
-| --------- | -------- | ----------------------- | ------------------------------------ |
-| `rich`    | >=14.1.0 | Console output, logging | Yes (consider making optional)       |
-| `typer`   | >=0.17.4 | CLI framework           | No (contrib)                         |
-| `textual` | >=6.1.0  | TUI framework           | No (contrib)                         |
+| Package | Version | Use | Required |
+| --- | --- | --- | --- |
+| `rich` | >=14.1.0 | Console output, logging | Yes |
 
-### 11.2 Planned
+### Optional
 
-| Package               | Use                 | Required        |
-| --------------------- | ------------------- | --------------- |
-| `anyio` or `asyncio`  | Native async        | Yes (stdlib)    |
-| `cryptography`        | SRTP                | No (media)      |
-| `numpy`               | Audio processing    | No (media)      |
-| `google-cloud-speech` | TTS/STT             | No (contrib)    |
-| `openai-whisper`      | Local STT           | No (contrib)    |
-| `websockets`          | WebSocket transport | No (transport)  |
+| Package | Use | When needed |
+| --- | --- | --- |
+| `dnspython` | DNS SRV resolution | When resolving SIP domains |
+| `opuslib` | Opus codec | When using Opus audio |
+| `pyaudio` | Mic/speaker I/O | Softphone mode |
+| `google-cloud-texttospeech` | Google TTS | TTS integration |
+| `openai-whisper` | Whisper STT | STT integration |
 
 ---
 
-## 12. Tests (Planned)
+## 12. Glossary
 
-```text
-tests/
-├── conftest.py                    # Fixtures (mock transport, PBX)
-├── test_client.py                 # Client methods
-├── test_async_client.py           # AsyncClient
-├── test_events.py                 # Event system
-├── test_fsm.py                    # Transaction/Dialog states
-├── test_server.py                 # SIPServer
-├── models/
-│   ├── test_message.py            # Request/Response/Parser
-│   ├── test_header.py             # Headers case-insensitivity
-│   ├── test_body.py               # SDPBody, Offer/Answer
-│   └── test_auth.py               # Digest auth, challenge parsing
-├── transports/
-│   ├── test_udp.py                # UDP transport
-│   ├── test_tcp.py                # TCP transport
-│   └── test_tls.py                # TLS transport
-├── media/                         # (future)
-│   ├── test_rtp.py
-│   ├── test_dtmf.py
-│   └── test_codecs.py
-└── integration/
-    ├── test_asterisk.py           # Tests with Asterisk Docker
-    └── test_e2e.py                # End-to-end flows
-```
-
----
-
-## 13. Glossary
-
-| Term      | Definition                                                     |
-| --------- | -------------------------------------------------------------- |
-| **SIP**   | Session Initiation Protocol -- signaling protocol for VoIP     |
-| **SDP**   | Session Description Protocol -- describes media parameters     |
-| **RTP**   | Real-time Transport Protocol -- real-time media transport       |
-| **SRTP**  | Secure RTP -- RTP with encryption                              |
-| **DTMF**  | Dual-Tone Multi-Frequency -- dialing tones                     |
-| **IVR**   | Interactive Voice Response -- automated voice menu system       |
-| **TTS**   | Text-to-Speech -- voice synthesis                              |
-| **STT**   | Speech-to-Text -- voice recognition                            |
-| **UAC**   | User Agent Client -- initiates the SIP request                 |
-| **UAS**   | User Agent Server -- receives the SIP request                  |
-| **ICT**   | INVITE Client Transaction                                      |
-| **NICT**  | Non-INVITE Client Transaction                                  |
-| **IST**   | INVITE Server Transaction                                      |
-| **NIST**  | Non-INVITE Server Transaction                                  |
-| **SIP-I** | SIP with encapsulated ISUP                                     |
-| **ISUP**  | ISDN User Part -- telephony signaling protocol                 |
-| **PBX**   | Private Branch Exchange -- private telephone exchange           |
+| Term | Definition |
+| --- | --- |
+| **SIP** | Session Initiation Protocol -- signaling protocol for VoIP |
+| **SDP** | Session Description Protocol -- describes media parameters |
+| **RTP** | Real-time Transport Protocol -- real-time media transport |
+| **SRTP** | Secure RTP -- RTP with encryption |
+| **DTMF** | Dual-Tone Multi-Frequency -- dialing tones |
+| **IVR** | Interactive Voice Response -- automated voice menu system |
+| **TTS** | Text-to-Speech -- voice synthesis |
+| **STT** | Speech-to-Text -- voice recognition |
+| **UAC** | User Agent Client -- initiates the SIP request |
+| **UAS** | User Agent Server -- receives the SIP request |
+| **ICT** | INVITE Client Transaction |
+| **NICT** | Non-INVITE Client Transaction |
+| **SIP-I** | SIP with encapsulated ISUP |
+| **ISUP** | ISDN User Part -- telephony signaling protocol |
+| **PBX** | Private Branch Exchange -- private telephone exchange |
+| **DI** | Dependency Injection |
 
 ---
 
 ## Appendix A -- Implemented SIP Methods
 
-| Method    | RFC  | `Client`  | `AsyncClient` | Description                  |
-| --------- | ---- | --------- | ------------- | ---------------------------- |
-| INVITE    | 3261 | ✅        | ✅            | Initiate call                |
-| ACK       | 3261 | ✅        | ✅            | Confirm INVITE               |
-| BYE       | 3261 | ✅        | ✅            | End call                     |
-| CANCEL    | 3261 | ✅        | ✅            | Cancel pending INVITE        |
-| REGISTER  | 3261 | ✅        | ✅            | Register location            |
-| OPTIONS   | 3261 | ✅        | ✅            | Query capabilities           |
-| MESSAGE   | 3428 | ✅        | ✅            | Instant message              |
-| SUBSCRIBE | 3265 | ✅ (stub) | ✅ (stub)     | Subscribe to events          |
-| NOTIFY    | 3265 | ✅ (stub) | ✅ (stub)     | Notify event                 |
-| REFER     | 3515 | ✅ (stub) | ✅ (stub)     | Call transfer                |
-| INFO      | 2976 | ✅        | ✅            | Mid-dialog information (DTMF)|
-| UPDATE    | 3311 | ✅ (stub) | ✅ (stub)     | Update session               |
-| PRACK     | 3262 | ✅ (stub) | ✅ (stub)     | Provisional ACK (100rel)     |
-| PUBLISH   | 3903 | ✅ (stub) | ✅ (stub)     | Publish state                |
-
-## Appendix B -- Supported Status Codes
-
-All 60+ SIP status codes are defined in `_utils.py:REASON_PHRASES`:
-
-- **1xx** Provisional: 100, 180, 181, 182, 183
-- **2xx** Success: 200, 202
-- **3xx** Redirection: 300, 301, 302, 305, 380
-- **4xx** Client Error: 400-493 (21 codes)
-- **5xx** Server Error: 500-513 (6 codes)
-- **6xx** Global Failure: 600, 603, 604, 606
+| Method | RFC | `Client` | `AsyncClient` | Description |
+| --- | --- | --- | --- | --- |
+| INVITE | 3261 | ✅ | ✅ | Initiate call |
+| ACK | 3261 | ✅ | ✅ | Confirm INVITE (auto dialog) |
+| BYE | 3261 | ✅ | ✅ | End call (auto dialog) |
+| CANCEL | 3261 | ✅ | ✅ | Cancel pending INVITE |
+| REGISTER | 3261 | ✅ | ✅ | Register location |
+| OPTIONS | 3261 | ✅ | ✅ | Query capabilities |
+| MESSAGE | 3428 | ✅ | ✅ | Instant message |
+| SUBSCRIBE | 3265 | ✅ | ✅ | Subscribe to events |
+| NOTIFY | 3265 | ✅ | ✅ | Notify event |
+| REFER | 3515 | ✅ | ✅ | Call transfer |
+| INFO | 2976 | ✅ | ✅ | Mid-dialog info (DTMF) |
+| UPDATE | 3311 | ✅ | ✅ | Update session |
+| PRACK | 3262 | ✅ | ✅ | Provisional ACK |
+| PUBLISH | 3903 | ✅ | ✅ | Publish state |

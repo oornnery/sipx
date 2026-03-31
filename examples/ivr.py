@@ -18,7 +18,6 @@ from rich.table import Table
 from sipx import (
     AsyncClient,
     Request,
-    Response,
     SDPBody,
     FromHeader,
     AutoRTP,
@@ -71,7 +70,7 @@ def on_invite(
     request: Request,
     caller: Annotated[str, FromHeader],
     rtp: Annotated[RTPSession, AutoRTP(port=RTP_SERVER)],
-) -> Response:
+):
     console.print(f"\n  [bold green]IVR: call from {caller}[/bold green]")
 
     # Create native async RTP from sync RTP's parameters
@@ -87,14 +86,9 @@ def on_invite(
         _loop.call_soon_threadsafe(asyncio.ensure_future, _ivr_flow(async_rtp))
 
     answer = SDPBody.audio(ip=HOST, port=RTP_SERVER)
-    return Response(
-        status_code=200,
+    return request.ok(
         headers={
-            "Via": request.via or "",
-            "From": request.from_header or "",
             "To": (request.to_header or "") + ";tag=ivr-tag",
-            "Call-ID": request.call_id or "",
-            "CSeq": request.cseq or "",
             "Contact": f"<sip:ivr@{HOST}:{SIP_PORT}>",
             "Content-Type": "application/sdp",
         },
@@ -103,23 +97,13 @@ def on_invite(
 
 
 @server.handle("INFO")
-def on_info(request: Request, source: Annotated[object, Source]) -> Response:
+def on_info(request: Request, source: Annotated[object, Source]):
     body = request.content.decode("utf-8", errors="ignore") if request.content else ""
     if "Signal=" in body:
         digit = body.split("Signal=")[1].split("\r")[0].split("\n")[0].strip()
         results["dtmf_info"] = digit
         console.print(f"  [yellow]IVR: DTMF '{digit}' via SIP INFO[/yellow]")
-    return Response(
-        status_code=200,
-        headers={
-            "Via": request.via or "",
-            "From": request.from_header or "",
-            "To": request.to_header or "",
-            "Call-ID": request.call_id or "",
-            "CSeq": request.cseq or "",
-            "Content-Length": "0",
-        },
-    )
+    return request.ok()
 
 
 async def _ivr_flow(rtp: AsyncRTPSession):
@@ -207,7 +191,7 @@ async def main():
 
             # ACK
             console.rule("2. ACK")
-            await client.ack(response=r, host=HOST, port=SIP_PORT)
+            await client.ack(host=HOST, port=SIP_PORT)
 
             # DTMF (3 methods)
             console.rule("3. DTMF (3 methods)")
@@ -253,7 +237,7 @@ async def main():
 
             # BYE
             console.rule("4. BYE")
-            await client.bye(response=r, host=HOST, port=SIP_PORT)
+            await client.bye(host=HOST, port=SIP_PORT)
 
         # Summary
         await asyncio.sleep(0.5)

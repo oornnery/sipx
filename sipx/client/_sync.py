@@ -13,6 +13,7 @@ from ..fsm import StateManager, TimerManager
 from ..models._message import Request, Response, MessageParser
 from ..transports import TransportAddress, TransportConfig
 from ._base import (
+    DialogTracker,
     _create_sync_transport,
     _extract_host_port,
     _build_auth_header,
@@ -51,6 +52,7 @@ class Client:
         events: Optional[Events] = None,
         auth: Optional[Union[SipAuthCredentials, tuple]] = None,
         auto_auth: bool = True,
+        auto_dns: bool = True,
     ) -> None:
         """
         Initialize SIP client.
@@ -62,6 +64,7 @@ class Client:
             events: Optional Events instance for handling SIP messages
             auth: Optional authentication credentials (from Auth.Digest() or tuple)
             auto_auth: Automatically retry on 401/407 if auth is set (default: True)
+            auto_dns: Automatically resolve SIP URIs via DNS SRV (default: True)
         """
         # Transport configuration
         self.config = TransportConfig(
@@ -92,6 +95,9 @@ class Client:
 
         # Client state
         self._closed = False
+        self._dialog = DialogTracker()
+        self._auto_dns = auto_dns
+        self._resolver = None
 
         # Re-registration support
         self._reregister_timer: Optional[threading.Timer] = None
@@ -379,6 +385,13 @@ class Client:
         else:
             port = port if port is not None else 5060
 
+        # Auto DNS resolution for non-IP hostnames
+        if self._auto_dns and not self._is_ip(host):
+            resolved = self._resolve_dns(host)
+            if resolved:
+                host = resolved.host
+                port = resolved.port
+
         # Build request
         request = Request(
             method=method,
@@ -532,6 +545,9 @@ class Client:
                 if retry_result:
                     final_response = retry_result
 
+            # Track dialog state for implicit ack/bye
+            self._dialog.track(final_response)
+
             return final_response
 
         except Exception as e:
@@ -648,17 +664,20 @@ class Client:
 
     def ack(
         self,
-        response: Response,
+        response: Optional[Response] = None,
         **kwargs,
     ) -> None:
         """
         Send ACK for INVITE response.
 
         Args:
-            response: The INVITE response to acknowledge
+            response: The INVITE response to acknowledge (uses tracked dialog if omitted)
             **kwargs: Additional parameters
         """
-        # Extract destination from response
+        if response is None:
+            response = self._dialog.active
+        if response is None:
+            raise ValueError("No response provided and no active dialog")
         request = response.request
         if request is None:
             raise ValueError("Response has no associated request")
@@ -681,6 +700,10 @@ class Client:
             uri=request.uri,
             headers=headers,
         )
+
+        # Apply route set if present in dialog
+        if self._dialog.route_set:
+            self._dialog.route_set.apply(ack_request)
 
         # Send ACK (no response expected)
         destination = TransportAddress(
@@ -715,9 +738,9 @@ class Client:
             >>> bye_response = client.bye(response=invite_response)
         """
         if response is None and dialog_id is None:
-            raise ValueError("Either response or dialog_id must be provided")
+            response = self._dialog.active
         if response is None:
-            raise ValueError("Response is required when dialog_id is not implemented")
+            raise ValueError("No response provided and no active dialog")
 
         # Extract dialog info from response
         request = response.request
@@ -732,12 +755,22 @@ class Client:
         cseq_num = int((request.headers.get("CSeq") or "1").split()[0]) + 1
         headers["CSeq"] = f"{cseq_num} BYE"
 
-        return self.request(
+        # Apply route set if present
+        if self._dialog.route_set and not self._dialog.route_set.is_empty:
+            route_value = ", ".join(f"<{r}>" for r in self._dialog.route_set.routes)
+            headers["Route"] = route_value
+
+        result = self.request(
             method="BYE",
             uri=request.uri,
             headers=headers,
             **kwargs,
         )
+
+        # Clear dialog after BYE
+        self._dialog.clear()
+
+        return result
 
     def cancel(
         self,
@@ -962,6 +995,36 @@ class Client:
     def is_closed(self):
         """Check if client is closed."""
         return self._closed
+
+    def create_sdp(self, port: int = 0, **kwargs):
+        """Create SDP using client's local address.
+
+        Returns:
+            SDPBody configured with the client's local IP.
+        """
+        from ..models._body import SDPBody
+
+        return SDPBody.audio(ip=self._transport.local_address.host, port=port, **kwargs)
+
+    @staticmethod
+    def _is_ip(host: str) -> bool:
+        """Check if host is an IP address (not a hostname)."""
+        import ipaddress
+
+        try:
+            ipaddress.ip_address(host)
+            return True
+        except ValueError:
+            return False
+
+    def _resolve_dns(self, host: str):
+        """Resolve hostname via SIP DNS SRV (lazy init)."""
+        if self._resolver is None:
+            from ..dns._sync import SipResolver
+
+            self._resolver = SipResolver()
+        targets = self._resolver.resolve(host, self.transport_protocol)
+        return targets[0] if targets else None
 
     def enable_auto_reregister(
         self,
