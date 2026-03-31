@@ -12,6 +12,8 @@ import socket
 import ssl
 from typing import Optional, Tuple
 
+import logging
+
 from ._utils import parse_content_length
 from .._types import (
     ConnectionError,
@@ -61,6 +63,10 @@ class TLSTransport(BaseTransport):
 
         # Configure verification
         if not self.config.verify_mode:
+            logging.getLogger("sipx").warning(
+                "TLS certificate verification is DISABLED — "
+                "connections are vulnerable to MitM attacks"
+            )
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
         else:
@@ -366,6 +372,10 @@ class AsyncTLSTransport(AsyncBaseTransport):
 
         # Configure verification
         if not self.config.verify_mode:
+            logging.getLogger("sipx").warning(
+                "TLS certificate verification is DISABLED — "
+                "connections are vulnerable to MitM attacks"
+            )
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
         else:

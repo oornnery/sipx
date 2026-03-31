@@ -472,7 +472,11 @@ class DigestAuth(AuthMethod):
         elif algorithm.upper() in ("SHA-256", "SHA-256-SESS"):
             hash_func = hashlib.sha256
         else:
-            # Default to MD5
+            import logging
+
+            logging.getLogger("sipx").warning(
+                f"Unknown digest algorithm '{algorithm}', falling back to MD5"
+            )
             hash_func = hashlib.md5
 
         # Calculate A1
