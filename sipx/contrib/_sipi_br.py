@@ -298,55 +298,51 @@ class SipIBR:
 
         return result
 
+    # --- BR Number utilities ---
 
-# ---------------------------------------------------------------------------
-# Utility functions
-# ---------------------------------------------------------------------------
+    @staticmethod
+    def normalize(number: str) -> str:
+        """Normalize a Brazilian phone number to DDD+NUMBER format.
+
+        Strips +55, spaces, dashes, parentheses.
+        """
+        digits = re.sub(r"\D", "", number)
+        if digits.startswith("55") and len(digits) > 11:
+            digits = digits[2:]
+        if digits.startswith("0") and len(digits) > 10:
+            digits = digits[1:]
+        return digits
+
+    @staticmethod
+    def is_valid(number: str) -> bool:
+        """Check if a number is a valid Brazilian phone number."""
+        digits = SipIBR.normalize(number)
+        if len(digits) not in (10, 11):
+            return False
+        try:
+            ddd = int(digits[:2])
+        except ValueError:
+            return False
+        return ddd in VALID_DDD
+
+    @staticmethod
+    def is_mobile(number: str) -> bool:
+        """Check if a Brazilian number is mobile (starts with 9 after DDD)."""
+        digits = SipIBR.normalize(number)
+        return len(digits) == 11 and digits[2] == "9"
 
 
+# Backward compat aliases (will be removed)
 def normalize_br_number(number: str) -> str:
-    """Normalize a Brazilian phone number to DDD+NUMBER format.
-
-    Strips +55, spaces, dashes, parentheses.
-
-    Examples:
-        "+55 (11) 98765-4321" -> "11987654321"
-        "011987654321" -> "11987654321"
-        "11987654321" -> "11987654321"
-    """
-    # Remove non-digits
-    digits = re.sub(r"\D", "", number)
-
-    # Remove country code 55
-    if digits.startswith("55") and len(digits) > 11:
-        digits = digits[2:]
-
-    # Remove trunk prefix 0
-    if digits.startswith("0") and len(digits) > 10:
-        digits = digits[1:]
-
-    return digits
+    return SipIBR.normalize(number)
 
 
 def is_valid_br_number(number: str) -> bool:
-    """Check if a number is a valid Brazilian phone number.
-
-    Valid formats: 10 digits (landline) or 11 digits (mobile).
-    """
-    digits = normalize_br_number(number)
-    if len(digits) not in (10, 11):
-        return False
-    try:
-        ddd = int(digits[:2])
-    except ValueError:
-        return False
-    return ddd in VALID_DDD
+    return SipIBR.is_valid(number)
 
 
 def is_mobile(number: str) -> bool:
-    """Check if a Brazilian number is mobile (starts with 9 after DDD)."""
-    digits = normalize_br_number(number)
-    return len(digits) == 11 and digits[2] == "9"
+    return SipIBR.is_mobile(number)
 
 
 __all__ = [

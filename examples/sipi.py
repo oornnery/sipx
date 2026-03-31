@@ -25,3 +25,31 @@ console.print(f"  PAI: {SipI.get_pai(req)}")
 console.print("\n[bold]P-Charging-Vector[/bold]")
 SipI.add_charging_vector(req, icid="abc123", orig_ioi="carrier.com")
 console.print(f"  PCV: {req.headers['P-Charging-Vector']}")
+
+# --- Full INVITE with SIP-I headers ---
+console.print("\n[bold]INVITE with SIP-I Headers[/bold]")
+invite = Request(
+    "INVITE",
+    "sip:+15551234567@gateway.carrier.com",
+    headers={
+        "Via": "SIP/2.0/UDP 10.0.0.1:5060;branch=z9hG4bKsipi",
+        "From": '"Alice" <sip:+15559876543@carrier.com>;tag=sipi01',
+        "To": "<sip:+15551234567@gateway.carrier.com>",
+        "Call-ID": "sipi-example-001@carrier.com",
+        "CSeq": "1 INVITE",
+        "Max-Forwards": "70",
+        "Content-Type": "application/sdp",
+        "Content-Length": "0",
+    },
+)
+
+# Add SIP-I headers
+SipI.add_pai(invite, "sip:+15559876543@carrier.com")
+SipI.add_charging_vector(
+    invite, icid="sipi-icid-001", orig_ioi="carrier-a.com", term_ioi="carrier-b.com"
+)
+
+console.print(f"  Request-URI: {invite.uri}")
+console.print(f"  PAI: {SipI.get_pai(invite)}")
+console.print(f"  PCV: {invite.headers['P-Charging-Vector']}")
+console.print(f"\n  Full INVITE:\n{invite.to_string()}")
