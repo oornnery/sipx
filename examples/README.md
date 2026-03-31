@@ -1,24 +1,48 @@
 # sipx - Examples
 
-Full demo exercising all components of the sipx library.
+## No network required
 
-## Run
+| Example | Description |
+|---------|-------------|
+| `sdp_demo.py` | SDP creation, offer/answer, codec analysis |
+| `audio_gen.py` | Tone, silence, noise, DTMF tone generators |
+| `parser_demo.py` | Parse raw SIP messages, headers, URIs |
 
 ```bash
-# Start Asterisk
-cd docker/asterisk && docker-compose up -d
-
-# Run demo
-uv run python examples/asterisk_demo.py
+uv run python examples/sdp_demo.py
+uv run python examples/audio_gen.py
+uv run python examples/parser_demo.py
 ```
 
-## What is tested
+## Requires Asterisk (`docker-compose up -d`)
 
-- Constants, Headers, MessageParser, SDPBody, Auth, FSM (offline)
-- SIPServer with custom handlers
-- 3 Asterisk users (OPTIONS, REGISTER, INVITE, ACK, BYE, MESSAGE, INFO)
-- Auth: invalid creds, per-request override, auto re-registration
-- SDP: early offer, late offer, create_answer, codec analysis
-- Events: on_request, on_response, @event_handler with method/status/tuple
+| Example | Description |
+|---------|-------------|
+| `quickstart.py` | One-liner examples: register, options, call, message |
+| `call_flow.py` | Complete call: REGISTER → INVITE → ACK → BYE |
+| `events_demo.py` | All event handler patterns (@on decorator) |
+| `dtmf_demo.py` | 3 DTMF methods: RFC 4733, SIP INFO, inband |
+| `asterisk_full.py` | Comprehensive test of every library component |
+
+```bash
+cd docker/asterisk && docker-compose up -d
+uv run python examples/quickstart.py
+uv run python examples/call_flow.py
+uv run python examples/events_demo.py
+uv run python examples/dtmf_demo.py
+uv run python examples/asterisk_full.py
+```
+
+## No Asterisk (sipx as server + client)
+
+| Example | Description |
+|---------|-------------|
+| `server_demo.py` | SIP server with decorators + DI extractors |
+| `ivr.py` | Async IVR with real RTP + DTMF (3 methods) |
+
+```bash
+uv run python examples/server_demo.py   # then test from another terminal
+uv run python examples/ivr.py           # self-contained client+server
+```
 
 See [docs/SDD.md](../docs/SDD.md) for the full spec.
