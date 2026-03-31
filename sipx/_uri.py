@@ -212,9 +212,4 @@ class SipURI:
         }
 
 
-def parse_uri(uri: str) -> SipURI:
-    """Parse a SIP URI string. Shortcut for SipURI.parse()."""
-    return SipURI.parse(uri)
-
-
-__all__ = ["SipURI", "parse_uri"]
+__all__ = ["SipURI"]

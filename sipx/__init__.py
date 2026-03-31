@@ -95,7 +95,7 @@ from ._depends import (
 # URI
 # ============================================================================
 
-from ._uri import SipURI, parse_uri
+from ._uri import SipURI
 
 # ============================================================================
 # FSM
@@ -219,7 +219,6 @@ __all__ = [
     "AsyncClient",
     "SIPServer",
     "SipURI",
-    "parse_uri",
     "Events",
     "EventContext",
     "event_handler",
