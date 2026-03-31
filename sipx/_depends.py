@@ -202,11 +202,23 @@ def resolve_handler(
                     kwargs[name] = meta().extract(request, source)
                     break
 
-    if kwargs:
-        return handler(**kwargs)
+    if not kwargs:
+        # No type hints matched — old-style handler(request, source)
+        return handler(request, source)
 
-    # Fallback: old-style handler(request, source)
-    return handler(request, source)
+    # Fill unresolved params by position (request, source)
+    import inspect
+
+    sig = inspect.signature(handler)
+    positional = [p.name for p in sig.parameters.values() if p.name != "return"]
+    for i, name in enumerate(positional):
+        if name not in kwargs:
+            if i == 0:
+                kwargs[name] = request
+            elif i == 1:
+                kwargs[name] = source
+
+    return handler(**kwargs)
 
 
 # ============================================================================

@@ -34,6 +34,7 @@ from sipx import (
     SDPBody,
     FromHeader,
     AutoRTP,
+    Source,
     on,
     Events,
 )
@@ -96,7 +97,7 @@ def on_invite(
 
 # Handle DTMF via SIP INFO (method 2)
 @server.handle("INFO")
-def on_info(request: Request, source) -> Response:
+def on_info(request: Request, source: Annotated[object, Source]) -> Response:
     body = request.content.decode("utf-8", errors="ignore") if request.content else ""
     if "Signal=" in body:
         digit = body.split("Signal=")[1].split("\r")[0].split("\n")[0].strip()
