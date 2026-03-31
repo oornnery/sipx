@@ -847,54 +847,24 @@ class MessageParser:
         """
         Parse SIP URI into components.
 
-        Example: sip:user@host:5060;transport=udp
+        Supports full RFC 3261 Section 19.1 format:
+            sip:user:password@host:port;param=value?header=value
 
         Args:
             uri: SIP URI string
 
         Returns:
-            Dict with keys: scheme, user, host, port, params
+            Dict with keys: scheme, user, password, host, port, params
 
         Example:
             >>> MessageParser.parse_uri("sip:alice@atlanta.com:5060;transport=tcp")
-            {'scheme': 'sip', 'user': 'alice', 'host': 'atlanta.com', 'port': '5060', 'params': 'transport=tcp'}
+            {'scheme': 'sip', 'user': 'alice', 'password': '', 'host': 'atlanta.com', 'port': '5060', 'params': 'transport=tcp'}
+
+        For the full SipURI object, use ``sipx.SipURI.parse(uri)`` instead.
         """
-        result: dict[str, str] = {
-            "scheme": "",
-            "user": "",
-            "host": "",
-            "port": "",
-            "params": "",
-        }
+        from .._uri import SipURI
 
-        # Extract scheme
-        if ":" not in uri:
-            return result
-
-        scheme, rest = uri.split(":", 1)
-        result["scheme"] = scheme
-
-        # Extract parameters
-        if ";" in rest:
-            rest, params = rest.split(";", 1)
-            result["params"] = params
-
-        # Extract user@host:port
-        if "@" in rest:
-            user, host_port = rest.split("@", 1)
-            result["user"] = user
-        else:
-            host_port = rest
-
-        # Extract host and port
-        if ":" in host_port:
-            host, port = host_port.rsplit(":", 1)
-            result["host"] = host
-            result["port"] = port
-        else:
-            result["host"] = host_port
-
-        return result
+        return SipURI.parse(uri).to_dict()
 
 
 # ============================================================================

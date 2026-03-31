@@ -582,7 +582,8 @@ class TestParseUri:
 
     def test_no_colon(self):
         result = MessageParser.parse_uri("invaliduri")
-        assert result["scheme"] == ""
+        # No scheme prefix — parser treats as host, defaults scheme to "sip"
+        assert result["host"] == "invaliduri"
 
     def test_uri_host_only(self):
         result = MessageParser.parse_uri("sip:server.example.com")
