@@ -27,29 +27,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sipx import (
     Client,
     Events,
-    EventContext,
-    event_handler,
     on,
     Request,
     Response,
     SDPBody,
-    Headers,
     console,
 )
 from sipx._server import SIPServer
-from sipx._media._rtp import RTPPacket, RTPSession
-from sipx._media._codecs import PCMU, PCMA
-from sipx._media._dtmf import (
-    DTMFSender,
-    DTMFCollector,
-    encode_dtmf_event,
-    decode_dtmf_event,
-    DTMF_PAYLOAD_TYPE,
-    DTMF_EVENTS,
-)
-from sipx._media._tts import BaseTTS, FileTTS
-from sipx._media._stt import DummySTT
-from sipx._contrib._ivr import Prompt, MenuItem, Menu, IVR
+from sipx._media._tts import BaseTTS
+from sipx._contrib._ivr import Prompt, MenuItem, Menu
 from sipx._types import TransportAddress
 
 # ---------------------------------------------------------------------------
@@ -81,7 +67,7 @@ class MemoryTTS(BaseTTS):
 
     def synthesize(self, text: str) -> bytes:
         """Return 1 second of silence (8000 samples * 2 bytes = 16000 bytes PCM)."""
-        console.print(f"  [cyan]TTS: \"{text}\"[/cyan]")
+        console.print(f'  [cyan]TTS: "{text}"[/cyan]')
         return b"\x00" * 16000  # 1 second of silence at 8kHz 16-bit
 
 
@@ -107,9 +93,12 @@ class IVRCallHandler:
         caller_sdp = None
         if request.content:
             from sipx._models._body import BodyParser
+
             try:
                 caller_sdp = BodyParser.parse_sdp(request.content)
-                console.print(f"  [dim]Caller SDP: {caller_sdp.get_codecs_summary()}[/dim]")
+                console.print(
+                    f"  [dim]Caller SDP: {caller_sdp.get_codecs_summary()}[/dim]"
+                )
             except Exception:
                 pass
 
@@ -119,15 +108,17 @@ class IVRCallHandler:
             origin_username="ivr",
             origin_address=SERVER_HOST,
             connection_address=SERVER_HOST,
-            media_specs=[{
-                "media": "audio",
-                "port": RTP_PORT_SERVER,
-                "codecs": [
-                    {"payload": "0", "name": "PCMU", "rate": "8000"},
-                    {"payload": "8", "name": "PCMA", "rate": "8000"},
-                    {"payload": "101", "name": "telephone-event", "rate": "8000"},
-                ],
-            }],
+            media_specs=[
+                {
+                    "media": "audio",
+                    "port": RTP_PORT_SERVER,
+                    "codecs": [
+                        {"payload": "0", "name": "PCMU", "rate": "8000"},
+                        {"payload": "8", "name": "PCMA", "rate": "8000"},
+                        {"payload": "101", "name": "telephone-event", "rate": "8000"},
+                    ],
+                }
+            ],
         )
 
         # Build 200 OK response
@@ -161,7 +152,9 @@ class IVRCallHandler:
 
         # Build the IVR menu
         menu = Menu(
-            greeting=Prompt(text="Welcome to sipx IVR. Press 1 for sales, 2 for support, 0 for operator."),
+            greeting=Prompt(
+                text="Welcome to sipx IVR. Press 1 for sales, 2 for support, 0 for operator."
+            ),
             items=[
                 MenuItem(
                     digit="1",
@@ -229,8 +222,10 @@ class CallerEvents(Events):
         self.got_200 = True
         if response.body:
             self.sdp_answer = response.body
-            console.print(f"  [green]Caller: call accepted, SDP received[/green]")
-            console.print(f"  [dim]Remote codecs: {response.body.get_codecs_summary()}[/dim]")
+            console.print("  [green]Caller: call accepted, SDP received[/green]")
+            console.print(
+                f"  [dim]Remote codecs: {response.body.get_codecs_summary()}[/dim]"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -271,15 +266,21 @@ def main():
                 origin_username="caller",
                 origin_address=SERVER_HOST,
                 connection_address=SERVER_HOST,
-                media_specs=[{
-                    "media": "audio",
-                    "port": RTP_PORT_CLIENT,
-                    "codecs": [
-                        {"payload": "0", "name": "PCMU", "rate": "8000"},
-                        {"payload": "8", "name": "PCMA", "rate": "8000"},
-                        {"payload": "101", "name": "telephone-event", "rate": "8000"},
-                    ],
-                }],
+                media_specs=[
+                    {
+                        "media": "audio",
+                        "port": RTP_PORT_CLIENT,
+                        "codecs": [
+                            {"payload": "0", "name": "PCMU", "rate": "8000"},
+                            {"payload": "8", "name": "PCMA", "rate": "8000"},
+                            {
+                                "payload": "101",
+                                "name": "telephone-event",
+                                "rate": "8000",
+                            },
+                        ],
+                    }
+                ],
             )
 
             # INVITE
@@ -296,7 +297,7 @@ def main():
             )
 
             if response.status_code == 200:
-                console.print(f"  [green]Call established (200 OK)[/green]")
+                console.print("  [green]Call established (200 OK)[/green]")
 
                 # ACK
                 console.print("\n[bold]2. ACK[/bold]")
@@ -308,12 +309,14 @@ def main():
                 time.sleep(3)
 
                 # Show IVR result
-                console.print(f"\n[bold]4. IVR Result[/bold]")
-                console.print(f"  IVR choice: [bold cyan]{ivr_handler.ivr_result}[/bold cyan]")
+                console.print("\n[bold]4. IVR Result[/bold]")
+                console.print(
+                    f"  IVR choice: [bold cyan]{ivr_handler.ivr_result}[/bold cyan]"
+                )
                 console.print(f"  Call active: {ivr_handler.call_active}")
 
                 # BYE
-                console.print(f"\n[bold]5. BYE[/bold]")
+                console.print("\n[bold]5. BYE[/bold]")
                 bye_response = client.bye(
                     response=response,
                     host=SERVER_HOST,
@@ -334,20 +337,28 @@ def main():
         table.add_column("Component", style="bold", width=15)
         table.add_column("Result", width=40)
 
-        table.add_row("SIPServer", "[green]PASS[/green] — answered INVITE, sent 200+SDP")
-        table.add_row("SIPClient", "[green]PASS[/green] — INVITE, ACK, BYE flow complete")
-        table.add_row("SDP Offer", f"[green]PASS[/green] — PCMU/PCMA/telephone-event")
-        table.add_row("SDP Answer", f"[green]PASS[/green] — server SDP negotiated")
-        table.add_row("IVR Menu", f"[green]PASS[/green] — 3 items (sales/support/operator)")
-        table.add_row("TTS", f"[green]PASS[/green] — MemoryTTS synthesized prompts")
-        table.add_row("DTMF", f"[green]PASS[/green] — simulated digit '1' -> sales")
+        table.add_row(
+            "SIPServer", "[green]PASS[/green] — answered INVITE, sent 200+SDP"
+        )
+        table.add_row(
+            "SIPClient", "[green]PASS[/green] — INVITE, ACK, BYE flow complete"
+        )
+        table.add_row("SDP Offer", "[green]PASS[/green] — PCMU/PCMA/telephone-event")
+        table.add_row("SDP Answer", "[green]PASS[/green] — server SDP negotiated")
+        table.add_row(
+            "IVR Menu", "[green]PASS[/green] — 3 items (sales/support/operator)"
+        )
+        table.add_row("TTS", "[green]PASS[/green] — MemoryTTS synthesized prompts")
+        table.add_row("DTMF", "[green]PASS[/green] — simulated digit '1' -> sales")
         table.add_row(
             "B2BUA Pattern",
             "[green]PASS[/green] — sipx as both UAC and UAS",
         )
 
         console.print(table)
-        console.print(f"\n[bold green]sipx works as client + server + IVR[/bold green]\n")
+        console.print(
+            "\n[bold green]sipx works as client + server + IVR[/bold green]\n"
+        )
 
     except Exception as e:
         console.print(f"\n[red]Error: {e}[/red]")

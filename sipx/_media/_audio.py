@@ -32,17 +32,11 @@ class AudioPlayer:
         """
         with wave.open(path, "rb") as wf:
             if wf.getnchannels() != 1:
-                raise ValueError(
-                    f"WAV must be mono, got {wf.getnchannels()} channels"
-                )
+                raise ValueError(f"WAV must be mono, got {wf.getnchannels()} channels")
             if wf.getsampwidth() != 2:
-                raise ValueError(
-                    f"WAV must be 16-bit, got {wf.getsampwidth() * 8}-bit"
-                )
+                raise ValueError(f"WAV must be 16-bit, got {wf.getsampwidth() * 8}-bit")
             if wf.getframerate() != 8000:
-                raise ValueError(
-                    f"WAV must be 8000 Hz, got {wf.getframerate()} Hz"
-                )
+                raise ValueError(f"WAV must be 8000 Hz, got {wf.getframerate()} Hz")
 
             pcm_data = wf.readframes(wf.getnframes())
 

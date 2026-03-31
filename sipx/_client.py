@@ -264,6 +264,7 @@ class Client:
                 old_via = request.headers["Via"]
                 new_branch = f"z9hG4bK{uuid.uuid4().hex[:16]}"
                 import re as _re
+
                 request.headers["Via"] = _re.sub(
                     r"branch=z9hG4bK[^;,\s]+", f"branch={new_branch}", old_via
                 )
@@ -470,7 +471,9 @@ class Client:
 
                 # Skip incoming requests (e.g. re-INVITE from server)
                 if not isinstance(response, Response):
-                    logger.debug(f"Skipped incoming {type(response).__name__}, waiting for Response")
+                    logger.debug(
+                        f"Skipped incoming {type(response).__name__}, waiting for Response"
+                    )
                     continue
 
                 response.raw = response_data

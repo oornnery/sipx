@@ -13,7 +13,7 @@ import socket
 import struct
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 from ._codecs import PCMA, PCMU, Codec

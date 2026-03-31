@@ -198,16 +198,22 @@ def make_sdp(client: Client, username: str, port: int = 8000) -> SDPBody:
         origin_username=username,
         origin_address=client.local_address.host,
         connection_address=client.local_address.host,
-        media_specs=[{
-            "media": "audio",
-            "port": port,
-            "codecs": [
-                {"payload": "0", "name": "PCMU", "rate": "8000"},
-                {"payload": "8", "name": "PCMA", "rate": "8000"},
-                {"payload": "101", "name": "telephone-event", "rate": "8000",
-                 "fmtp": "0-16"},
-            ],
-        }],
+        media_specs=[
+            {
+                "media": "audio",
+                "port": port,
+                "codecs": [
+                    {"payload": "0", "name": "PCMU", "rate": "8000"},
+                    {"payload": "8", "name": "PCMA", "rate": "8000"},
+                    {
+                        "payload": "101",
+                        "name": "telephone-event",
+                        "rate": "8000",
+                        "fmtp": "0-16",
+                    },
+                ],
+            }
+        ],
     )
 
 
@@ -238,19 +244,21 @@ def demo_constants_and_parsing() -> dict:
 
     # --- Headers ---
     console.print("\n[bold]0.2 Headers[/bold]")
-    h = Headers({
-        "Via": "SIP/2.0/UDP 10.0.0.1:5060;branch=z9hG4bKtest",
-        "from": '"Alice" <sip:alice@example.com>;tag=abc123',
-        "To": "<sip:bob@example.com>",
-        "call-id": "unique-id@10.0.0.1",
-        "CSeq": "1 INVITE",
-        "content-type": "application/sdp",
-        "Content-Length": "0",
-    })
+    h = Headers(
+        {
+            "Via": "SIP/2.0/UDP 10.0.0.1:5060;branch=z9hG4bKtest",
+            "from": '"Alice" <sip:alice@example.com>;tag=abc123',
+            "To": "<sip:bob@example.com>",
+            "call-id": "unique-id@10.0.0.1",
+            "CSeq": "1 INVITE",
+            "content-type": "application/sdp",
+            "Content-Length": "0",
+        }
+    )
     # Case-insensitive access
     assert h["FROM"] == h["from"] == h["From"]
     # Compact form access
-    assert h["f"] == h["From"]     # f -> From
+    assert h["f"] == h["From"]  # f -> From
     assert h["i"] == h["Call-ID"]  # i -> Call-ID
     assert h["c"] == h["Content-Type"]  # c -> Content-Type
     console.print("  case-insensitive: h['FROM'] == h['from'] == h['f']")
@@ -267,7 +275,9 @@ def demo_constants_and_parsing() -> dict:
 
     value_parts = HeaderParser.parse_header_value("application/sdp; charset=utf-8")
     console.print(f"  parse_header_value: {value_parts}")
-    formatted = HeaderParser.format_header_value("application/sdp", {"charset": "utf-8"})
+    formatted = HeaderParser.format_header_value(
+        "application/sdp", {"charset": "utf-8"}
+    )
     console.print(f"  format_header_value: {formatted}")
     results["header_parser"] = True
 
@@ -336,18 +346,26 @@ def demo_constants_and_parsing() -> dict:
         origin_username="alice",
         origin_address="10.0.0.1",
         connection_address="10.0.0.1",
-        media_specs=[{
-            "media": "audio",
-            "port": 49170,
-            "codecs": [
-                {"payload": "0", "name": "PCMU", "rate": "8000"},
-                {"payload": "8", "name": "PCMA", "rate": "8000"},
-                {"payload": "101", "name": "telephone-event", "rate": "8000",
-                 "fmtp": "0-16"},
-            ],
-        }],
+        media_specs=[
+            {
+                "media": "audio",
+                "port": 49170,
+                "codecs": [
+                    {"payload": "0", "name": "PCMU", "rate": "8000"},
+                    {"payload": "8", "name": "PCMA", "rate": "8000"},
+                    {
+                        "payload": "101",
+                        "name": "telephone-event",
+                        "rate": "8000",
+                        "fmtp": "0-16",
+                    },
+                ],
+            }
+        ],
     )
-    console.print(f"  offer: {len(offer.to_string())} bytes, content_type={offer.content_type}")
+    console.print(
+        f"  offer: {len(offer.to_string())} bytes, content_type={offer.content_type}"
+    )
     console.print(f"  connection: {offer.get_connection_address()}")
     console.print(f"  ports: {offer.get_media_ports()}")
     console.print(f"  codecs: {offer.get_codecs_summary()}")
@@ -359,11 +377,13 @@ def demo_constants_and_parsing() -> dict:
         origin_username="bob",
         origin_address="10.0.0.2",
         connection_address="10.0.0.2",
-        accepted_media=[{
-            "index": 0,
-            "port": 49170,
-            "codecs": ["0", "8"],  # accept PCMU + PCMA, reject telephone-event
-        }],
+        accepted_media=[
+            {
+                "index": 0,
+                "port": 49170,
+                "codecs": ["0", "8"],  # accept PCMU + PCMA, reject telephone-event
+            }
+        ],
     )
     console.print(f"  answer: {len(answer.to_string())} bytes")
     console.print(f"  accepted codecs: {answer.get_accepted_codecs(0)}")
@@ -394,16 +414,23 @@ def demo_constants_and_parsing() -> dict:
     # --- TransportAddress ---
     console.print("\n[bold]0.8 TransportAddress[/bold]")
     addr = TransportAddress.from_uri("sips:alice@example.com:5061")
-    console.print(f"  from_uri: {addr} (secure={addr.is_secure}, reliable={addr.is_reliable})")
+    console.print(
+        f"  from_uri: {addr} (secure={addr.is_secure}, reliable={addr.is_reliable})"
+    )
     addr2 = TransportAddress.from_uri("sip:bob@example.com;transport=tcp")
-    console.print(f"  from_uri: {addr2} (secure={addr2.is_secure}, reliable={addr2.is_reliable})")
+    console.print(
+        f"  from_uri: {addr2} (secure={addr2.is_secure}, reliable={addr2.is_reliable})"
+    )
     results["transport_address"] = True
 
     # --- FSM (offline) ---
     console.print("\n[bold]0.9 StateManager[/bold]")
     sm = StateManager()
-    req = Request("INVITE", "sip:bob@example.com",
-                  headers={"Via": "SIP/2.0/UDP x;branch=z9hG4bKtest"})
+    req = Request(
+        "INVITE",
+        "sip:bob@example.com",
+        headers={"Via": "SIP/2.0/UDP x;branch=z9hG4bKtest"},
+    )
     txn = sm.create_transaction(req)
     console.print(f"  created: {txn!r}")
     console.print(f"  type: {txn.transaction_type.name}, state: {txn.state.name}")
@@ -414,11 +441,17 @@ def demo_constants_and_parsing() -> dict:
 
     fake_resp2 = Response(200, headers={"Via": "SIP/2.0/UDP x"})
     sm.update_transaction(txn.id, fake_resp2)
-    console.print(f"  after 200: state={txn.state.name}, is_complete={txn.is_complete()}")
+    console.print(
+        f"  after 200: state={txn.state.name}, is_complete={txn.is_complete()}"
+    )
 
     dlg = sm.create_dialog(
-        call_id="test-call", local_tag="abc", remote_tag="def",
-        local_uri="sip:alice@x", remote_uri="sip:bob@x", remote_target="sip:bob@x",
+        call_id="test-call",
+        local_tag="abc",
+        remote_tag="def",
+        local_uri="sip:alice@x",
+        remote_uri="sip:bob@x",
+        remote_target="sip:bob@x",
     )
     console.print(f"  dialog: {dlg!r}")
     console.print(f"  dialog_id: {dlg.get_dialog_id()}")
@@ -669,7 +702,9 @@ def test_advanced(user: User) -> dict:
         r = auth_request(client, client.register(f"sip:{u}@{HOST}", expires=120))
         if not (r and r.status_code == 200):
             results["auto_rereg"] = False
-            console.print(f"  initial register failed: {r.status_code if r else 'None'}")
+            console.print(
+                f"  initial register failed: {r.status_code if r else 'None'}"
+            )
             return results
 
         count = [0]

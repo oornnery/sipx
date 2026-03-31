@@ -25,6 +25,4 @@ class WhisperSTT(BaseSTT):
 
     def transcribe(self, audio: bytes) -> str:
         """Raise ``ImportError`` — the Whisper library is not installed."""
-        raise ImportError(
-            "pip install openai-whisper"
-        )
+        raise ImportError("pip install openai-whisper")

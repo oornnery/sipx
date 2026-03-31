@@ -87,9 +87,7 @@ class Menu:
             text="Invalid selection. Please try again."
         )
         self.max_retries = max_retries
-        self._item_map: dict[str, MenuItem] = {
-            item.digit: item for item in self.items
-        }
+        self._item_map: dict[str, MenuItem] = {item.digit: item for item in self.items}
 
     def add_item(
         self,
@@ -107,9 +105,7 @@ class Menu:
             handler: Optional callback function.
             submenu: Optional nested menu.
         """
-        item = MenuItem(
-            digit=digit, prompt=prompt, handler=handler, submenu=submenu
-        )
+        item = MenuItem(digit=digit, prompt=prompt, handler=handler, submenu=submenu)
         self.items.append(item)
         self._item_map[digit] = item
 
@@ -197,9 +193,7 @@ class IVR:
         Returns:
             The digit string (e.g. ``"1"``), or empty string on timeout.
         """
-        collector = DTMFCollector(
-            self.rtp_session, max_digits=1, timeout=timeout
-        )
+        collector = DTMFCollector(self.rtp_session, max_digits=1, timeout=timeout)
         return collector.collect()
 
     # ------------------------------------------------------------------

@@ -7,7 +7,6 @@ No external dependencies — lookup tables are used for fast encode/decode.
 
 from __future__ import annotations
 
-import struct
 from abc import ABC, abstractmethod
 from typing import ClassVar, List
 

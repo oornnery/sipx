@@ -35,6 +35,4 @@ class GoogleTTS(BaseTTS):
 
     def synthesize(self, text: str) -> bytes:
         """Raise ``ImportError`` — the Google Cloud SDK is not installed."""
-        raise ImportError(
-            "pip install google-cloud-texttospeech"
-        )
+        raise ImportError("pip install google-cloud-texttospeech")

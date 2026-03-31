@@ -217,9 +217,7 @@ class SIPServer:
         else:
             txn_type = TransactionType.NON_INVITE_SERVER
 
-        txn = self._state_manager.create_transaction(
-            request, transaction_type=txn_type
-        )
+        txn = self._state_manager.create_transaction(request, transaction_type=txn_type)
         txn.transport = self.transport
         self._emit("transaction_created", txn)
         return txn

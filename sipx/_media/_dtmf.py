@@ -14,14 +14,26 @@ import time
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from ._rtp import RTPPacket, RTPSession
+    from ._rtp import RTPSession
 
 # DTMF event codes per RFC 4733
 DTMF_EVENTS: dict[str, int] = {
-    "0": 0, "1": 1, "2": 2, "3": 3,
-    "4": 4, "5": 5, "6": 6, "7": 7,
-    "8": 8, "9": 9, "*": 10, "#": 11,
-    "A": 12, "B": 13, "C": 14, "D": 15,
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "3": 3,
+    "4": 4,
+    "5": 5,
+    "6": 6,
+    "7": 7,
+    "8": 8,
+    "9": 9,
+    "*": 10,
+    "#": 11,
+    "A": 12,
+    "B": 13,
+    "C": 14,
+    "D": 15,
 }
 
 DTMF_PAYLOAD_TYPE = 101
@@ -100,7 +112,9 @@ class DTMFSender:
 
         # Packet 2: continuation
         mid_duration = total_duration // 2
-        payload = encode_dtmf_event(event_code, end=False, volume=volume, duration=mid_duration)
+        payload = encode_dtmf_event(
+            event_code, end=False, volume=volume, duration=mid_duration
+        )
         pkt = RTPPacket(
             marker=False,
             payload_type=DTMF_PAYLOAD_TYPE,
@@ -116,7 +130,9 @@ class DTMFSender:
         time.sleep(duration_ms / 2000.0)
 
         # Packet 3: end (E bit set, send 3 times per RFC 4733)
-        payload = encode_dtmf_event(event_code, end=True, volume=volume, duration=total_duration)
+        payload = encode_dtmf_event(
+            event_code, end=True, volume=volume, duration=total_duration
+        )
         for _ in range(3):
             pkt = RTPPacket(
                 marker=False,

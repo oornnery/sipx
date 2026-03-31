@@ -700,7 +700,13 @@ class SDPBody(MessageBody):
                 "clock_rate": int(first.get("rate", "8000")),
             }
 
-        return {"ip": ip, "port": port, "codec_name": "PCMU", "payload_type": 0, "clock_rate": 8000}
+        return {
+            "ip": ip,
+            "port": port,
+            "codec_name": "PCMU",
+            "payload_type": 0,
+            "clock_rate": 8000,
+        }
 
 
 # ============================================================================
