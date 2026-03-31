@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Optional
 
-from ._rtp import RTPSession
+from ._rtp import RTPPacket
 
 if TYPE_CHECKING:
     from sipx._client import Client
@@ -25,42 +25,108 @@ if TYPE_CHECKING:
 
 
 class AsyncDTMFHelper:
-    """Async DTMF send/collect wrapping sync helpers via ``asyncio.to_thread``."""
+    """Native async DTMF send/collect using AsyncRTPSession directly."""
 
     def __init__(self, async_rtp: AsyncRTPSession) -> None:
         self._rtp = async_rtp
 
-    async def send(self, digits: str, duration_ms: int = 160) -> None:
-        """Send one or more DTMF digits via RFC 4733.
+    async def send(self, digits: str, duration_ms: int = 160, volume: int = 10) -> None:
+        """Send DTMF digits via RFC 4733 (native async)."""
+        from ._dtmf import DTMF_EVENTS, DTMF_PAYLOAD_TYPE, DTMFEvent
+        from ._rtp import RTPPacket
 
-        Args:
-            digits: String of digits to send (e.g. ``"123#"``).
-            duration_ms: Per-digit tone duration in milliseconds.
-        """
-        from ._dtmf import DTMFSender
+        for digit in digits:
+            event_code = DTMF_EVENTS.get(digit.upper())
+            if event_code is None:
+                continue
 
-        sender = DTMFSender(self._rtp._sync)
-        for d in digits:
-            await asyncio.to_thread(sender.send_digit, d, duration_ms)
+            ts = self._rtp._timestamp
+            samples_per_ms = self._rtp.clock_rate // 1000
+            total_duration = duration_ms * samples_per_ms
+
+            # Start packet (marker=True)
+            payload = DTMFEvent(
+                event=event_code, end=False, volume=volume, duration=0
+            ).to_bytes()
+            await self._rtp.send_packet(
+                RTPPacket(
+                    marker=True,
+                    payload_type=DTMF_PAYLOAD_TYPE,
+                    sequence_number=self._rtp._sequence_number & 0xFFFF,
+                    timestamp=ts,
+                    ssrc=self._rtp._ssrc,
+                    payload=payload,
+                )
+            )
+            self._rtp._sequence_number += 1
+            await asyncio.sleep(duration_ms / 2000.0)
+
+            # Continuation
+            mid = total_duration // 2
+            payload = DTMFEvent(
+                event=event_code, end=False, volume=volume, duration=mid
+            ).to_bytes()
+            await self._rtp.send_packet(
+                RTPPacket(
+                    payload_type=DTMF_PAYLOAD_TYPE,
+                    sequence_number=self._rtp._sequence_number & 0xFFFF,
+                    timestamp=ts,
+                    ssrc=self._rtp._ssrc,
+                    payload=payload,
+                )
+            )
+            self._rtp._sequence_number += 1
+            await asyncio.sleep(duration_ms / 2000.0)
+
+            # End (3x per RFC 4733)
+            payload = DTMFEvent(
+                event=event_code, end=True, volume=volume, duration=total_duration
+            ).to_bytes()
+            for _ in range(3):
+                await self._rtp.send_packet(
+                    RTPPacket(
+                        payload_type=DTMF_PAYLOAD_TYPE,
+                        sequence_number=self._rtp._sequence_number & 0xFFFF,
+                        timestamp=ts,
+                        ssrc=self._rtp._ssrc,
+                        payload=payload,
+                    )
+                )
+                self._rtp._sequence_number += 1
+
+            self._rtp._timestamp = (self._rtp._timestamp + total_duration) & 0xFFFFFFFF
             await asyncio.sleep(0.05)
 
     async def collect(self, max_digits: int = 1, timeout: float = 10.0) -> str:
-        """Collect DTMF digits from the remote party.
-
-        Args:
-            max_digits: Maximum digits to collect (``0`` = unlimited).
-            timeout: Collection timeout in seconds.
-
-        Returns:
-            String of collected digits.
-        """
-        from ._dtmf import DTMFCollector
+        """Collect DTMF digits via RFC 4733 (native async)."""
+        import time
+        from ._dtmf import DTMF_PAYLOAD_TYPE, DTMFEvent
 
         effective = max_digits if max_digits > 0 else 9999
-        collector = DTMFCollector(
-            self._rtp._sync, max_digits=effective, timeout=timeout
-        )
-        return await asyncio.to_thread(collector.collect)
+        digits: list[str] = []
+        last_end_ts: int | None = None
+        deadline = time.monotonic() + timeout
+
+        while len(digits) < effective:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            pkt = await self._rtp.recv_packet(timeout=min(remaining, 0.5))
+            if (
+                pkt is None
+                or pkt.payload_type != DTMF_PAYLOAD_TYPE
+                or len(pkt.payload) < 4
+            ):
+                continue
+            evt = DTMFEvent.from_bytes(pkt.payload)
+            if evt.end:
+                if pkt.timestamp == last_end_ts:
+                    continue
+                last_end_ts = pkt.timestamp
+                if evt.digit is not None:
+                    digits.append(evt.digit)
+
+        return "".join(digits)
 
 
 # ============================================================================
@@ -68,8 +134,30 @@ class AsyncDTMFHelper:
 # ============================================================================
 
 
+class _RTPProtocol(asyncio.DatagramProtocol):
+    """asyncio DatagramProtocol for native async RTP."""
+
+    def __init__(self) -> None:
+        self.transport: asyncio.DatagramTransport | None = None
+        self._queue: asyncio.Queue[RTPPacket] = asyncio.Queue()
+
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
+        self.transport = transport  # type: ignore[assignment]
+
+    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+        if len(data) >= 12:
+            try:
+                packet = RTPPacket.from_bytes(data)
+                self._queue.put_nowait(packet)
+            except Exception:
+                pass
+
+
 class AsyncRTPSession:
-    """Async wrapper for ``RTPSession`` via ``asyncio.to_thread``."""
+    """Native async RTP session using asyncio.DatagramProtocol.
+
+    No threading — runs entirely in the asyncio event loop.
+    """
 
     def __init__(
         self,
@@ -81,124 +169,115 @@ class AsyncRTPSession:
         clock_rate: int = 8000,
         codec: "Codec | None" = None,
     ) -> None:
-        self._sync = RTPSession(
-            local_ip=local_ip,
-            local_port=local_port,
-            remote_ip=remote_ip,
-            remote_port=remote_port,
-            payload_type=payload_type,
-            clock_rate=clock_rate,
-            codec=codec,
-        )
+        self.local_ip = local_ip
+        self.local_port = local_port
+        self.remote_ip = remote_ip
+        self.remote_port = remote_port
+        self.payload_type = payload_type
+        self.clock_rate = clock_rate
 
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
+        # Resolve codec
+        from ._codecs import PCMA, PCMU
+
+        _registry: dict[int, type] = {0: PCMU, 8: PCMA}
+        if codec is not None:
+            self.codec = codec
+        elif payload_type in _registry:
+            self.codec = _registry[payload_type]()
+        else:
+            self.codec = PCMU()
+
+        # RTP state
+        import random
+
+        self._ssrc = random.randint(0, 0xFFFFFFFF)
+        self._sequence_number = random.randint(0, 0xFFFF)
+        self._timestamp = random.randint(0, 0xFFFFFFFF)
+        self._samples_per_packet = clock_rate // 50  # 20ms
+
+        # asyncio transport
+        self._transport: asyncio.DatagramTransport | None = None
+        self._protocol: _RTPProtocol | None = None
 
     async def start(self) -> None:
-        """Bind the UDP socket and start the receive thread."""
-        await asyncio.to_thread(self._sync.start)
+        loop = asyncio.get_running_loop()
+        self._transport, self._protocol = await loop.create_datagram_endpoint(
+            _RTPProtocol,
+            local_addr=(self.local_ip, self.local_port),
+        )
 
     async def stop(self) -> None:
-        """Stop threads and close the socket."""
-        await asyncio.to_thread(self._sync.stop)
+        if self._transport:
+            self._transport.close()
+            self._transport = None
 
-    # ------------------------------------------------------------------
-    # Sending
-    # ------------------------------------------------------------------
+    async def send_packet(self, packet: RTPPacket) -> None:
+        if self._transport:
+            self._transport.sendto(
+                packet.to_bytes(), (self.remote_ip, self.remote_port)
+            )
+
+    async def recv_packet(self, timeout: float = 1.0) -> Optional[RTPPacket]:
+        if not self._protocol:
+            return None
+        try:
+            return await asyncio.wait_for(self._protocol._queue.get(), timeout)
+        except asyncio.TimeoutError:
+            return None
 
     async def send_audio(self, pcm_data: bytes) -> None:
-        """Encode PCM data and send as RTP packets at 20 ms intervals.
-
-        Args:
-            pcm_data: 16-bit signed little-endian PCM audio.
-        """
-        await asyncio.to_thread(self._sync.send_audio, pcm_data)
-
-    async def send_packet(self, packet: object) -> None:
-        """Send a raw RTP packet to the remote endpoint."""
-        await asyncio.to_thread(self._sync.send_packet, packet)
-
-    # ------------------------------------------------------------------
-    # Receiving
-    # ------------------------------------------------------------------
+        bytes_per_packet = self._samples_per_packet * 2
+        offset = 0
+        while offset < len(pcm_data):
+            chunk = pcm_data[offset : offset + bytes_per_packet]
+            if not chunk:
+                break
+            encoded = self.codec.encode(chunk)
+            packet = RTPPacket(
+                payload_type=self.payload_type,
+                sequence_number=self._sequence_number & 0xFFFF,
+                timestamp=self._timestamp & 0xFFFFFFFF,
+                ssrc=self._ssrc,
+                payload=encoded,
+            )
+            await self.send_packet(packet)
+            self._sequence_number += 1
+            self._timestamp += self._samples_per_packet
+            offset += bytes_per_packet
+            await asyncio.sleep(0.020)
 
     async def recv_audio(self, timeout: float = 1.0) -> Optional[bytes]:
-        """Receive an RTP packet, decode, and return PCM audio."""
-        return await asyncio.to_thread(self._sync.recv_audio, timeout)
-
-    async def recv_packet(self, timeout: float = 1.0):
-        """Receive a single RTP packet (blocking with timeout)."""
-        return await asyncio.to_thread(self._sync.recv_packet, timeout)
-
-    # ------------------------------------------------------------------
-    # DTMF convenience
-    # ------------------------------------------------------------------
+        packet = await self.recv_packet(timeout)
+        if packet is None:
+            return None
+        return self.codec.decode(packet.payload)
 
     @property
     def dtmf(self) -> AsyncDTMFHelper:
-        """Auto-created ``AsyncDTMFHelper`` for send/collect."""
         if not hasattr(self, "_dtmf_helper") or self._dtmf_helper is None:
             self._dtmf_helper = AsyncDTMFHelper(self)
         return self._dtmf_helper
 
-    # ------------------------------------------------------------------
-    # Proxy properties
-    # ------------------------------------------------------------------
-
-    @property
-    def local_ip(self) -> str:
-        return self._sync.local_ip
-
-    @property
-    def local_port(self) -> int:
-        return self._sync.local_port
-
-    @property
-    def remote_ip(self) -> str:
-        return self._sync.remote_ip
-
-    @property
-    def remote_port(self) -> int:
-        return self._sync.remote_port
-
-    @property
-    def clock_rate(self) -> int:
-        return self._sync.clock_rate
-
-    @property
-    def payload_type(self) -> int:
-        return self._sync.payload_type
-
-    # ------------------------------------------------------------------
-    # Factory
-    # ------------------------------------------------------------------
-
     @classmethod
     def from_sdp(
-        cls,
-        sdp_body: SDPBody,
-        local_ip: str,
-        local_port: int,
+        cls, sdp_body: SDPBody, local_ip: str, local_port: int
     ) -> AsyncRTPSession:
-        """Create an ``AsyncRTPSession`` from an SDP body.
-
-        Args:
-            sdp_body: Parsed ``SDPBody`` (typically from a 200 OK).
-            local_ip: Local IP address to bind.
-            local_port: Local UDP port to bind.
-
-        Returns:
-            Configured (but not started) ``AsyncRTPSession``.
-        """
-        sync = RTPSession.from_sdp(sdp_body, local_ip, local_port)
-        obj = cls.__new__(cls)
-        obj._sync = sync
-        return obj
-
-    # ------------------------------------------------------------------
-    # Context manager
-    # ------------------------------------------------------------------
+        params = sdp_body.get_rtp_params()
+        if params:
+            return cls(
+                local_ip=local_ip,
+                local_port=local_port,
+                remote_ip=params["ip"] or "127.0.0.1",
+                remote_port=params["port"],
+                payload_type=params["payload_type"],
+                clock_rate=params["clock_rate"],
+            )
+        return cls(
+            local_ip=local_ip,
+            local_port=local_port,
+            remote_ip="127.0.0.1",
+            remote_port=0,
+        )
 
     async def __aenter__(self) -> AsyncRTPSession:
         await self.start()

@@ -407,137 +407,233 @@ class SIPServer:
         return False
 
 
+class _SIPServerProtocol(asyncio.DatagramProtocol):
+    """asyncio DatagramProtocol for native async SIP server."""
+
+    def __init__(self, server: AsyncSIPServer) -> None:
+        self.server = server
+        self.transport: asyncio.DatagramTransport | None = None
+
+    def connection_made(self, transport: asyncio.BaseTransport) -> None:
+        self.transport = transport  # type: ignore[assignment]
+
+    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+        asyncio.ensure_future(self.server._handle_datagram(data, addr, self.transport))
+
+
 class AsyncSIPServer:
-    """Async SIP server wrapping sync ``SIPServer`` via ``asyncio.to_thread``."""
+    """Native async SIP server using asyncio.DatagramProtocol.
+
+    No threading — runs entirely in the asyncio event loop.
+    """
 
     def __init__(
         self,
         local_host: str = "0.0.0.0",
         local_port: int = 5060,
-        config: Optional[TransportConfig] = None,
-        transport: str = "UDP",
-        events: Optional[Dict[str, Callable]] = None,
+        **kwargs: object,
     ) -> None:
-        self._sync = SIPServer(
-            local_host=local_host,
-            local_port=local_port,
-            config=config,
-            transport=transport,
-            events=events,
-        )
+        self._host = local_host
+        self._port = local_port
+        self._handlers: Dict[str, Callable] = {}
+        self._transport: asyncio.DatagramTransport | None = None
+        self._protocol: _SIPServerProtocol | None = None
+        self._register_default_handlers()
+
+    def _register_default_handlers(self) -> None:
+        def _bye(request: Request, source: TransportAddress) -> Response:
+            return Response(
+                status_code=200,
+                headers={
+                    "Via": request.via or "",
+                    "From": request.from_header or "",
+                    "To": request.to_header or "",
+                    "Call-ID": request.call_id or "",
+                    "CSeq": request.cseq or "",
+                    "Content-Length": "0",
+                },
+            )
+
+        def _cancel(request: Request, source: TransportAddress) -> Response:
+            return Response(
+                status_code=200,
+                headers={
+                    "Via": request.via or "",
+                    "From": request.from_header or "",
+                    "To": request.to_header or "",
+                    "Call-ID": request.call_id or "",
+                    "CSeq": request.cseq or "",
+                    "Content-Length": "0",
+                },
+            )
+
+        def _options(request: Request, source: TransportAddress) -> Response:
+            return Response(
+                status_code=200,
+                headers={
+                    "Via": request.via or "",
+                    "From": request.from_header or "",
+                    "To": request.to_header or "",
+                    "Call-ID": request.call_id or "",
+                    "CSeq": request.cseq or "",
+                    "Allow": "INVITE,ACK,BYE,CANCEL,OPTIONS,MESSAGE,REGISTER",
+                    "Accept": "application/sdp",
+                    "Content-Length": "0",
+                },
+            )
+
+        self._handlers["BYE"] = _bye
+        self._handlers["CANCEL"] = _cancel
+        self._handlers["OPTIONS"] = _options
 
     # ------------------------------------------------------------------
-    # Decorators (delegate to sync server)
+    # Decorators
     # ------------------------------------------------------------------
 
     def handle(self, method: str):
-        """Decorator to register a handler for a SIP method."""
-        return self._sync.handle(method)
+        def decorator(fn: Callable) -> Callable:
+            self._handlers[method.upper()] = fn
+            return fn
+
+        return decorator
+
+    def register_handler(self, method: str, handler: Callable) -> None:
+        self._handlers[method.upper()] = handler
 
     @property
     def invite(self):
-        """Decorator to register an INVITE handler."""
-        return self._sync.invite
+        return self.handle("INVITE")
 
     @property
     def register(self):
-        """Decorator to register a REGISTER handler."""
-        return self._sync.register
+        return self.handle("REGISTER")
 
     @property
     def options(self):
-        """Decorator to register an OPTIONS handler."""
-        return self._sync.options
+        return self.handle("OPTIONS")
 
     @property
     def bye(self):
-        """Decorator to register a BYE handler."""
-        return self._sync.bye
+        return self.handle("BYE")
 
     @property
     def cancel(self):
-        """Decorator to register a CANCEL handler."""
-        return self._sync.cancel
+        return self.handle("CANCEL")
 
     @property
     def message(self):
-        """Decorator to register a MESSAGE handler."""
-        return self._sync.message
+        return self.handle("MESSAGE")
 
     @property
     def subscribe(self):
-        """Decorator to register a SUBSCRIBE handler."""
-        return self._sync.subscribe
+        return self.handle("SUBSCRIBE")
 
     @property
     def notify(self):
-        """Decorator to register a NOTIFY handler."""
-        return self._sync.notify
+        return self.handle("NOTIFY")
 
     @property
     def refer(self):
-        """Decorator to register a REFER handler."""
-        return self._sync.refer
+        return self.handle("REFER")
 
     @property
     def info(self):
-        """Decorator to register an INFO handler."""
-        return self._sync.info
+        return self.handle("INFO")
 
     @property
     def update(self):
-        """Decorator to register an UPDATE handler."""
-        return self._sync.update
+        return self.handle("UPDATE")
 
     @property
     def prack(self):
-        """Decorator to register a PRACK handler."""
-        return self._sync.prack
+        return self.handle("PRACK")
 
     @property
     def publish(self):
-        """Decorator to register a PUBLISH handler."""
-        return self._sync.publish
+        return self.handle("PUBLISH")
 
     # ------------------------------------------------------------------
-    # Properties
+    # Datagram handler
     # ------------------------------------------------------------------
 
-    @property
-    def state_manager(self) -> StateManager:
-        """Access the server's state manager."""
-        return self._sync.state_manager
-
-    # ------------------------------------------------------------------
-    # Registration
-    # ------------------------------------------------------------------
-
-    def register_handler(
+    async def _handle_datagram(
         self,
-        method: str,
-        handler: Callable[[Request, TransportAddress], Response],
+        data: bytes,
+        addr: tuple[str, int],
+        transport: asyncio.DatagramTransport | None,
     ) -> None:
-        """Register a custom handler for a SIP method."""
-        self._sync.register_handler(method, handler)
+        from .models._message import MessageParser
+
+        try:
+            message = MessageParser.parse(data)
+        except Exception:
+            return
+
+        if not isinstance(message, Request):
+            return
+
+        source = TransportAddress(host=addr[0], port=addr[1])
+
+        # ACK: no response
+        if message.method == "ACK":
+            logger.info("Received ACK from %s:%s", addr[0], addr[1])
+            return
+
+        handler = self._handlers.get(message.method)
+        if handler:
+            try:
+                response = resolve_handler(handler, message, source)
+            except Exception as e:
+                logger.error("Handler error: %s", e)
+                response = Response(
+                    status_code=500,
+                    headers={
+                        "Via": message.via or "",
+                        "From": message.from_header or "",
+                        "To": message.to_header or "",
+                        "Call-ID": message.call_id or "",
+                        "CSeq": message.cseq or "",
+                        "Content-Length": "0",
+                    },
+                )
+        else:
+            response = Response(
+                status_code=501,
+                headers={
+                    "Via": message.via or "",
+                    "From": message.from_header or "",
+                    "To": message.to_header or "",
+                    "Call-ID": message.call_id or "",
+                    "CSeq": message.cseq or "",
+                    "Content-Length": "0",
+                },
+            )
+
+        if transport:
+            transport.sendto(response.to_bytes(), addr)
 
     # ------------------------------------------------------------------
-    # Lifecycle (async via to_thread)
+    # Lifecycle
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        """Start the server in a background thread."""
-        await asyncio.to_thread(self._sync.start)
+        loop = asyncio.get_running_loop()
+        self._transport, self._protocol = await loop.create_datagram_endpoint(
+            lambda: _SIPServerProtocol(self),
+            local_addr=(self._host, self._port),
+        )
+        logger.info("AsyncSIPServer started on %s:%s", self._host, self._port)
 
     async def stop(self) -> None:
-        """Stop the server."""
-        await asyncio.to_thread(self._sync.stop)
+        if self._transport:
+            self._transport.close()
+            self._transport = None
+        logger.info("AsyncSIPServer stopped")
 
     async def __aenter__(self):
-        """Async context manager entry."""
         await self.start()
         return self
 
     async def __aexit__(self, *_) -> bool:
-        """Async context manager exit."""
         await self.stop()
         return False
