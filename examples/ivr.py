@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-sipx — IVR Demo with REAL RTP + DTMF (no Asterisk)
+sipx — Async IVR Demo with REAL RTP + DTMF (no Asterisk)
 
-sipx as both server (IVR) and client. Real RTP audio and DTMF RFC 4733.
+Full async event loop. SIP client ops run in thread pool via asyncio.to_thread.
+IVR handler runs as async coroutine.
 
     sngrep port 15070                    # SIP
     sudo tcpdump -i lo udp port 19000   # RTP
@@ -11,9 +12,8 @@ Usage:
     uv run python examples/ivr.py
 """
 
+import asyncio
 import sys
-import threading
-import time
 from pathlib import Path
 from typing import Annotated
 
@@ -23,32 +23,28 @@ from rich.table import Table
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sipx import (
+    Client,
     SIPServer,
     Request,
     Response,
     SDPBody,
     FromHeader,
     AutoRTP,
-    console,
     on,
-    Client,
     Events,
 )
-from sipx.media import (
-    RTPSession,
-    ToneGenerator,
-    CallSession,
-)
+from sipx._utils import console
+from sipx.media import RTPSession, ToneGenerator, CallSession
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
 HOST = "127.0.0.1"
-SIP_PORT = 15070
-CLIENT_PORT = 15071
-RTP_SERVER = 19000
-RTP_CLIENT = 19002
+SIP_PORT = 15080
+CLIENT_PORT = 15081
+RTP_SERVER = 19010
+RTP_CLIENT = 19012
 
 # ---------------------------------------------------------------------------
 # IVR Server
@@ -56,13 +52,8 @@ RTP_CLIENT = 19002
 
 server = SIPServer(local_host=HOST, local_port=SIP_PORT)
 tone = ToneGenerator(440)
-
-# Shared state for results
-ivr_state = {
-    "dtmf": None,
-    "rtp_packets": 0,
-    "active": False,
-}
+ivr_state = {"dtmf": None, "rtp_packets": 0}
+loop: asyncio.AbstractEventLoop | None = None
 
 
 @server.invite
@@ -71,13 +62,9 @@ def on_invite(
     caller: Annotated[str, FromHeader],
     rtp: Annotated[RTPSession, AutoRTP(port=RTP_SERVER)],
 ) -> Response:
-    """Handle incoming INVITE — answer and run IVR."""
     console.print(f"\n  [bold green]IVR: call from {caller}[/bold green]")
-
-    ivr_state["active"] = True
-
-    # Start IVR in background (after response is sent)
-    threading.Thread(target=_run_ivr, args=(rtp,), daemon=True).start()
+    if loop:
+        asyncio.run_coroutine_threadsafe(_async_ivr(rtp), loop)
 
     answer = SDPBody.audio(ip=HOST, port=RTP_SERVER)
     return Response(
@@ -95,22 +82,22 @@ def on_invite(
     )
 
 
-def _run_ivr(rtp: RTPSession):
-    """IVR flow: play greeting, collect DTMF, play response."""
-    time.sleep(0.5)
+async def _async_ivr(rtp: RTPSession):
+    """Async IVR: greeting → collect DTMF → response. Blocking I/O in thread pool."""
+    await asyncio.sleep(0.5)
     rtp.start()
 
-    console.print("\n  [bold yellow]--- IVR Started ---[/bold yellow]")
+    console.print("\n  [bold yellow]--- IVR Started (async) ---[/bold yellow]")
     try:
-        # Play greeting tone
+        # Play greeting (blocking → thread pool)
         console.print('  [cyan]TTS: "Press 1 for sales, 2 for support"[/cyan]')
         pcm = tone.generate(500)
-        rtp.send_audio(pcm)
+        await asyncio.to_thread(rtp.send_audio, pcm)
         ivr_state["rtp_packets"] = len(pcm) // 320
 
-        # Collect DTMF (real RFC 4733)
+        # Collect DTMF (blocking → thread pool)
         console.print("  [dim]Listening for DTMF...[/dim]")
-        digits = rtp.dtmf.collect(max_digits=3, timeout=5.0)
+        digits = await asyncio.to_thread(rtp.dtmf.collect, 3, 5.0)
 
         if digits:
             ivr_state["dtmf"] = digits
@@ -118,16 +105,15 @@ def _run_ivr(rtp: RTPSession):
         else:
             console.print("  [dim]No DTMF (timeout)[/dim]")
 
-        # Play response tone
+        # Play response
         console.print(f'  [cyan]TTS: "You entered {digits or "nothing"}"[/cyan]')
         pcm2 = tone.generate(300)
-        rtp.send_audio(pcm2)
+        await asyncio.to_thread(rtp.send_audio, pcm2)
         ivr_state["rtp_packets"] += len(pcm2) // 320
 
     finally:
         rtp.stop()
-        ivr_state["active"] = False
-        console.print("  [bold yellow]--- IVR Ended ---[/bold yellow]")
+        console.print("  [bold yellow]--- IVR Ended (async) ---[/bold yellow]")
 
 
 # ---------------------------------------------------------------------------
@@ -147,26 +133,20 @@ class CallerEvents(Events):
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Async Client (sync Client in thread pool)
 # ---------------------------------------------------------------------------
 
 
-def main():
-    console.print("\n[bold]sipx — IVR Demo (real RTP + DTMF)[/bold]")
-    console.print(f"SIP: {HOST}:{SIP_PORT}  RTP: {RTP_SERVER}/{RTP_CLIENT}\n")
+async def run_client() -> CallerEvents:
+    events = CallerEvents()
+    sdp = SDPBody.audio(ip=HOST, port=RTP_CLIENT)
 
-    server.start()
-    time.sleep(0.5)
-
-    try:
-        events = CallerEvents()
-        sdp = SDPBody.audio(ip=HOST, port=RTP_CLIENT)
-
+    def _sip_flow():
+        """Sync SIP flow running in thread pool."""
         with Client(local_host=HOST, local_port=CLIENT_PORT) as client:
             client.events = events
 
-            # 1. INVITE
-            console.rule("1. INVITE")
+            # INVITE
             r = client.invite(
                 to_uri=f"sip:ivr@{HOST}:{SIP_PORT}",
                 from_uri=f"sip:caller@{HOST}",
@@ -176,26 +156,46 @@ def main():
                 port=SIP_PORT,
             )
             if r.status_code != 200:
-                console.print(f"  [red]Failed: {r.status_code}[/red]")
                 return
 
-            # 2. ACK
-            console.rule("2. ACK")
+            # ACK
             client.ack(response=r, host=HOST, port=SIP_PORT)
 
-            # 3. Send DTMF via real RTP
-            console.rule("3. DTMF")
+            # DTMF via real RTP
             with CallSession(client, r, rtp_port=RTP_CLIENT) as call:
-                time.sleep(2)  # wait for IVR greeting
-                console.print("  [yellow]Sending DTMF '123'...[/yellow]")
+                import time
+                time.sleep(2)
                 call.send_dtmf("123")
-                console.print("  [green]DTMF sent (15 RTP packets)[/green]")
-                time.sleep(2)  # wait for IVR to process
+                time.sleep(2)
 
-            # 4. BYE
-            console.rule("4. BYE")
-            bye_r = client.bye(response=r, host=HOST, port=SIP_PORT)
-            console.print(f"  BYE -> {bye_r.status_code}")
+            # BYE
+            client.bye(response=r, host=HOST, port=SIP_PORT)
+
+    await asyncio.to_thread(_sip_flow)
+    return events
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+
+async def main():
+    global loop
+    loop = asyncio.get_running_loop()
+
+    console.print("\n[bold]sipx — Async IVR Demo (real RTP + DTMF)[/bold]")
+    console.print(f"SIP: {HOST}:{SIP_PORT}  RTP: {RTP_SERVER}/{RTP_CLIENT}\n")
+
+    server.start()
+    await asyncio.sleep(0.5)
+
+    try:
+        # Client runs in parallel with IVR coroutines
+        console.rule("Running async IVR")
+        events = await run_client()
+
+        await asyncio.sleep(0.5)  # let IVR finish
 
         # Summary
         console.rule("Summary")
@@ -213,7 +213,7 @@ def main():
         table.add_row("SIP", p(sip_ok, "INVITE->200->ACK->BYE->200"))
         table.add_row("RTP", p(rtp_ok, f"{ivr_state['rtp_packets']} packets"))
         table.add_row("DTMF", p(dtmf_ok, f"'{ivr_state['dtmf']}' via RFC 4733"))
-        table.add_row("B2BUA", p(sip_ok, "sipx as UAC + UAS"))
+        table.add_row("Async", p(sip_ok, "asyncio + to_thread"))
         console.print(table)
 
     except Exception as e:
@@ -224,4 +224,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

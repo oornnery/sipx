@@ -1395,7 +1395,7 @@ class AsyncClient:
             headers = self._ensure_required_headers(method, uri, headers or {})
 
             # Create request
-            request = Request(method=method, uri=uri, headers=headers, body=body)
+            request = Request(method=method, uri=uri, headers=headers, content=body)
 
             # Determine destination
             if not host:
@@ -1403,9 +1403,7 @@ class AsyncClient:
             destination = TransportAddress(host, port or 5060)
 
             # Create transaction
-            transaction = self._state_manager.create_transaction(
-                request.method, is_client=True
-            )
+            transaction = self._state_manager.create_transaction(request)
 
             # Create event context
             context = EventContext(

@@ -337,7 +337,21 @@ class SIPServer:
 
                 if handler:
                     # Call handler with DI resolution
-                    response = resolve_handler(handler, request, source)
+                    try:
+                        response = resolve_handler(handler, request, source)
+                    except Exception as handler_err:
+                        logger.error(f"Handler error: {handler_err}")
+                        response = Response(
+                            status_code=500,
+                            headers={
+                                "Via": request.via or "",
+                                "From": request.from_header or "",
+                                "To": request.to_header or "",
+                                "Call-ID": request.call_id or "",
+                                "CSeq": request.cseq or "",
+                                "Content-Length": "0",
+                            },
+                        )
 
                     console.print(
                         f"\n[bold green]>>> SENDING {response.status_code} {response.reason_phrase} to {source.host}:{source.port}[/bold green]"

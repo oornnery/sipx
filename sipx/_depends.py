@@ -194,8 +194,12 @@ def resolve_handler(
         # Annotated[X, extractor] — look for Extractor in metadata
         if hasattr(hint, "__metadata__"):
             for meta in hint.__metadata__:
+                # Accept both instances and classes
                 if isinstance(meta, Extractor):
                     kwargs[name] = meta.extract(request, source)
+                    break
+                if isinstance(meta, type) and issubclass(meta, Extractor):
+                    kwargs[name] = meta().extract(request, source)
                     break
 
     if kwargs:
