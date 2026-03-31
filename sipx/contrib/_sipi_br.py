@@ -186,6 +186,26 @@ class ATI:
         return ATIResult(number=number, ported=False)
 
 
+class AsyncATI:
+    """Async ATI for Brazilian number portability.
+
+    Uses AsyncClient.invite() natively — no threading.
+    """
+
+    def __init__(self, client, ati_server: str):
+        self.client = client
+        self.ati_server = ati_server
+
+    async def query(self, number: str) -> ATIResult:
+        """Query ATI asynchronously."""
+        number = SipIBR.normalize(number)
+        r = await self.client.invite(to_uri=f"sip:{number}@{self.ati_server}")
+        if r and r.status_code == 302:
+            contact = (r.headers.get("Contact") or "").strip("<>").strip()
+            return ATIResult.from_redirect(contact)
+        return ATIResult(number=number, ported=False)
+
+
 # ---------------------------------------------------------------------------
 # SipIBR — Brazilian SIP-I helper class
 # ---------------------------------------------------------------------------
@@ -347,6 +367,7 @@ def is_mobile(number: str) -> bool:
 
 __all__ = [
     "ATI",
+    "AsyncATI",
     "ATIResult",
     "SipIBR",
     "VALID_DDD",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sipx.contrib._ivr import Menu, MenuItem, Prompt
+from sipx.contrib.ivr import Menu, MenuItem, Prompt
 from sipx.contrib._sipi import SipI
 from sipx.models._message import Request
 

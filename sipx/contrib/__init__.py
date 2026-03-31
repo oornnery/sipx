@@ -13,10 +13,11 @@ from sipx.contrib._isup import (
     encode_calling_party,
     encode_cause_indicators,
 )
-from sipx.contrib._ivr import IVR, Menu, MenuItem, Prompt
+from sipx.contrib.ivr import IVR, AsyncIVR, Menu, MenuItem, Prompt
 from sipx.contrib._sipi import SipI
 from sipx.contrib._sipi_br import (
     ATI,
+    AsyncATI,
     ATIResult,
     SipIBR,
     normalize_br_number,
@@ -39,12 +40,14 @@ __all__ = [
     "encode_calling_party",
     "encode_cause_indicators",
     "IVR",
+    "AsyncIVR",
     "Menu",
     "MenuItem",
     "Prompt",
     "SipI",
     "SipIBR",
     "ATI",
+    "AsyncATI",
     "ATIResult",
     "normalize_br_number",
     "is_valid_br_number",
