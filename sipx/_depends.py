@@ -189,7 +189,7 @@ class AutoRTP(Extractor):
 
 
 def resolve_handler(handler: Any, request: Request, source: TransportAddress) -> Any:
-    """Backward compat — use Extractor.resolve_handler() instead."""
+    """Shortcut for Extractor.resolve_handler()."""
     return Extractor.resolve_handler(handler, request, source)
 
 

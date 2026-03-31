@@ -2,48 +2,73 @@
 
 from __future__ import annotations
 
-from sipx._media._dtmf import (
-    DTMF_EVENTS,
-    decode_dtmf_event,
-    encode_dtmf_event,
-    event_to_digit,
-)
+from sipx._media._dtmf import DTMF_EVENTS, DTMFEvent
 
 
-class TestEncodeDecode:
+class TestDTMFEvent:
     def test_roundtrip(self):
-        data = encode_dtmf_event(event=5, end=False, volume=10, duration=800)
-        result = decode_dtmf_event(data)
-        assert result["event"] == 5
-        assert result["end"] is False
-        assert result["volume"] == 10
-        assert result["duration"] == 800
+        evt = DTMFEvent(event=5, end=False, volume=10, duration=800)
+        data = evt.to_bytes()
+        parsed = DTMFEvent.from_bytes(data)
+        assert parsed.event == 5
+        assert parsed.end is False
+        assert parsed.volume == 10
+        assert parsed.duration == 800
 
     def test_end_bit_set(self):
-        data = encode_dtmf_event(event=0, end=True, volume=0, duration=0)
-        result = decode_dtmf_event(data)
-        assert result["end"] is True
+        evt = DTMFEvent(event=0, end=True)
+        parsed = DTMFEvent.from_bytes(evt.to_bytes())
+        assert parsed.end is True
 
     def test_end_bit_clear(self):
-        data = encode_dtmf_event(event=0, end=False, volume=0, duration=0)
-        result = decode_dtmf_event(data)
-        assert result["end"] is False
+        evt = DTMFEvent(event=0, end=False)
+        parsed = DTMFEvent.from_bytes(evt.to_bytes())
+        assert parsed.end is False
 
     def test_volume_preserved(self):
         for vol in (0, 10, 63):
-            data = encode_dtmf_event(event=0, end=False, volume=vol, duration=0)
-            assert decode_dtmf_event(data)["volume"] == vol
+            evt = DTMFEvent(event=0, volume=vol)
+            assert DTMFEvent.from_bytes(evt.to_bytes()).volume == vol
 
     def test_duration_preserved(self):
         for dur in (0, 160, 1280, 65535):
-            data = encode_dtmf_event(event=0, end=False, volume=0, duration=dur)
-            assert decode_dtmf_event(data)["duration"] == dur
+            evt = DTMFEvent(event=0, duration=dur)
+            assert DTMFEvent.from_bytes(evt.to_bytes()).duration == dur
 
     def test_all_events_roundtrip(self):
         for digit, code in DTMF_EVENTS.items():
-            data = encode_dtmf_event(event=code, end=True, volume=10, duration=160)
-            result = decode_dtmf_event(data)
-            assert result["event"] == code
+            evt = DTMFEvent(event=code, end=True, volume=10, duration=160)
+            parsed = DTMFEvent.from_bytes(evt.to_bytes())
+            assert parsed.event == code
+
+    def test_from_bytes_short_data(self):
+        evt = DTMFEvent.from_bytes(b"\x00")
+        assert evt.event == 0
+
+    def test_digit_property(self):
+        expected = list("0123456789*#ABCD")
+        for code in range(16):
+            assert DTMFEvent(event=code).digit == expected[code]
+
+    def test_digit_invalid(self):
+        assert DTMFEvent(event=16).digit is None
+        assert DTMFEvent(event=99).digit is None
+
+    def test_from_digit(self):
+        evt = DTMFEvent.from_digit("5", volume=10, duration=160)
+        assert evt.event == 5
+        assert evt.volume == 10
+        assert evt.duration == 160
+
+    def test_from_digit_all(self):
+        for digit in "0123456789*#ABCD":
+            evt = DTMFEvent.from_digit(digit)
+            assert evt.digit == digit
+
+    def test_from_digit_invalid(self):
+        import pytest
+        with pytest.raises(ValueError):
+            DTMFEvent.from_digit("X")
 
 
 class TestDTMFEvents:
@@ -51,15 +76,3 @@ class TestDTMFEvents:
         expected = set("0123456789*#ABCD")
         assert set(DTMF_EVENTS.keys()) == expected
         assert len(DTMF_EVENTS) == 16
-
-
-class TestEventToDigit:
-    def test_all_codes_0_to_15(self):
-        expected = list("0123456789*#ABCD")
-        for code in range(16):
-            assert event_to_digit(code) == expected[code]
-
-    def test_invalid_code_returns_none(self):
-        assert event_to_digit(16) is None
-        assert event_to_digit(99) is None
-        assert event_to_digit(-1) is None

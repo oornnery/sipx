@@ -12,7 +12,7 @@ from __future__ import annotations
 import struct
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ._rtp import RTPSession
@@ -85,21 +85,6 @@ class DTMFEvent:
         return cls(event=code, **kwargs)
 
 
-# Backward compat
-def encode_dtmf_event(event: int, end: bool, volume: int, duration: int) -> bytes:
-    """Backward compat — use DTMFEvent.to_bytes() instead."""
-    return DTMFEvent(event=event, end=end, volume=volume, duration=duration).to_bytes()
-
-
-def decode_dtmf_event(data: bytes) -> dict:
-    """Backward compat — use DTMFEvent.from_bytes() instead."""
-    e = DTMFEvent.from_bytes(data)
-    return {"event": e.event, "end": e.end, "volume": e.volume, "duration": e.duration}
-
-
-def event_to_digit(event: int) -> Optional[str]:
-    """Backward compat — use DTMFEvent(event=N).digit instead."""
-    return DTMFEvent(event=event).digit
 
 
 class DTMFSender:
@@ -130,7 +115,7 @@ class DTMFSender:
         total_duration = duration_ms * samples_per_ms
 
         # Packet 1: start (marker bit set)
-        payload = encode_dtmf_event(event_code, end=False, volume=volume, duration=0)
+        payload = DTMFEvent(event=event_code, end=False, volume=volume, duration=0).to_bytes()
         pkt = RTPPacket(
             marker=True,
             payload_type=DTMF_PAYLOAD_TYPE,
@@ -149,9 +134,7 @@ class DTMFSender:
 
         # Packet 2: continuation
         mid_duration = total_duration // 2
-        payload = encode_dtmf_event(
-            event_code, end=False, volume=volume, duration=mid_duration
-        )
+        payload = DTMFEvent(event=event_code, end=False, volume=volume, duration=mid_duration).to_bytes()
         pkt = RTPPacket(
             marker=False,
             payload_type=DTMF_PAYLOAD_TYPE,
@@ -169,9 +152,7 @@ class DTMFSender:
         time.sleep(duration_ms / 2000.0)
 
         # Packet 3: end (E bit set, send 3 times per RFC 4733)
-        payload = encode_dtmf_event(
-            event_code, end=True, volume=volume, duration=total_duration
-        )
+        payload = DTMFEvent(event=event_code, end=True, volume=volume, duration=total_duration).to_bytes()
         for _ in range(3):
             pkt = RTPPacket(
                 marker=False,
@@ -236,15 +217,14 @@ class DTMFCollector:
             if len(pkt.payload) < 4:
                 continue
 
-            event = decode_dtmf_event(pkt.payload)
-            if event.get("end"):
+            evt = DTMFEvent.from_bytes(pkt.payload)
+            if evt.end:
                 # RFC 4733: end-packet is sent 3 times with same timestamp.
                 # Only count the first one per timestamp.
                 if pkt.timestamp == last_end_ts:
                     continue
                 last_end_ts = pkt.timestamp
-                digit = event_to_digit(event["event"])
-                if digit is not None:
-                    digits.append(digit)
+                if evt.digit is not None:
+                    digits.append(evt.digit)
 
         return "".join(digits)

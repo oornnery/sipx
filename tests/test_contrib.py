@@ -3,56 +3,47 @@
 from __future__ import annotations
 
 from sipx._contrib._ivr import Menu, MenuItem, Prompt
-from sipx._contrib._sipi import (
-    add_charging_vector,
-    add_pai_header,
-    get_pai,
-    isup_to_sip,
-    sip_to_isup,
-)
+from sipx._contrib._sipi import SipI
 from sipx._models._message import Request
-from sipx._types import TransportAddress
 
 
-class TestISUPSIPMapping:
+class TestSipI:
     def test_isup_to_sip_known(self):
-        assert isup_to_sip(17) == 486
+        assert SipI.isup_to_sip(17) == 486
 
     def test_isup_to_sip_unknown(self):
-        assert isup_to_sip(999) == 500
+        assert SipI.isup_to_sip(999) == 500
 
     def test_sip_to_isup_known(self):
-        assert sip_to_isup(486) == 17
+        assert SipI.sip_to_isup(486) == 17
 
     def test_sip_to_isup_unknown(self):
-        assert sip_to_isup(999) == 127
+        assert SipI.sip_to_isup(999) == 127
 
-
-class TestSIPIHeaders:
-    def test_add_pai_header(self):
+    def test_add_pai(self):
         req = Request("INVITE", "sip:bob@example.com")
-        add_pai_header(req, "sip:alice@example.com")
+        SipI.add_pai(req, "sip:alice@example.com")
         assert req.headers["P-Asserted-Identity"] == "sip:alice@example.com"
 
     def test_get_pai(self):
         req = Request("INVITE", "sip:bob@example.com")
-        add_pai_header(req, "tel:+15551234567")
-        assert get_pai(req) == "tel:+15551234567"
+        SipI.add_pai(req, "tel:+15551234567")
+        assert SipI.get_pai(req) == "tel:+15551234567"
 
     def test_get_pai_missing(self):
         req = Request("INVITE", "sip:bob@example.com")
-        assert get_pai(req) is None
+        assert SipI.get_pai(req) is None
 
     def test_add_charging_vector_with_orig_ioi(self):
         req = Request("INVITE", "sip:bob@example.com")
-        add_charging_vector(req, icid="abc123", orig_ioi="operator.com")
+        SipI.add_charging_vector(req, icid="abc123", orig_ioi="operator.com")
         value = req.headers["P-Charging-Vector"]
         assert "icid-value=abc123" in value
         assert "orig-ioi=operator.com" in value
 
     def test_add_charging_vector_without_ioi(self):
         req = Request("INVITE", "sip:bob@example.com")
-        add_charging_vector(req, icid="xyz")
+        SipI.add_charging_vector(req, icid="xyz")
         assert req.headers["P-Charging-Vector"] == "icid-value=xyz"
 
 
@@ -75,7 +66,8 @@ class TestIVR:
         assert p.text == "Press 1 for sales"
 
     def test_menu_item_fields(self):
-        handler = lambda: None
+        def handler():
+            pass
         item = MenuItem(digit="5", prompt=Prompt(text="Five"), handler=handler)
         assert item.digit == "5"
         assert item.prompt.text == "Five"

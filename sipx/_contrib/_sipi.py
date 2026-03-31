@@ -118,39 +118,8 @@ class SipI:
         request.headers["P-Charging-Vector"] = value
 
 
-# Backward compat
-def isup_to_sip(cause: int) -> int:
-    return SipI.isup_to_sip(cause)
-
-
-def sip_to_isup(status: int) -> int:
-    return SipI.sip_to_isup(status)
-
-
-def add_pai_header(request: "Request", identity: str) -> None:
-    SipI.add_pai(request, identity)
-
-
-def add_charging_vector(
-    request: "Request",
-    icid: str,
-    orig_ioi: str | None = None,
-    term_ioi: str | None = None,
-) -> None:
-    SipI.add_charging_vector(request, icid, orig_ioi, term_ioi)
-
-
-def get_pai(message: Union["Request", "Response"]) -> str | None:
-    return SipI.get_pai(message)
-
-
 __all__ = [
     "SipI",
     "ISUP_CAUSE_TO_SIP",
     "SIP_TO_ISUP_CAUSE",
-    "isup_to_sip",
-    "sip_to_isup",
-    "add_pai_header",
-    "add_charging_vector",
-    "get_pai",
 ]
