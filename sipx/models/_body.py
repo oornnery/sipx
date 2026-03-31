@@ -6,6 +6,7 @@ Supports SDP (Session Description Protocol) as the primary body type.
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -120,12 +121,15 @@ class SDPBody(MessageBody):
             >>> sdp.add_media("audio", 49170, "RTP/AVP", ["0", "8", "101"])
             >>> sdp.add_media("video", 51372, "RTP/AVP", ["31", "34"])
         """
-        media_desc = {
+        media_desc: Dict[str, Any] = {
             "media": media,
             "port": port,
             "port_count": port_count,
             "protocol": protocol,
             "formats": formats,
+            "candidates": [],
+            "crypto": [],
+            "rtcp_fb": [],
         }
 
         if connection:
@@ -239,6 +243,14 @@ class SDPBody(MessageBody):
                     lines.append(f"a={attr}")
                 else:
                     lines.append(f"a={attr}:{value}")
+
+            # Multi-value attribute lists
+            for candidate in media.get("candidates", []):
+                lines.append(f"a=candidate:{candidate}")
+            for crypto in media.get("crypto", []):
+                lines.append(f"a=crypto:{crypto}")
+            for rtcp_fb in media.get("rtcp_fb", []):
+                lines.append(f"a=rtcp-fb:{rtcp_fb}")
 
         return lines
 
@@ -386,15 +398,27 @@ class SDPBody(MessageBody):
         codecs: list[str] | None = None,
         username: str = "-",
         session_name: str = "sipx",
+        ice_ufrag: str | None = None,
+        ice_pwd: str | None = None,
+        crypto_key: str | None = None,
+        fingerprint: tuple[str, str] | None = None,
+        setup: str | None = None,
+        direction: str = "sendrecv",
     ) -> "SDPBody":
         """Create a simple audio SDP offer with sensible defaults.
 
         Args:
-            ip: Local IP address
-            port: RTP port
-            codecs: Codec names (default: ["PCMU", "PCMA", "telephone-event"])
-            username: Origin username
-            session_name: Session name
+            ip: Local IP address.
+            port: RTP port.
+            codecs: Codec names (default: ["PCMU", "PCMA", "telephone-event"]).
+            username: Origin username.
+            session_name: Session name.
+            ice_ufrag: ICE username fragment.
+            ice_pwd: ICE password.
+            crypto_key: Base64 SDES key (uses AES_CM_128_HMAC_SHA1_80).
+            fingerprint: Tuple of (hash_func, fingerprint_hex) for DTLS.
+            setup: DTLS setup role ("actpass", "active", "passive").
+            direction: Media direction (default "sendrecv").
         """
         codec_map = {
             "PCMU": {"payload": "0", "name": "PCMU", "rate": "8000"},
@@ -413,7 +437,7 @@ class SDPBody(MessageBody):
 
         codec_specs = [codec_map[c] for c in codecs if c in codec_map]
 
-        return cls.create_offer(
+        sdp = cls.create_offer(
             session_name=session_name,
             origin_username=username,
             origin_address=ip,
@@ -426,6 +450,20 @@ class SDPBody(MessageBody):
                 }
             ],
         )
+
+        # Apply optional advanced attributes to the first media
+        if ice_ufrag is not None and ice_pwd is not None:
+            sdp.add_ice_credentials(0, ice_ufrag, ice_pwd)
+        if crypto_key is not None:
+            sdp.add_crypto(0, 1, "AES_CM_128_HMAC_SHA1_80", crypto_key)
+        if fingerprint is not None:
+            sdp.add_fingerprint(0, fingerprint[0], fingerprint[1])
+        if setup is not None:
+            sdp.add_setup(0, setup)
+        if direction != "sendrecv":
+            sdp.set_direction(0, direction)
+
+        return sdp
 
     @classmethod
     def create_answer(
@@ -757,6 +795,351 @@ class SDPBody(MessageBody):
             "clock_rate": 8000,
         }
 
+    # ========================================================================
+    # ICE Attributes (RFC 8445)
+    # ========================================================================
+
+    def _ensure_media_lists(self, media_index: int) -> Dict[str, Any]:
+        """Get media description and ensure list fields exist.
+
+        Raises:
+            IndexError: If media_index is out of range.
+        """
+        if media_index >= len(self.media_descriptions):
+            msg = f"media_index {media_index} out of range (have {len(self.media_descriptions)} media)"
+            raise IndexError(msg)
+        media = self.media_descriptions[media_index]
+        for key in ("candidates", "crypto", "rtcp_fb"):
+            if key not in media:
+                media[key] = []
+        if "attributes" not in media:
+            media["attributes"] = {}
+        return media
+
+    def add_ice_candidate(
+        self,
+        media_index: int,
+        foundation: str,
+        component: int,
+        transport: str,
+        priority: int,
+        address: str,
+        port: int,
+        typ: str,
+        raddr: str = "",
+        rport: int = 0,
+    ) -> None:
+        """Add a=candidate line to media description.
+
+        Args:
+            media_index: Index of media description.
+            foundation: Candidate foundation string.
+            component: Component ID (1=RTP, 2=RTCP).
+            transport: Transport protocol (e.g. "UDP").
+            priority: Candidate priority.
+            address: Candidate IP address.
+            port: Candidate port.
+            typ: Candidate type (host, srflx, prflx, relay).
+            raddr: Related address (for srflx/prflx/relay).
+            rport: Related port (for srflx/prflx/relay).
+        """
+        media = self._ensure_media_lists(media_index)
+        line = f"{foundation} {component} {transport} {priority} {address} {port} typ {typ}"
+        if raddr and rport:
+            line += f" raddr {raddr} rport {rport}"
+        media["candidates"].append(line)
+
+    def add_ice_credentials(self, media_index: int, ufrag: str, pwd: str) -> None:
+        """Add a=ice-ufrag and a=ice-pwd to media description.
+
+        Args:
+            media_index: Index of media description.
+            ufrag: ICE username fragment.
+            pwd: ICE password.
+        """
+        media = self._ensure_media_lists(media_index)
+        media["attributes"]["ice-ufrag"] = ufrag
+        media["attributes"]["ice-pwd"] = pwd
+
+    def get_ice_candidates(self, media_index: int = 0) -> list[dict]:
+        """Parse a=candidate lines from media description.
+
+        Args:
+            media_index: Index of media description (default 0).
+
+        Returns:
+            List of dicts with keys: foundation, component, transport,
+            priority, address, port, typ, raddr, rport.
+        """
+        if media_index >= len(self.media_descriptions):
+            return []
+
+        media = self.media_descriptions[media_index]
+        results: list[dict] = []
+
+        # Check list-based candidates first
+        raw_candidates = list(media.get("candidates", []))
+
+        # Also check attributes dict for parsed candidates
+        for key, val in media.get("attributes", {}).items():
+            if key == "candidate" and val is not None:
+                raw_candidates.append(val)
+
+        pattern = re.compile(
+            r"(\S+)\s+(\d+)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)\s+typ\s+(\S+)"
+            r"(?:\s+raddr\s+(\S+)\s+rport\s+(\d+))?"
+        )
+
+        for raw in raw_candidates:
+            m = pattern.match(raw)
+            if m:
+                candidate = {
+                    "foundation": m.group(1),
+                    "component": int(m.group(2)),
+                    "transport": m.group(3),
+                    "priority": int(m.group(4)),
+                    "address": m.group(5),
+                    "port": int(m.group(6)),
+                    "typ": m.group(7),
+                }
+                if m.group(8):
+                    candidate["raddr"] = m.group(8)
+                    candidate["rport"] = int(m.group(9))
+                results.append(candidate)
+
+        return results
+
+    def get_ice_credentials(self, media_index: int = 0) -> tuple[str, str] | None:
+        """Get (ufrag, pwd) from media description.
+
+        Args:
+            media_index: Index of media description (default 0).
+
+        Returns:
+            Tuple of (ufrag, pwd) or None if not found.
+        """
+        if media_index >= len(self.media_descriptions):
+            return None
+
+        attrs = self.media_descriptions[media_index].get("attributes", {})
+        ufrag = attrs.get("ice-ufrag")
+        pwd = attrs.get("ice-pwd")
+        if ufrag is not None and pwd is not None:
+            return (ufrag, pwd)
+        return None
+
+    # ========================================================================
+    # SRTP Crypto (RFC 4568 - SDES)
+    # ========================================================================
+
+    def add_crypto(self, media_index: int, tag: int, suite: str, key: str) -> None:
+        """Add a=crypto line for SDES-SRTP.
+
+        Args:
+            media_index: Index of media description.
+            tag: Crypto tag (1, 2, ...).
+            suite: Crypto suite (e.g. "AES_CM_128_HMAC_SHA1_80").
+            key: Base64 encoded key material.
+        """
+        media = self._ensure_media_lists(media_index)
+        media["crypto"].append(f"{tag} {suite} inline:{key}")
+
+    def get_crypto(self, media_index: int = 0) -> list[dict]:
+        """Parse a=crypto lines from media description.
+
+        Args:
+            media_index: Index of media description (default 0).
+
+        Returns:
+            List of dicts with keys: tag, suite, key.
+        """
+        if media_index >= len(self.media_descriptions):
+            return []
+
+        media = self.media_descriptions[media_index]
+        results: list[dict] = []
+
+        raw_lines = list(media.get("crypto", []))
+
+        # Also check attributes dict for single parsed crypto
+        for key, val in media.get("attributes", {}).items():
+            if key == "crypto" and val is not None:
+                raw_lines.append(val)
+
+        pattern = re.compile(r"(\d+)\s+(\S+)\s+inline:(\S+)")
+        for raw in raw_lines:
+            m = pattern.match(raw)
+            if m:
+                results.append(
+                    {
+                        "tag": int(m.group(1)),
+                        "suite": m.group(2),
+                        "key": m.group(3),
+                    }
+                )
+
+        return results
+
+    # ========================================================================
+    # RTCP Feedback (RFC 4585)
+    # ========================================================================
+
+    def add_rtcp_fb(
+        self,
+        media_index: int,
+        payload_type: str,
+        fb_type: str,
+        fb_param: str = "",
+    ) -> None:
+        """Add a=rtcp-fb line.
+
+        Args:
+            media_index: Index of media description.
+            payload_type: Payload type number or "*".
+            fb_type: Feedback type (e.g. "nack", "ccm").
+            fb_param: Feedback parameter (e.g. "pli", "fir").
+        """
+        media = self._ensure_media_lists(media_index)
+        line = f"{payload_type} {fb_type}"
+        if fb_param:
+            line += f" {fb_param}"
+        media["rtcp_fb"].append(line)
+
+    def get_rtcp_fb(self, media_index: int = 0) -> list[dict]:
+        """Parse a=rtcp-fb lines from media description.
+
+        Args:
+            media_index: Index of media description (default 0).
+
+        Returns:
+            List of dicts with keys: pt, type, param.
+        """
+        if media_index >= len(self.media_descriptions):
+            return []
+
+        media = self.media_descriptions[media_index]
+        results: list[dict] = []
+
+        raw_lines = list(media.get("rtcp_fb", []))
+
+        # Also check attributes for single parsed rtcp-fb
+        for key, val in media.get("attributes", {}).items():
+            if key == "rtcp-fb" and val is not None:
+                raw_lines.append(val)
+
+        for raw in raw_lines:
+            parts = raw.split(None, 2)
+            if len(parts) >= 2:
+                entry: dict[str, str] = {"pt": parts[0], "type": parts[1]}
+                if len(parts) > 2:
+                    entry["param"] = parts[2]
+                else:
+                    entry["param"] = ""
+                results.append(entry)
+
+        return results
+
+    # ========================================================================
+    # DTLS-SRTP (RFC 5763/5764)
+    # ========================================================================
+
+    def add_fingerprint(
+        self, media_index: int, hash_func: str, fingerprint: str
+    ) -> None:
+        """Add a=fingerprint for DTLS-SRTP.
+
+        Args:
+            media_index: Index of media description.
+            hash_func: Hash function (e.g. "sha-256").
+            fingerprint: Colon-separated hex fingerprint.
+        """
+        media = self._ensure_media_lists(media_index)
+        media["attributes"]["fingerprint"] = f"{hash_func} {fingerprint}"
+
+    def add_setup(self, media_index: int, role: str) -> None:
+        """Add a=setup for DTLS role negotiation.
+
+        Args:
+            media_index: Index of media description.
+            role: DTLS role ("actpass", "active", "passive").
+        """
+        media = self._ensure_media_lists(media_index)
+        media["attributes"]["setup"] = role
+
+    def get_fingerprint(self, media_index: int = 0) -> tuple[str, str] | None:
+        """Get (hash_func, fingerprint) from media description.
+
+        Args:
+            media_index: Index of media description (default 0).
+
+        Returns:
+            Tuple of (hash_func, fingerprint) or None if not found.
+        """
+        if media_index >= len(self.media_descriptions):
+            return None
+
+        attrs = self.media_descriptions[media_index].get("attributes", {})
+        fp = attrs.get("fingerprint")
+        if fp is not None:
+            parts = fp.split(None, 1)
+            if len(parts) == 2:
+                return (parts[0], parts[1])
+        return None
+
+    def get_setup(self, media_index: int = 0) -> str | None:
+        """Get DTLS setup role from media description.
+
+        Args:
+            media_index: Index of media description (default 0).
+
+        Returns:
+            Setup role string or None if not found.
+        """
+        if media_index >= len(self.media_descriptions):
+            return None
+
+        return self.media_descriptions[media_index].get("attributes", {}).get("setup")
+
+    # ========================================================================
+    # Direction Attributes
+    # ========================================================================
+
+    _DIRECTION_ATTRS = frozenset({"sendrecv", "sendonly", "recvonly", "inactive"})
+
+    def set_direction(self, media_index: int, direction: str) -> None:
+        """Set media stream direction.
+
+        Args:
+            media_index: Index of media description.
+            direction: One of "sendrecv", "sendonly", "recvonly", "inactive".
+        """
+        if direction not in self._DIRECTION_ATTRS:
+            msg = f"Invalid direction: {direction!r}"
+            raise ValueError(msg)
+        media = self._ensure_media_lists(media_index)
+        # Remove any existing direction attributes
+        for d in self._DIRECTION_ATTRS:
+            media["attributes"].pop(d, None)
+        media["attributes"][direction] = None
+
+    def get_direction(self, media_index: int = 0) -> str:
+        """Get media stream direction (default "sendrecv").
+
+        Args:
+            media_index: Index of media description (default 0).
+
+        Returns:
+            Direction string.
+        """
+        if media_index >= len(self.media_descriptions):
+            return "sendrecv"
+
+        attrs = self.media_descriptions[media_index].get("attributes", {})
+        for d in self._DIRECTION_ATTRS:
+            if d in attrs:
+                return d
+        return "sendrecv"
+
 
 # ============================================================================
 # Body Parser
@@ -918,20 +1301,35 @@ class BodyParser:
 
             elif key == "a":
                 # a=<attribute> or a=<attribute>:<value>
+                # Multi-value attributes go into dedicated lists
+                if ":" in value:
+                    attr_name, attr_value = value.split(":", 1)
+                else:
+                    attr_name = value
+                    attr_value = None
+
                 if current_media is not None:
                     if "attributes" not in current_media:
                         current_media["attributes"] = {}
-                    if ":" in value:
-                        attr_name, attr_value = value.split(":", 1)
+                    for list_key in ("candidates", "crypto", "rtcp_fb"):
+                        if list_key not in current_media:
+                            current_media[list_key] = []
+
+                    if attr_name == "candidate" and attr_value is not None:
+                        current_media["candidates"].append(attr_value)
+                    elif attr_name == "crypto" and attr_value is not None:
+                        current_media["crypto"].append(attr_value)
+                    elif attr_name == "rtcp-fb" and attr_value is not None:
+                        current_media["rtcp_fb"].append(attr_value)
+                    elif attr_value is not None:
                         current_media["attributes"][attr_name] = attr_value
                     else:
-                        current_media["attributes"][value] = None
+                        current_media["attributes"][attr_name] = None
                 else:
-                    if ":" in value:
-                        attr_name, attr_value = value.split(":", 1)
+                    if attr_value is not None:
                         attributes[attr_name] = attr_value
                     else:
-                        attributes[value] = None
+                        attributes[attr_name] = None
 
             elif key == "m":
                 # Save previous media if any
@@ -1003,5 +1401,10 @@ class BodyParser:
                 bandwidth=media_desc.get("bandwidth"),
                 attributes=media_desc.get("attributes"),
             )
+            # Carry over multi-value list fields from parsing
+            last = sdp.media_descriptions[-1]
+            for list_key in ("candidates", "crypto", "rtcp_fb"):
+                if list_key in media_desc and media_desc[list_key]:
+                    last[list_key] = media_desc[list_key]
 
         return sdp
