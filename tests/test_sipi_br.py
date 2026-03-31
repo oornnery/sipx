@@ -1,10 +1,10 @@
-"""Tests for sipx._contrib._sipi_br (Brazilian SIP-I extensions)."""
+"""Tests for sipx.contrib._sipi_br (Brazilian SIP-I extensions)."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from sipx._contrib._sipi_br import (
+from sipx.contrib._sipi_br import (
     ATI,
     ATIResult,
     SipIBR,

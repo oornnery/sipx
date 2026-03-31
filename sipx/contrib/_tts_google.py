@@ -9,7 +9,7 @@ Google Cloud SDK.  Install it separately::
 
 from __future__ import annotations
 
-from sipx._media._tts import BaseTTS
+from sipx.media._tts import BaseTTS
 
 
 class GoogleTTS(BaseTTS):

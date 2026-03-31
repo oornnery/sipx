@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from sipx._media._rtp import RTPPacket
+from sipx.media._rtp import RTPPacket
 
 
 class TestRTPPacketRoundtrip:

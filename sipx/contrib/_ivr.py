@@ -11,12 +11,12 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Optional
 
-from sipx._media._audio import AudioPlayer
-from sipx._media._dtmf import DTMFCollector
-from sipx._media._tts import BaseTTS
+from sipx.media._audio import AudioPlayer
+from sipx.media._dtmf import DTMFCollector
+from sipx.media._tts import BaseTTS
 
 if TYPE_CHECKING:
-    from sipx._media._rtp import RTPSession
+    from sipx.media._rtp import RTPSession
 
 logger = logging.getLogger(__name__)
 

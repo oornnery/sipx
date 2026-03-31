@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import struct
 
-from sipx._media._codecs import PCMA, PCMU
+from sipx.media._codecs import PCMA, PCMU
 
 
 class TestPCMUProperties:

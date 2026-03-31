@@ -42,7 +42,7 @@ class SIPRouter:
     Example::
 
         from fastapi import FastAPI
-        from sipx._contrib._fastapi import SIPRouter
+        from sipx.contrib._fastapi import SIPRouter
 
         sip = SIPRouter(host="0.0.0.0", port=5060)
 

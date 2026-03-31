@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sipx._media._generators import (
+from sipx.media._generators import (
     DTMFToneGenerator,
     NoiseGenerator,
     SilenceGenerator,

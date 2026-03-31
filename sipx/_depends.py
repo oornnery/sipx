@@ -175,7 +175,7 @@ class AutoRTP(Extractor):
         self.port = port
 
     def extract(self, request: Request, source: TransportAddress) -> Any:
-        from ._media._rtp import RTPSession
+        from .media._rtp import RTPSession
 
         body = request.body
         if body and hasattr(body, "get_rtp_params"):

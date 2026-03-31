@@ -9,7 +9,7 @@ Whisper library.  Install it separately::
 
 from __future__ import annotations
 
-from sipx._media._stt import BaseSTT
+from sipx.media._stt import BaseSTT
 
 
 class WhisperSTT(BaseSTT):

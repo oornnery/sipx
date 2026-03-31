@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from sipx._media._session import CallSession, DTMFHelper
+from sipx.media._session import CallSession, DTMFHelper
 
 
 class TestDTMFHelper:

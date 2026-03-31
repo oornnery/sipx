@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sipx._media._dtmf import DTMF_EVENTS, DTMFEvent
+from sipx.media._dtmf import DTMF_EVENTS, DTMFEvent
 
 
 class TestDTMFEvent:
