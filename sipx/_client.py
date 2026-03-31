@@ -83,6 +83,7 @@ class Client:
         transport: str = "UDP",
         events: Optional[Events] = None,
         auth: Optional[SipAuthCredentials] = None,
+        auto_auth: bool = True,
     ) -> None:
         """
         Initialize SIP client.
@@ -93,6 +94,7 @@ class Client:
             transport: Transport protocol - UDP, TCP, or TLS (default: UDP)
             events: Optional Events instance for handling SIP messages
             auth: Optional authentication credentials (from Auth.Digest())
+            auto_auth: Automatically retry on 401/407 if auth is set (default: True)
         """
         # Transport configuration
         self.config = TransportConfig(
@@ -110,6 +112,7 @@ class Client:
         # Events and Auth
         self._events = events
         self._auth = auth
+        self._auto_auth = auto_auth
 
         # Client state
         self._closed = False
@@ -164,14 +167,22 @@ class Client:
         return self._auth
 
     @auth.setter
-    def auth(self, credentials: Optional[SipAuthCredentials]) -> None:
+    def auth(self, credentials: Optional[Union[SipAuthCredentials, tuple]]) -> None:
         """
         Set authentication credentials.
 
+        Accepts a SipAuthCredentials instance or a (username, password) tuple.
+
         Example:
             >>> client.auth = Auth.Digest('alice', 'secret')
+            >>> client.auth = ('alice', 'secret')  # tuple shorthand
         """
-        self._auth = credentials
+        if isinstance(credentials, tuple) and len(credentials) == 2:
+            self._auth = SipAuthCredentials(
+                username=credentials[0], password=credentials[1]
+            )
+        else:
+            self._auth = credentials
 
     def retry_with_auth(
         self, response: Response, auth: Optional[SipAuthCredentials] = None
@@ -513,6 +524,17 @@ class Client:
                 # Store provisional response
                 if final_response is None:
                     final_response = response
+
+            # Auto-retry on 401/407 if auth is set
+            if (
+                self._auto_auth
+                and self._auth
+                and final_response
+                and final_response.status_code in (401, 407)
+            ):
+                retry_result = self.retry_with_auth(final_response)
+                if retry_result:
+                    final_response = retry_result
 
             return final_response
 

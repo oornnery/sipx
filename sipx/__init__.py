@@ -1,78 +1,67 @@
 """
-SIPX - Modern SIP (Session Initiation Protocol) library for Python.
-
-This library provides a simplified, declarative API for SIP communication:
-
-- **Events-based handlers**: Use the `Events` class with decorators
-- **Simple authentication**: Use `Auth.Digest()` for authentication
-- **Clean client API**: Simple method signatures with auto-extraction
+sipx — Modern SIP library for Python.
 
 Quick Start:
-    >>> from sipx import Client, Events, Auth, event_handler, SDPBody
+    >>> import sipx
+    >>> r = sipx.register("sip:alice@pbx.com", auth=("alice", "secret"))
+    >>> r = sipx.options("sip:pbx.com")
+
+With Client:
+    >>> from sipx import Client, Events, on, SDPBody
     >>>
     >>> class MyEvents(Events):
-    ...     @event_handler('INVITE', status=200)
-    ...     def on_call_accepted(self, request, response, context):
+    ...     @on('INVITE', status=200)
+    ...     def on_call(self, request, response, context):
     ...         print("Call accepted!")
     ...
     >>> with Client() as client:
+    ...     client.auth = ("alice", "secret")
     ...     client.events = MyEvents()
-    ...     client.auth = Auth.Digest('alice', 'secret')
-    ...     response = client.invite('sip:bob@example.com', 'sip:alice@local')
+    ...     r = client.invite("sip:bob@pbx.com", body=SDPBody.audio("10.0.0.1", 8000).to_string())
 
-Main Components:
-    - Client: Synchronous SIP client
-    - Events: Base class for event handlers
-    - Auth: Authentication helpers (Auth.Digest)
-    - event_handler: Decorator for specific events
-    - SDPBody: SDP body creation and parsing
-
-For advanced use cases, you can access:
-    - Request/Response models
-    - Body parsers (SDP, XML, PIDF, etc.)
-    - Transport layer
-    - State management (Transaction, Dialog)
+Server with DI:
+    >>> from sipx import SIPServer, Request, Response, SDPBody, FromHeader, SDP
+    >>> from typing import Annotated
+    >>>
+    >>> server = SIPServer(port=5060)
+    >>> @server.invite
+    ... def on_invite(request: Request, caller: Annotated[str, FromHeader]) -> Response:
+    ...     return Response(200)
 """
 
 from __future__ import annotations
 
+from typing import Optional
+
 # ============================================================================
-# Main API - Client and Server
+# Client / Server
 # ============================================================================
 
 from ._client import Client, AsyncClient
+from ._server import SIPServer
 
 # ============================================================================
-# Simplified Events API
+# Events
 # ============================================================================
 
 from ._events import Events, EventContext, event_handler, on
 
 # ============================================================================
-# FSM Components (for advanced use)
-# ============================================================================
-
-from ._fsm import Dialog, StateManager, TimerManager, Transaction
-
-# ============================================================================
-# Message Models
+# Models
 # ============================================================================
 
 from ._models import (
-    # Base classes
     SIPMessage,
     Request,
     Response,
     MessageParser,
-    # Headers
     Headers,
     HeaderParser,
     HeaderContainer,
-    # Bodies
     MessageBody,
+    RawBody,
     SDPBody,
     BodyParser,
-    # Authentication
     Auth,
     SipAuthCredentials,
     AuthMethod,
@@ -85,7 +74,31 @@ from ._models import (
 )
 
 # ============================================================================
-# Transport Layer
+# DI Extractors
+# ============================================================================
+
+from ._depends import (
+    Extractor,
+    FromHeader,
+    ToHeader,
+    CallID,
+    CSeqValue,
+    ViaValue,
+    SDP,
+    Source,
+    Header,
+    AutoRTP,
+    resolve_handler,
+)
+
+# ============================================================================
+# FSM
+# ============================================================================
+
+from ._fsm import Dialog, StateManager, TimerManager, Transaction
+
+# ============================================================================
+# Transport
 # ============================================================================
 
 from ._transports import (
@@ -97,7 +110,7 @@ from ._transports import (
 )
 
 # ============================================================================
-# Types and Constants
+# Types
 # ============================================================================
 
 from ._types import (
@@ -111,74 +124,135 @@ from ._types import (
     TimeoutError,
 )
 
-from ._utils import (
-    console,
-    logger,
-    EOL,
-    SCHEME,
-    VERSION,
-    BRANCH,
-    HEADERS,
-    HEADERS_COMPACT,
-    REASON_PHRASES,
-)
-
 # ============================================================================
 # Version
 # ============================================================================
 
 __version__ = "0.3.0"
 
+
+# ============================================================================
+# One-liner functions (httpx-style)
+# ============================================================================
+
+
+def register(
+    aor: str,
+    *,
+    auth: Optional[tuple[str, str]] = None,
+    transport: str = "UDP",
+    expires: int = 3600,
+) -> Response:
+    """Register with a SIP server.
+
+    >>> r = sipx.register("sip:alice@pbx.com", auth=("alice", "secret"))
+    """
+    with Client(transport=transport, auto_auth=bool(auth)) as client:
+        if auth:
+            client.auth = auth
+        return client.register(aor, expires=expires)
+
+
+def options(
+    uri: str,
+    *,
+    auth: Optional[tuple[str, str]] = None,
+    transport: str = "UDP",
+) -> Response:
+    """Query server capabilities.
+
+    >>> r = sipx.options("sip:pbx.com")
+    """
+    with Client(transport=transport, auto_auth=bool(auth)) as client:
+        if auth:
+            client.auth = auth
+        return client.options(uri)
+
+
+def call(
+    uri: str,
+    *,
+    auth: Optional[tuple[str, str]] = None,
+    transport: str = "UDP",
+    body: Optional[str] = None,
+) -> Response:
+    """Make a SIP call (INVITE).
+
+    >>> r = sipx.call("sip:100@pbx.com", auth=("alice", "secret"))
+    """
+    with Client(transport=transport, auto_auth=bool(auth)) as client:
+        if auth:
+            client.auth = auth
+        return client.invite(to_uri=uri, body=body)
+
+
+def send(
+    uri: str,
+    content: str = "",
+    *,
+    auth: Optional[tuple[str, str]] = None,
+    transport: str = "UDP",
+) -> Response:
+    """Send a SIP MESSAGE.
+
+    >>> r = sipx.send("sip:bob@pbx.com", "Hello!", auth=("alice", "secret"))
+    """
+    with Client(transport=transport, auto_auth=bool(auth)) as client:
+        if auth:
+            client.auth = auth
+        return client.message(to_uri=uri, content=content)
+
+
 # ============================================================================
 # Public API
 # ============================================================================
 
 __all__ = [
-    # ========================================================================
-    # Main API - Start Here
-    # ========================================================================
+    # ------ Main API ------
     "Client",
+    "AsyncClient",
+    "SIPServer",
     "Events",
-    "Auth",
+    "EventContext",
     "event_handler",
     "on",
-    # ========================================================================
-    # Core Models - Messages and Bodies
-    # ========================================================================
+    # ------ One-liners ------
+    "register",
+    "options",
+    "call",
+    "send",
+    # ------ Auth ------
+    "Auth",
+    "SipAuthCredentials",
+    # ------ Models ------
     "Request",
     "Response",
     "SDPBody",
-    "SipAuthCredentials",
-    # ========================================================================
-    # Advanced - Event Context
-    # ========================================================================
-    "EventContext",
-    # ========================================================================
-    # Advanced - State Management
-    # ========================================================================
-    "StateManager",
-    "TimerManager",
-    "Transaction",
-    "Dialog",
-    "TransactionState",
-    "DialogState",
-    "TransactionType",
-    # ========================================================================
-    # Advanced - Message Models
-    # ========================================================================
+    "Headers",
+    # ------ DI Extractors ------
+    "Extractor",
+    "FromHeader",
+    "ToHeader",
+    "CallID",
+    "CSeqValue",
+    "ViaValue",
+    "SDP",
+    "Source",
+    "Header",
+    "AutoRTP",
+    # ------ Transport ------
+    "BaseTransport",
+    "TransportAddress",
+    "TransportConfig",
+    "TransportError",
+    # ------ Advanced ------
     "SIPMessage",
     "MessageParser",
-    # Headers
-    "Headers",
     "HeaderParser",
     "HeaderContainer",
-    # Bodies
     "MessageBody",
-    "SDPBody",
+    "RawBody",
     "BodyParser",
-    # ========================================================================
-    # Advanced - Authentication
-    # ========================================================================
     "AuthMethod",
     "DigestAuth",
     "DigestChallenge",
@@ -186,37 +260,18 @@ __all__ = [
     "Challenge",
     "Credentials",
     "AuthParser",
-    # ========================================================================
-    # Advanced - Transport
-    # ========================================================================
-    "BaseTransport",
     "AsyncBaseTransport",
-    "TransportAddress",
-    "TransportConfig",
-    "TransportError",
-    # ========================================================================
-    # Advanced - Types and Errors
-    # ========================================================================
+    "StateManager",
+    "TimerManager",
+    "Transaction",
+    "Dialog",
+    "TransactionState",
+    "DialogState",
+    "TransactionType",
     "HeaderTypes",
     "ConnectionError",
     "ReadError",
     "WriteError",
     "TimeoutError",
-    # ========================================================================
-    # Utilities
-    # ========================================================================
-    "console",
-    "logger",
-    # Constants
-    "EOL",
-    "SCHEME",
-    "VERSION",
-    "BRANCH",
-    "HEADERS",
-    "HEADERS_COMPACT",
-    "REASON_PHRASES",
-    # ========================================================================
-    # Async (not yet implemented)
-    # ========================================================================
-    "AsyncClient",
+    "resolve_handler",
 ]

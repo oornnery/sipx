@@ -379,6 +379,55 @@ class SDPBody(MessageBody):
         return sdp
 
     @classmethod
+    def audio(
+        cls,
+        ip: str,
+        port: int,
+        codecs: list[str] | None = None,
+        username: str = "-",
+        session_name: str = "sipx",
+    ) -> "SDPBody":
+        """Create a simple audio SDP offer with sensible defaults.
+
+        Args:
+            ip: Local IP address
+            port: RTP port
+            codecs: Codec names (default: ["PCMU", "PCMA", "telephone-event"])
+            username: Origin username
+            session_name: Session name
+        """
+        codec_map = {
+            "PCMU": {"payload": "0", "name": "PCMU", "rate": "8000"},
+            "PCMA": {"payload": "8", "name": "PCMA", "rate": "8000"},
+            "telephone-event": {
+                "payload": "101",
+                "name": "telephone-event",
+                "rate": "8000",
+                "fmtp": "0-16",
+            },
+            "G722": {"payload": "9", "name": "G722", "rate": "8000"},
+        }
+
+        if codecs is None:
+            codecs = ["PCMU", "PCMA", "telephone-event"]
+
+        codec_specs = [codec_map[c] for c in codecs if c in codec_map]
+
+        return cls.create_offer(
+            session_name=session_name,
+            origin_username=username,
+            origin_address=ip,
+            connection_address=ip,
+            media_specs=[
+                {
+                    "media": "audio",
+                    "port": port,
+                    "codecs": codec_specs,
+                }
+            ],
+        )
+
+    @classmethod
     def create_answer(
         cls,
         offer: "SDPBody",

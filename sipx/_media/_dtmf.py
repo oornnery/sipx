@@ -105,7 +105,9 @@ class DTMFSender:
             payload=payload,
         )
         self.rtp_session.send_packet(pkt)
-        self.rtp_session._sequence_number = (self.rtp_session._sequence_number + 1) & 0xFFFF
+        self.rtp_session._sequence_number = (
+            self.rtp_session._sequence_number + 1
+        ) & 0xFFFF
 
         # Wait half duration
         time.sleep(duration_ms / 2000.0)
@@ -124,7 +126,9 @@ class DTMFSender:
             payload=payload,
         )
         self.rtp_session.send_packet(pkt)
-        self.rtp_session._sequence_number = (self.rtp_session._sequence_number + 1) & 0xFFFF
+        self.rtp_session._sequence_number = (
+            self.rtp_session._sequence_number + 1
+        ) & 0xFFFF
 
         # Wait remaining duration
         time.sleep(duration_ms / 2000.0)
@@ -143,7 +147,9 @@ class DTMFSender:
                 payload=payload,
             )
             self.rtp_session.send_packet(pkt)
-            self.rtp_session._sequence_number = (self.rtp_session._sequence_number + 1) & 0xFFFF
+            self.rtp_session._sequence_number = (
+                self.rtp_session._sequence_number + 1
+            ) & 0xFFFF
 
         # Advance timestamp past this digit so next digit has a different ts
         self.rtp_session._timestamp = (

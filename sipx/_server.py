@@ -15,6 +15,7 @@ from ._models._message import MessageParser, Request, Response
 from ._transports._udp import UDPTransport
 from ._types import TransportConfig, TransportAddress, TransactionType, TransactionState
 from ._fsm import StateManager
+from ._depends import resolve_handler
 
 
 class SIPServer:
@@ -155,6 +156,80 @@ class SIPServer:
         """
         self._handlers[method.upper()] = handler
 
+    def handle(self, method: str):
+        """Decorator to register a handler for a SIP method."""
+
+        def decorator(fn):
+            self.register_handler(method, fn)
+            return fn
+
+        return decorator
+
+    @property
+    def invite(self):
+        """Decorator to register an INVITE handler."""
+        return self.handle("INVITE")
+
+    @property
+    def register(self):
+        """Decorator to register a REGISTER handler."""
+        return self.handle("REGISTER")
+
+    @property
+    def options(self):
+        """Decorator to register an OPTIONS handler."""
+        return self.handle("OPTIONS")
+
+    @property
+    def bye(self):
+        """Decorator to register a BYE handler."""
+        return self.handle("BYE")
+
+    @property
+    def cancel(self):
+        """Decorator to register a CANCEL handler."""
+        return self.handle("CANCEL")
+
+    @property
+    def message(self):
+        """Decorator to register a MESSAGE handler."""
+        return self.handle("MESSAGE")
+
+    @property
+    def subscribe(self):
+        """Decorator to register a SUBSCRIBE handler."""
+        return self.handle("SUBSCRIBE")
+
+    @property
+    def notify(self):
+        """Decorator to register a NOTIFY handler."""
+        return self.handle("NOTIFY")
+
+    @property
+    def refer(self):
+        """Decorator to register a REFER handler."""
+        return self.handle("REFER")
+
+    @property
+    def info(self):
+        """Decorator to register an INFO handler."""
+        return self.handle("INFO")
+
+    @property
+    def update(self):
+        """Decorator to register an UPDATE handler."""
+        return self.handle("UPDATE")
+
+    @property
+    def prack(self):
+        """Decorator to register a PRACK handler."""
+        return self.handle("PRACK")
+
+    @property
+    def publish(self):
+        """Decorator to register a PUBLISH handler."""
+        return self.handle("PUBLISH")
+
     @property
     def _running(self) -> bool:
         """Check if the server is running (thread-safe)."""
@@ -261,8 +336,8 @@ class SIPServer:
                 handler = self._handlers.get(request.method)
 
                 if handler:
-                    # Call handler and send response
-                    response = handler(request, source)
+                    # Call handler with DI resolution
+                    response = resolve_handler(handler, request, source)
 
                     console.print(
                         f"\n[bold green]>>> SENDING {response.status_code} {response.reason_phrase} to {source.host}:{source.port}[/bold green]"
