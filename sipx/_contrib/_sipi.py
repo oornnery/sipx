@@ -129,18 +129,24 @@ def add_pai_header(
 def add_charging_vector(
     request: "Request",
     icid: str,
+    orig_ioi: str | None = None,
+    term_ioi: str | None = None,
 ) -> None:
     """
     Add a P-Charging-Vector header to a SIP request.
 
-    The ``icid-value`` parameter is the IMS Charging Identifier
-    defined in 3GPP TS 24.229.
-
     Args:
         request: The SIP request to modify.
-        icid: IMS Charging Identifier value.
+        icid: IMS Charging Identifier value (just the ID, not "icid-value=...").
+        orig_ioi: Originating Inter-Operator Identifier (optional).
+        term_ioi: Terminating Inter-Operator Identifier (optional).
     """
-    request.headers["P-Charging-Vector"] = f"icid-value={icid}"
+    value = f"icid-value={icid}"
+    if orig_ioi:
+        value += f";orig-ioi={orig_ioi}"
+    if term_ioi:
+        value += f";term-ioi={term_ioi}"
+    request.headers["P-Charging-Vector"] = value
 
 
 def get_pai(
