@@ -391,6 +391,30 @@ class TestStateManager:
         removed = sm.cleanup_dialogs(max_age=3600)
         assert removed == 0
 
+    def test_create_invite_server_transaction(self):
+        sm = StateManager()
+        req = Request(
+            method="INVITE",
+            uri="sip:bob@x",
+            headers={"Via": "SIP/2.0/UDP x;branch=z9hG4bKtest"},
+        )
+        txn = sm.create_transaction(req, transaction_type=TransactionType.INVITE_SERVER)
+        assert txn.transaction_type == TransactionType.INVITE_SERVER
+        assert txn.state == TransactionState.PROCEEDING
+
+    def test_create_non_invite_server_transaction(self):
+        sm = StateManager()
+        req = Request(
+            method="REGISTER",
+            uri="sip:bob@x",
+            headers={"Via": "SIP/2.0/UDP x;branch=z9hG4bKtest"},
+        )
+        txn = sm.create_transaction(
+            req, transaction_type=TransactionType.NON_INVITE_SERVER
+        )
+        assert txn.transaction_type == TransactionType.NON_INVITE_SERVER
+        assert txn.state == TransactionState.TRYING
+
     def test_get_statistics(self):
         sm = StateManager()
         req1 = Request(method="INVITE", uri="sip:bob@example.com")
@@ -412,3 +436,50 @@ class TestStateManager:
         assert "by_state" in stats["transactions"]
         assert "by_type" in stats["transactions"]
         assert "by_state" in stats["dialogs"]
+
+
+# ============================================================================
+# TimerManager
+# ============================================================================
+
+
+class TestTimerManager:
+    def test_start_timer_fires_callback(self):
+        from sipx._fsm import TimerManager
+
+        result = []
+        tm = TimerManager()
+        tm.start_timer("test", 0.1, lambda: result.append(True))
+        time.sleep(0.3)
+        assert result == [True]
+        tm.cancel_all()
+
+    def test_cancel_timer(self):
+        from sipx._fsm import TimerManager
+
+        result = []
+        tm = TimerManager()
+        tm.start_timer("test", 0.5, lambda: result.append(True))
+        tm.cancel_timer("test")
+        time.sleep(0.7)
+        assert result == []
+
+    def test_cancel_all(self):
+        from sipx._fsm import TimerManager
+
+        tm = TimerManager()
+        tm.start_timer("a", 0.5, lambda: None)
+        tm.start_timer("b", 0.5, lambda: None)
+        tm.cancel_all()
+        assert len(tm.active_timers) == 0
+
+    def test_start_timer_replaces_existing(self):
+        from sipx._fsm import TimerManager
+
+        result = []
+        tm = TimerManager()
+        tm.start_timer("test", 5.0, lambda: result.append("old"))
+        tm.start_timer("test", 0.1, lambda: result.append("new"))
+        time.sleep(0.3)
+        assert result == ["new"]
+        tm.cancel_all()

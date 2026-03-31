@@ -336,3 +336,72 @@ class TestBuildAuthHeader:
         assert 'username="alice"' in header
         assert 'realm="example.com"' in header
         assert 'nonce="abc123"' in header
+
+
+# ============================================================================
+# Tuple auth conversion
+# ============================================================================
+
+
+class TestTupleAuth:
+    @patch("sipx._client._create_sync_transport")
+    def test_tuple_auth_converts_to_credentials(self, mock_create):
+        mock_create.return_value = MockTransport()
+        client = Client(local_port=0)
+        client.auth = ("alice", "secret")
+        assert client.auth.username == "alice"
+        assert client.auth.password == "secret"
+        client.close()
+
+    @patch("sipx._client._create_sync_transport")
+    def test_auth_digest_still_works(self, mock_create):
+        mock_create.return_value = MockTransport()
+        client = Client(local_port=0)
+        client.auth = Auth.Digest("alice", "secret")
+        assert client.auth.username == "alice"
+        client.close()
+
+    @patch("sipx._client._create_sync_transport")
+    def test_auto_auth_default_true(self, mock_create):
+        mock_create.return_value = MockTransport()
+        client = Client(local_port=0)
+        assert client._auto_auth is True
+        client.close()
+
+    @patch("sipx._client._create_sync_transport")
+    def test_auto_auth_false(self, mock_create):
+        mock_create.return_value = MockTransport()
+        client = Client(local_port=0, auto_auth=False)
+        assert client._auto_auth is False
+        client.close()
+
+
+# ============================================================================
+# SDPBody.audio() factory
+# ============================================================================
+
+
+class TestSDPAudioFactory:
+    def test_sdp_audio_basic(self):
+        from sipx._models._body import SDPBody
+
+        sdp = SDPBody.audio(ip="10.0.0.1", port=8000)
+        assert sdp.get_connection_address() == "10.0.0.1"
+        ports = sdp.get_media_ports()
+        assert ports["audio"] == 8000
+        codecs = sdp.get_codecs_summary()
+        assert "PCMU" in codecs.get("audio", [])
+        assert "PCMA" in codecs.get("audio", [])
+
+    def test_sdp_audio_custom_codecs(self):
+        from sipx._models._body import SDPBody
+
+        sdp = SDPBody.audio(ip="10.0.0.1", port=9000, codecs=["PCMU"])
+        codecs = sdp.get_codecs_summary()
+        assert "PCMU" in codecs.get("audio", [])
+
+    def test_sdp_audio_default_session_name(self):
+        from sipx._models._body import SDPBody
+
+        sdp = SDPBody.audio(ip="10.0.0.1", port=8000)
+        assert sdp.session_name == "sipx"

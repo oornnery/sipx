@@ -11,6 +11,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 
 from sipx._server import SIPServer
+from sipx._models._message import Response
 from sipx._types import TransportConfig
 
 
@@ -131,3 +132,75 @@ class TestServerContextManager:
     def test_context_manager_returns_server(self, mock_udp_cls):
         with SIPServer() as server:
             assert isinstance(server, SIPServer)
+
+
+# ============================================================================
+# Server decorators
+# ============================================================================
+
+
+class TestServerDecorators:
+    @patch("sipx._server.UDPTransport")
+    def test_handle_decorator_registers_handler(self, mock_udp_cls):
+        server = SIPServer(local_host="127.0.0.1", local_port=0)
+
+        @server.handle("SUBSCRIBE")
+        def on_subscribe(request, source):
+            return Response(200)
+
+        assert "SUBSCRIBE" in server._handlers
+
+    @patch("sipx._server.UDPTransport")
+    def test_invite_property_decorator(self, mock_udp_cls):
+        server = SIPServer(local_host="127.0.0.1", local_port=0)
+
+        @server.invite
+        def on_invite(request, source):
+            return Response(200)
+
+        assert "INVITE" in server._handlers
+
+    @patch("sipx._server.UDPTransport")
+    def test_register_property_decorator(self, mock_udp_cls):
+        server = SIPServer(local_host="127.0.0.1", local_port=0)
+
+        @server.register
+        def on_register(request, source):
+            return Response(200)
+
+        assert "REGISTER" in server._handlers
+
+    @patch("sipx._server.UDPTransport")
+    def test_message_property_decorator(self, mock_udp_cls):
+        server = SIPServer(local_host="127.0.0.1", local_port=0)
+
+        @server.message
+        def on_message(request, source):
+            return Response(200)
+
+        assert "MESSAGE" in server._handlers
+
+    @patch("sipx._server.UDPTransport")
+    def test_options_property_decorator(self, mock_udp_cls):
+        server = SIPServer(local_host="127.0.0.1", local_port=0)
+
+        @server.options
+        def on_options(request, source):
+            return Response(200)
+
+        assert "OPTIONS" in server._handlers
+
+    @patch("sipx._server.UDPTransport")
+    def test_multiple_decorators(self, mock_udp_cls):
+        server = SIPServer(local_host="127.0.0.1", local_port=0)
+
+        @server.invite
+        def h1(request, source):
+            return Response(200)
+
+        @server.bye
+        def h2(request, source):
+            return Response(200)
+
+        assert "INVITE" in server._handlers
+        assert "BYE" in server._handlers
