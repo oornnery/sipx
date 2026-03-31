@@ -1,69 +1,42 @@
 # sipx — TODO
 
-## Done (this session)
+## Async Gap — modules using threading that need native async versions
 
-- [x] Native AsyncClient — thin wrapper over sync Client (-532 lines)
-- [x] AsyncSIPServer, AsyncRTPSession, AsyncCallSession, AsyncDTMFHelper
-- [x] Server decorators + DI extractors (Annotated)
-- [x] SDPBody.audio(), tuple auth, auto-retry, one-liners
-- [x] Audio generators, CallSession, DTMFHelper
-- [x] sipx.media / sipx.contrib public packages
-- [x] Security hardening (TLS verify warning, MD5 fallback warning)
-- [x] 10 examples
-- [x] SIP URI parser (RFC 3261 Section 19.1) — SipURI dataclass
-- [x] Session Timers (RFC 4028) — SessionTimer auto-refresh
-- [x] Route/Record-Route processing (RFC 3261 Section 16) — RouteSet
-- [x] SUBSCRIBE/NOTIFY complete (RFC 6665) — Subscription manager
-- [x] Opus codec (RFC 6716) — optional opuslib
-- [x] PyAudio integration — MicrophoneSource + SpeakerSink
-- [x] Refactor: DTMFEvent, SipI, Extractor.resolve_handler
-- [x] SIP-I BR (ANATEL) — ATI portability, Reason Q.850, P-Charging-Function-Addresses
-- [x] DNS SRV resolution (RFC 3263) — SipResolver with SRV + A fallback
-- [x] 607 tests (60% coverage)
+### Has async wrapper (to_thread) but internal threading.Timer/Thread
 
-## Test Coverage (current: 60%)
+| Module | Threading usage | Async wrapper | Needs native async |
+|--------|----------------|---------------|-------------------|
+| `_fsm.py` (TimerManager) | `threading.Timer` for retransmission | None | `AsyncTimerManager` with `asyncio.create_task(asyncio.sleep())` |
+| `_session_timer.py` | `threading.Timer` for refresh | None | `AsyncSessionTimer` with `asyncio.sleep` loop |
+| `_subscription.py` | `threading.Timer` for auto-refresh | None | `AsyncSubscription` with `asyncio.sleep` loop |
+| `_client.py` (auto-reregister) | `threading.Timer` for re-registration | `AsyncClient` uses `asyncio.sleep` (done) | Done |
+| `_server.py` (SIPServer) | `threading.Thread` for main loop | `AsyncSIPServer` (to_thread) | Native `asyncio.start_server` |
+| `media/_rtp.py` (RTPSession) | `threading.Thread` for recv loop | `AsyncRTPSession` (to_thread) | Native `asyncio.DatagramProtocol` |
+| `media/_pyaudio.py` | `threading.Thread` for capture/playback | None | `AsyncMicrophoneSource`/`AsyncSpeakerSink` |
+| `transports/_ws.py` (WSTransport) | `threading.Lock` | `AsyncWSTransport` exists | Review lock usage |
 
-### 90%+ (done)
+### Already native async (no changes needed)
 
-- `_uri.py` — 100%
-- `_routing.py` — 100%
-- `_media/_codecs.py` — 100%
-- `_media/_generators.py` — 100%
-- `_models/_header.py` — 99%
-- `_events.py` — 98%
-- `_subscription.py` — 97%
-- `_session_timer.py` — 96%
-- `_contrib/_sipi_br.py` — 96%
-- `_contrib/_sipi.py` — 96%
-- `_depends.py` — 92%
-- `_models/_auth.py` — 92%
-- `_dns.py` — 92%
+| Module | Status |
+|--------|--------|
+| `AsyncClient` | Uses `asyncio.to_thread` for sync Client + `asyncio.sleep` for reregister |
+| `AsyncSIPServer` | Wraps sync via `to_thread` |
+| `AsyncRTPSession` | Wraps sync via `to_thread` |
+| `AsyncCallSession` | Wraps sync via `to_thread` |
+| `AsyncDTMFHelper` | Wraps sync via `to_thread` |
+| `AsyncUDPTransport` | Native `asyncio.DatagramProtocol` |
+| `AsyncTCPTransport` | Native `asyncio.open_connection` |
+| `AsyncTLSTransport` | Native `asyncio.open_connection` + SSL |
+| `AsyncWSTransport` | Native `websockets.connect` |
 
-### Needs improvement
+### Priority for native async rewrite
 
-- [ ] `_models/_message.py` (88%) — edge cases
-- [ ] `_models/_body.py` (85%) — SDP parsing edge cases
-- [ ] `_transports/_base.py` (83%) — ABC coverage
-- [ ] `_types.py` (80%) — TransportAddress.from_uri
-- [ ] `_fsm.py` (72%) — IST/NIST timer callbacks
-
-### Needs mocks/network (hard to test)
-
-- [ ] `_client.py` (33%) — needs full MockTransport flow
-- [ ] `_server.py` (58%) — needs loopback integration
-- [ ] `_media/_rtp.py` (57%) — needs UDP loopback
-- [ ] `_media/_session.py` (53%) — needs mock RTP
-- [ ] `_media/_dtmf.py` (44%) — needs RTP loopback
-- [ ] `_transports/` (0-20%) — needs socket mocks
-
-### Stubs (optional deps, 0%)
-
-- `_media/_opus.py` — needs opuslib
-- `_media/_pyaudio.py` — needs pyaudio
-- `_media/_async.py` — needs async test framework
-- `_transports/_ws.py` — needs websockets
-- `_contrib/_fastapi.py` — needs fastapi
-- `main.py` — needs typer CliRunner
+1. [ ] `AsyncTimerManager` — `asyncio.create_task(asyncio.sleep(delay))` instead of `threading.Timer`
+2. [ ] `AsyncSessionTimer` — uses AsyncTimerManager, `await client.update()`
+3. [ ] `AsyncSubscription` — uses AsyncTimerManager, `await client.subscribe()`
+4. [ ] `AsyncSIPServer` (native) — `asyncio.DatagramProtocol` instead of threading
+5. [ ] `AsyncRTPSession` (native) — `asyncio.DatagramProtocol` for recv instead of thread
+6. [ ] `AsyncMicrophoneSource` / `AsyncSpeakerSink` — optional, low priority
 
 ## Features Remaining
 
@@ -73,7 +46,15 @@
 
 ### Medium Priority
 
-- [ ] WebSocket transport (RFC 7118) — real websockets integration
-- [ ] IPv6 support
+- [ ] WebSocket keepalive (RFC 7118 Section 3.2)
+- [ ] SDP advanced attributes (ICE, crypto, rtcp-fb)
+- [ ] IPv6 support (AAAA records in DNS resolver)
+- [ ] NAPTR DNS records
 - [ ] SCTP transport
-- [ ] Conferencing (audio mixer)
+
+### Test Coverage (60%)
+
+- [ ] `_client.py` (33%) — needs MockTransport integration tests
+- [ ] `_server.py` (58%) — needs loopback tests
+- [ ] `media/_rtp.py` (57%) — needs UDP loopback
+- [ ] `contrib/_isup.py` (0%) — needs encode/decode tests
