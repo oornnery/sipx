@@ -14,6 +14,7 @@ from sipx._media._generators import (
     DTMFToneGenerator,
 )
 from sipx._media._session import CallSession, DTMFHelper
+from sipx._media._opus import Opus
 from sipx._media._async import AsyncRTPSession, AsyncCallSession, AsyncDTMFHelper
 
 __all__ = [
@@ -40,4 +41,5 @@ __all__ = [
     "AsyncRTPSession",
     "AsyncCallSession",
     "AsyncDTMFHelper",
+    "Opus",
 ]
