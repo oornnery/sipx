@@ -151,6 +151,9 @@ class Transaction:
     # Active timer manager (not serialized, set externally)
     timer_manager: Optional[TimerManager] = field(default=None, repr=False)
 
+    # Retransmit callback (set by Client to re-send the request)
+    _retransmit_fn: Optional[Callable[[], None]] = field(default=None, repr=False)
+
     # Metadata
     dialog_id: Optional[str] = None  # Associated dialog
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -189,15 +192,35 @@ class Transaction:
             if new_state == TransactionState.CALLING:
                 self.timer_a = 0.5  # T1 (500ms)
                 self.timer_b = 32.0  # 64*T1
+                if not is_reliable and self._retransmit_fn:
+                    self._schedule_timer("Timer A", self.timer_a, self._on_timer_a)
+                self._schedule_timer("Timer B", self.timer_b, self._on_timer_expired)
+            elif new_state == TransactionState.PROCEEDING:
+                # Stop retransmissions, keep timeout
+                self._cancel_active_timers("Timer A")
             elif new_state == TransactionState.COMPLETED:
+                self._cancel_active_timers("Timer A", "Timer B")
                 self.timer_d = 32.0  # > 32s for UDP
+                self._schedule_timer("Timer D", self.timer_d, self._on_timer_expired)
+            elif new_state == TransactionState.TERMINATED:
+                self._cancel_all_timers()
 
         elif self.transaction_type == TransactionType.NON_INVITE:
             if new_state == TransactionState.TRYING:
                 self.timer_e = 0.5  # T1
                 self.timer_f = 32.0  # 64*T1
+                if not is_reliable and self._retransmit_fn:
+                    self._schedule_timer("Timer E", self.timer_e, self._on_timer_e)
+                self._schedule_timer("Timer F", self.timer_f, self._on_timer_expired)
+            elif new_state == TransactionState.PROCEEDING:
+                # Stop retransmissions, keep timeout
+                self._cancel_active_timers("Timer E")
             elif new_state == TransactionState.COMPLETED:
+                self._cancel_active_timers("Timer E", "Timer F")
                 self.timer_k = 5.0  # T4
+                self._schedule_timer("Timer K", self.timer_k, self._on_timer_expired)
+            elif new_state == TransactionState.TERMINATED:
+                self._cancel_all_timers()
 
         # --- Server-side: IST (INVITE Server Transaction, RFC 3261 17.2.1) ---
         elif self.transaction_type == TransactionType.INVITE_SERVER:
@@ -253,6 +276,28 @@ class Transaction:
             self._schedule_timer("Timer G", self.timer_g, self._on_timer_g)
         if self.timer_h is not None:
             self._schedule_timer("Timer H", self.timer_h, self._on_timer_expired)
+
+    def _on_timer_a(self) -> None:
+        """Timer A fired (ICT): retransmit INVITE and double the interval."""
+        if self.state != TransactionState.CALLING:
+            return
+        if self._retransmit_fn:
+            self._retransmit_fn()
+        # Double timer A up to T2 (4s)
+        if self.timer_a is not None:
+            self.timer_a = min(self.timer_a * 2, 4.0)
+            self._schedule_timer("Timer A", self.timer_a, self._on_timer_a)
+
+    def _on_timer_e(self) -> None:
+        """Timer E fired (NICT): retransmit request and double the interval."""
+        if self.state not in (TransactionState.TRYING, TransactionState.PROCEEDING):
+            return
+        if self._retransmit_fn:
+            self._retransmit_fn()
+        # Double timer E up to T2 (4s)
+        if self.timer_e is not None:
+            self.timer_e = min(self.timer_e * 2, 4.0)
+            self._schedule_timer("Timer E", self.timer_e, self._on_timer_e)
 
     def _on_timer_g(self) -> None:
         """Timer G fired: retransmit last response and double the interval."""

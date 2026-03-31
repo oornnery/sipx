@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 from ._utils import logger
 from .models._auth import SipAuthCredentials, DigestCredentials, DigestAuth
 from ._events import Events, EventContext
-from ._fsm import StateManager
+from ._fsm import StateManager, TimerManager
 from .models._message import Request, Response, MessageParser
 from .transports import (
     TransportAddress,
@@ -460,6 +460,14 @@ class Client:
         # Create transaction
         transaction = self._state_manager.create_transaction(request)
 
+        # Wire up timer manager for automatic retransmissions
+        timer_manager = TimerManager()
+        transaction.timer_manager = timer_manager
+        transaction.transport = self.transport_protocol
+        transaction._retransmit_fn = lambda: self._transport.send(
+            request.to_bytes(), destination
+        )
+
         # Create event context
         context = EventContext(
             request=request,
@@ -521,7 +529,7 @@ class Client:
                 )
                 logger.debug(response.to_string())
 
-                # Update transaction
+                # Update transaction (triggers state change which cancels timers)
                 self._state_manager.update_transaction(transaction.id, response)
 
                 # Update context
@@ -560,6 +568,9 @@ class Client:
         except Exception as e:
             logger.error(f"Request failed: {e}")
             raise
+        finally:
+            # Clean up all timers for this transaction
+            timer_manager.cancel_all()
 
     def _ensure_required_headers(
         self, request: Request, host: str, port: int

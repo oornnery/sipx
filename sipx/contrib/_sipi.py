@@ -1,17 +1,24 @@
 """
 SIP-I / ISUP interworking support (ITU-T Q.1912.5).
 
-Provides ISUP cause code <-> SIP status code mapping tables and
+Provides ISUP cause code <-> SIP status code mapping tables,
 helper functions for common SIP-I headers (P-Asserted-Identity,
-P-Charging-Vector).
+P-Charging-Vector), and multipart/mixed body encoding for SDP + ISUP.
 """
 
 from __future__ import annotations
 
+import logging
+import re
+import uuid
 from typing import TYPE_CHECKING, Union
+
+from sipx.contrib._isup import ISUPMessage
 
 if TYPE_CHECKING:
     from ..models._message import Request, Response
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # ISUP cause -> SIP status  (ITU-T Q.1912.5 / RFC 3398)
@@ -116,6 +123,127 @@ class SipI:
         if term_ioi:
             value += f";term-ioi={term_ioi}"
         request.headers["P-Charging-Vector"] = value
+
+    # ------------------------------------------------------------------
+    # Multipart SIP-I body (SDP + ISUP)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def create_sipi_body(
+        sdp: str,
+        isup_msg: ISUPMessage,
+        boundary: str | None = None,
+    ) -> tuple[str, bytes]:
+        """Create multipart/mixed body with SDP + ISUP binary.
+
+        Produces a MIME multipart/mixed body suitable for SIP-I messages,
+        containing an application/sdp part and an application/isup part.
+
+        Args:
+            sdp: SDP body text.
+            isup_msg: ISUP message to encode as binary.
+            boundary: MIME boundary string (auto-generated if not provided).
+
+        Returns:
+            Tuple of (content_type_header, body_bytes).
+            content_type_header includes the boundary parameter.
+        """
+        if boundary is None:
+            boundary = f"sipx-{uuid.uuid4().hex[:16]}"
+
+        isup_bytes = isup_msg.to_bytes()
+
+        parts: list[bytes] = []
+
+        # SDP part
+        parts.append(f"--{boundary}\r\n".encode())
+        parts.append(b"Content-Type: application/sdp\r\n")
+        parts.append(b"Content-Disposition: session\r\n")
+        parts.append(b"\r\n")
+        # Normalize SDP line endings to CRLF
+        sdp_normalized = sdp.replace("\r\n", "\n").replace("\n", "\r\n")
+        if not sdp_normalized.endswith("\r\n"):
+            sdp_normalized += "\r\n"
+        parts.append(sdp_normalized.encode())
+
+        # ISUP part
+        parts.append(f"--{boundary}\r\n".encode())
+        parts.append(b"Content-Type: application/isup; version=itu-t92+\r\n")
+        parts.append(b"Content-Disposition: signal;handling=optional\r\n")
+        parts.append(b"\r\n")
+        parts.append(isup_bytes)
+        parts.append(b"\r\n")
+
+        # Closing boundary
+        parts.append(f"--{boundary}--\r\n".encode())
+
+        body = b"".join(parts)
+        content_type = f"multipart/mixed; boundary={boundary}"
+
+        return (content_type, body)
+
+    @staticmethod
+    def parse_sipi_body(
+        content_type: str,
+        body: bytes,
+    ) -> tuple[str | None, ISUPMessage | None]:
+        """Parse multipart/mixed body, extract SDP and ISUP.
+
+        Args:
+            content_type: Content-Type header value (must contain boundary).
+            body: Raw multipart body bytes.
+
+        Returns:
+            Tuple of (sdp_text, isup_message). Either may be None if the
+            corresponding part is not found.
+        """
+        # Extract boundary from Content-Type
+        match = re.search(r"boundary=([^\s;]+)", content_type)
+        if not match:
+            logger.warning("No boundary found in Content-Type: %s", content_type)
+            return (None, None)
+
+        boundary = match.group(1).strip('"')
+        delimiter = f"--{boundary}".encode()
+
+        # Split body into parts
+        raw_parts = body.split(delimiter)
+
+        sdp_text: str | None = None
+        isup_msg: ISUPMessage | None = None
+
+        for part in raw_parts:
+            # Skip preamble and closing delimiter
+            if not part or part.startswith(b"--"):
+                continue
+
+            # Strip leading CRLF
+            if part.startswith(b"\r\n"):
+                part = part[2:]
+
+            # Split headers from body at first double CRLF
+            header_end = part.find(b"\r\n\r\n")
+            if header_end == -1:
+                continue
+
+            header_section = part[:header_end].decode("utf-8", errors="replace")
+            part_body = part[header_end + 4 :]
+
+            # Strip trailing CRLF from part body
+            if part_body.endswith(b"\r\n"):
+                part_body = part_body[:-2]
+
+            # Detect content type
+            ct_lower = header_section.lower()
+            if "application/sdp" in ct_lower:
+                sdp_text = part_body.decode("utf-8", errors="replace")
+            elif "application/isup" in ct_lower:
+                try:
+                    isup_msg = ISUPMessage.from_bytes(part_body)
+                except (ValueError, IndexError) as exc:
+                    logger.warning("Failed to decode ISUP part: %s", exc)
+
+        return (sdp_text, isup_msg)
 
 
 __all__ = [
