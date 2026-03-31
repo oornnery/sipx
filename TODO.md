@@ -31,9 +31,9 @@
 
 ### Priority for native async rewrite
 
-1. [ ] `AsyncTimerManager` — `asyncio.create_task(asyncio.sleep(delay))` instead of `threading.Timer`
-2. [ ] `AsyncSessionTimer` — uses AsyncTimerManager, `await client.update()`
-3. [ ] `AsyncSubscription` — uses AsyncTimerManager, `await client.subscribe()`
+1. [x] `AsyncTimerManager` — `asyncio.create_task(asyncio.sleep(delay))`
+2. [x] `AsyncSessionTimer` — async refresh loop with `await client.update()`
+3. [x] `AsyncSubscription` — async subscribe/refresh loop
 4. [ ] `AsyncSIPServer` (native) — `asyncio.DatagramProtocol` instead of threading
 5. [ ] `AsyncRTPSession` (native) — `asyncio.DatagramProtocol` for recv instead of thread
 6. [ ] `AsyncMicrophoneSource` / `AsyncSpeakerSink` — optional, low priority
