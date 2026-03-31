@@ -39,11 +39,11 @@
 ### High Priority
 
 - [ ] SRTP (RFC 3711) — AES-128-CM, HMAC-SHA1
-- [ ] DNS SRV resolution (RFC 3263)
+- [x] DNS SRV resolution (RFC 3263) — SipResolver with SRV + A fallback
 
 ### Medium Priority
 
-- [ ] SIP-I BR (ANATEL) — ISUP-BR cause codes, portability
+- [x] SIP-I BR (ANATEL) — ATI portability, Reason Q.850, P-Charging-Function-Addresses
 - [ ] WebSocket transport (RFC 7118) — real websockets integration
 - [ ] IPv6 support
 - [ ] SCTP transport
