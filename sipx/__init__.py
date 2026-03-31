@@ -98,6 +98,7 @@ from ._depends import (
 from ._uri import SipURI
 from ._session_timer import SessionTimer, SessionTimerConfig
 from ._routing import RouteSet
+from ._dns import SipResolver, ResolvedTarget
 from ._subscription import Subscription, SubscriptionState
 
 # ============================================================================
@@ -225,6 +226,8 @@ __all__ = [
     "SessionTimer",
     "SessionTimerConfig",
     "RouteSet",
+    "SipResolver",
+    "ResolvedTarget",
     "Subscription",
     "SubscriptionState",
     "Events",
