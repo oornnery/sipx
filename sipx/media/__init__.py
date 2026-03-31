@@ -15,6 +15,7 @@ from sipx._media._generators import (
 )
 from sipx._media._session import CallSession, DTMFHelper
 from sipx._media._opus import Opus
+from sipx._media._pyaudio import MicrophoneSource, SpeakerSink
 from sipx._media._async import AsyncRTPSession, AsyncCallSession, AsyncDTMFHelper
 
 __all__ = [
@@ -42,4 +43,6 @@ __all__ = [
     "AsyncCallSession",
     "AsyncDTMFHelper",
     "Opus",
+    "MicrophoneSource",
+    "SpeakerSink",
 ]
