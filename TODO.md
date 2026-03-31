@@ -16,6 +16,7 @@
 - [x] sipx.media / sipx.contrib — public packages (no underscores)
 - [x] Security hardening — TLS verify warning, MD5 fallback warning
 - [x] 10 examples — quickstart, call_flow, events, dtmf, sdp, audio, parser, server, ivr, asterisk_full
+- [x] Complete SIP URI parser (RFC 3261 Section 19.1) — SipURI dataclass with full support
 
 ## Test Coverage (current: 55%, target: 80%+)
 
@@ -50,7 +51,7 @@
 
 ### High Priority
 
-- [ ] Complete SIP URI parser (RFC 3986) — current is partial
+- [x] Complete SIP URI parser (RFC 3261 Section 19.1) — done
 - [ ] SRTP (RFC 3711) — AES-128-CM, HMAC-SHA1, key exchange via SDP
 - [ ] DNS SRV resolution (RFC 3263) — auto-resolve SIP server from domain
 
