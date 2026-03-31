@@ -37,11 +37,19 @@ class Menu:
     ) -> None:
         self.greeting = greeting
         self.items: list[MenuItem] = list(items) if items else []
-        self.invalid_prompt = invalid_prompt or Prompt(text="Invalid selection. Please try again.")
+        self.invalid_prompt = invalid_prompt or Prompt(
+            text="Invalid selection. Please try again."
+        )
         self.max_retries = max_retries
         self._item_map: dict[str, MenuItem] = {item.digit: item for item in self.items}
 
-    def add_item(self, digit: str, prompt: Prompt, handler: Optional[Callable] = None, submenu: Optional[Menu] = None) -> None:
+    def add_item(
+        self,
+        digit: str,
+        prompt: Prompt,
+        handler: Optional[Callable] = None,
+        submenu: Optional[Menu] = None,
+    ) -> None:
         item = MenuItem(digit=digit, prompt=prompt, handler=handler, submenu=submenu)
         self.items.append(item)
         self._item_map[digit] = item

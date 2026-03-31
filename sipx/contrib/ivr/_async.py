@@ -42,6 +42,7 @@ class AsyncIVR:
         """Play prompt via TTS or audio file (async)."""
         if prompt.audio_file:
             import wave
+
             with wave.open(prompt.audio_file, "rb") as wf:
                 pcm = wf.readframes(wf.getnframes())
             await self.rtp_session.send_audio(pcm)

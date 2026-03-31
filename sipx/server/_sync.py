@@ -164,7 +164,9 @@ class SIPServer(SIPServerHandlerMixin):
                 if request.method == "INVITE":
                     trying = request.trying()
                     self._transport.send(trying.to_bytes(), source)
-                    logger.debug(">>> AUTO 100 Trying to %s:%s", source.host, source.port)
+                    logger.debug(
+                        ">>> AUTO 100 Trying to %s:%s", source.host, source.port
+                    )
 
                 # Find handler for this method
                 handler = self._handlers.get(request.method)

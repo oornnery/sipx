@@ -418,9 +418,15 @@ class Request(SIPMessage):
         }
         if extra_headers:
             h.update(extra_headers)
-        return Response(status_code=code, reason_phrase=reason, headers=h, content=content)
+        return Response(
+            status_code=code, reason_phrase=reason, headers=h, content=content
+        )
 
-    def ok(self, headers: dict | None = None, content: str | bytes | MessageBody | None = None) -> Response:
+    def ok(
+        self,
+        headers: dict | None = None,
+        content: str | bytes | MessageBody | None = None,
+    ) -> Response:
         """Create 200 OK response."""
         return self._create_response(200, "OK", headers, content)
 
@@ -438,7 +444,9 @@ class Request(SIPMessage):
 
     def redirect(self, contact_uri: str) -> Response:
         """Create 302 Moved Temporarily response."""
-        return self._create_response(302, "Moved Temporarily", {"Contact": f"<{contact_uri}>"})
+        return self._create_response(
+            302, "Moved Temporarily", {"Contact": f"<{contact_uri}>"}
+        )
 
     def __repr__(self) -> str:
         return f"<Request({self.method!r}, {self.uri!r})>"

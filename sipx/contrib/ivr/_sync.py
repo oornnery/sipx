@@ -20,11 +20,18 @@ logger = logging.getLogger(__name__)
 class IVR:
     """Sync IVR controller using RTPSession + TTS + DTMF."""
 
-    def __init__(self, rtp_session: RTPSession, tts: Optional[BaseTTS] = None, dtmf_collector: Optional[DTMFCollector] = None) -> None:
+    def __init__(
+        self,
+        rtp_session: RTPSession,
+        tts: Optional[BaseTTS] = None,
+        dtmf_collector: Optional[DTMFCollector] = None,
+    ) -> None:
         self.rtp_session = rtp_session
         self.tts = tts
         self._player = AudioPlayer(rtp_session)
-        self._dtmf_collector = dtmf_collector or DTMFCollector(rtp_session, max_digits=1)
+        self._dtmf_collector = dtmf_collector or DTMFCollector(
+            rtp_session, max_digits=1
+        )
         self._on_call_start: list[Callable] = []
         self._on_call_end: list[Callable] = []
 

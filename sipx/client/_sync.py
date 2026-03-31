@@ -7,6 +7,7 @@ import uuid
 from typing import Optional, Union, Callable
 
 from .._utils import logger
+from .._types import TimeoutError
 from ..models._auth import SipAuthCredentials
 from .._events import Events, EventContext
 from ..fsm import StateManager, TimerManager
@@ -377,6 +378,9 @@ class Client:
 
         Returns:
             SIP response
+
+        Raises:
+            TimeoutError: If no response is received within the configured timeout.
         """
         # Auto-extract host/port from URI if not provided
         if host is None:
@@ -532,8 +536,9 @@ class Client:
                     final_response = response
 
             if final_response is None:
-                logger.warning("Request timed out after %.0fs", self._transport.config.read_timeout)
-                return None
+                raise TimeoutError(
+                    f"Request timed out after {self._transport.config.read_timeout:.0f}s"
+                )
 
             # Auto-retry on 401/407 if auth is set
             if (
@@ -550,9 +555,8 @@ class Client:
 
             return final_response
 
-        except Exception as e:
-            logger.error("Request failed: %s", e)
-            return None
+        except Exception:
+            raise
         finally:
             # Clean up all timers for this transaction
             timer_manager.cancel_all()
@@ -582,7 +586,9 @@ class Client:
         """
         # Auto-generate from_uri if not provided
         if from_uri is None:
-            from_uri = _get_default_from_uri(self._auth, self._transport.local_address.host)
+            from_uri = _get_default_from_uri(
+                self._auth, self._transport.local_address.host
+            )
 
         # Build headers
         headers = kwargs.pop("headers", {})
@@ -829,7 +835,9 @@ class Client:
             >>> response = client.message('sip:bob@example.com', content='Hello!')
         """
         if from_uri is None:
-            from_uri = _get_default_from_uri(self._auth, self._transport.local_address.host)
+            from_uri = _get_default_from_uri(
+                self._auth, self._transport.local_address.host
+            )
 
         headers = kwargs.pop("headers", {})
         headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"

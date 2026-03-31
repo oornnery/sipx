@@ -14,7 +14,9 @@ class AsyncSipResolver:
     def __init__(self, nameservers: list[str] | None = None):
         self._nameservers = nameservers
 
-    async def resolve(self, domain: str, transport: str | None = None) -> list[ResolvedTarget]:
+    async def resolve(
+        self, domain: str, transport: str | None = None
+    ) -> list[ResolvedTarget]:
         """Resolve domain using asyncio.getaddrinfo (non-blocking A record)."""
         # Try SRV via dnspython if available (run in thread — dnspython is sync)
         try:
@@ -33,7 +35,9 @@ class AsyncSipResolver:
         parsed = SipURI.parse(uri)
         if parsed.port:
             t = parsed.transport or ("TLS" if parsed.is_secure else "UDP")
-            return [ResolvedTarget(host=parsed.host, port=parsed.port, transport=t.upper())]
+            return [
+                ResolvedTarget(host=parsed.host, port=parsed.port, transport=t.upper())
+            ]
         transport = parsed.transport
         if parsed.is_secure and not transport:
             transport = "TLS"
@@ -60,28 +64,41 @@ class AsyncSipResolver:
             elif t == "TLS":
                 queries.append(("_sips._tcp", "TLS"))
         else:
-            queries = [("_sip._udp", "UDP"), ("_sip._tcp", "TCP"), ("_sips._tcp", "TLS")]
+            queries = [
+                ("_sip._udp", "UDP"),
+                ("_sip._tcp", "TCP"),
+                ("_sips._tcp", "TLS"),
+            ]
 
         targets: list[ResolvedTarget] = []
         for prefix, proto in queries:
             try:
                 answers = resolver.resolve(f"{prefix}.{domain}", "SRV")
                 for rdata in answers:
-                    targets.append(ResolvedTarget(
-                        priority=rdata.priority, weight=rdata.weight,
-                        host=str(rdata.target).rstrip("."), port=rdata.port, transport=proto,
-                    ))
+                    targets.append(
+                        ResolvedTarget(
+                            priority=rdata.priority,
+                            weight=rdata.weight,
+                            host=str(rdata.target).rstrip("."),
+                            port=rdata.port,
+                            transport=proto,
+                        )
+                    )
             except Exception:
                 continue
         return targets
 
-    async def _resolve_a(self, domain: str, transport: str | None) -> list[ResolvedTarget]:
+    async def _resolve_a(
+        self, domain: str, transport: str | None
+    ) -> list[ResolvedTarget]:
         """Async A record resolution via asyncio.getaddrinfo."""
         transport = (transport or "UDP").upper()
         port = 5061 if transport == "TLS" else 5060
         try:
             loop = asyncio.get_running_loop()
-            infos = await loop.getaddrinfo(domain, port, family=socket.AF_INET, type=socket.SOCK_DGRAM)
+            infos = await loop.getaddrinfo(
+                domain, port, family=socket.AF_INET, type=socket.SOCK_DGRAM
+            )
             if infos:
                 addr = infos[0][4][0]
                 return [ResolvedTarget(host=addr, port=port, transport=transport)]

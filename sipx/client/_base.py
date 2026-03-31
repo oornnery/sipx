@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import MutableMapping
 from urllib.parse import urlparse
 
 from .._utils import logger
@@ -93,11 +94,11 @@ def _get_default_from_uri(auth: SipAuthCredentials | None, host: str) -> str:
 def _ensure_required_headers(
     method: str,
     uri: str,
-    headers: dict,
+    headers: MutableMapping[str, str],
     local_addr,
     transport_protocol: str,
     auth: SipAuthCredentials | None,
-) -> dict:
+) -> MutableMapping[str, str]:
     """Ensure all required SIP headers are present.
 
     Mutates and returns *headers*.
@@ -149,9 +150,7 @@ def _detect_auth_challenge(response: Response, context: EventContext) -> None:
         if challenge:
             context.metadata["needs_auth"] = True
             context.metadata["auth_challenge"] = challenge
-            logger.debug(
-                f"Authentication challenge detected: {response.status_code}"
-            )
+            logger.debug(f"Authentication challenge detected: {response.status_code}")
 
 
 class DialogTracker:
@@ -172,6 +171,7 @@ class DialogTracker:
             # Store route set if present
             if "Record-Route" in response.headers:
                 from .._routing import RouteSet
+
                 self._route_set = RouteSet.from_response(response)
 
     @property

@@ -27,7 +27,9 @@ class SipResolver:
         except ImportError:
             return None
 
-    def resolve(self, domain: str, transport: str | None = None) -> list[ResolvedTarget]:
+    def resolve(
+        self, domain: str, transport: str | None = None
+    ) -> list[ResolvedTarget]:
         resolver = self._get_resolver()
         if resolver is not None:
             targets = self._resolve_srv(resolver, domain, transport)
@@ -41,13 +43,19 @@ class SipResolver:
         parsed = SipURI.parse(uri)
         if parsed.port:
             transport = parsed.transport or ("TLS" if parsed.is_secure else "UDP")
-            return [ResolvedTarget(host=parsed.host, port=parsed.port, transport=transport.upper())]
+            return [
+                ResolvedTarget(
+                    host=parsed.host, port=parsed.port, transport=transport.upper()
+                )
+            ]
         transport = parsed.transport
         if parsed.is_secure and not transport:
             transport = "TLS"
         return self.resolve(parsed.host, transport)
 
-    def _resolve_srv(self, resolver, domain: str, transport: str | None) -> list[ResolvedTarget]:
+    def _resolve_srv(
+        self, resolver, domain: str, transport: str | None
+    ) -> list[ResolvedTarget]:
         import dns.resolver
 
         queries = []
@@ -60,18 +68,31 @@ class SipResolver:
             elif t == "TLS":
                 queries.append(("_sips._tcp", "TLS"))
         else:
-            queries = [("_sip._udp", "UDP"), ("_sip._tcp", "TCP"), ("_sips._tcp", "TLS")]
+            queries = [
+                ("_sip._udp", "UDP"),
+                ("_sip._tcp", "TCP"),
+                ("_sips._tcp", "TLS"),
+            ]
 
         targets: list[ResolvedTarget] = []
         for prefix, proto in queries:
             try:
                 answers = resolver.resolve(f"{prefix}.{domain}", "SRV")
                 for rdata in answers:
-                    targets.append(ResolvedTarget(
-                        priority=rdata.priority, weight=rdata.weight,
-                        host=str(rdata.target).rstrip("."), port=rdata.port, transport=proto,
-                    ))
-            except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+                    targets.append(
+                        ResolvedTarget(
+                            priority=rdata.priority,
+                            weight=rdata.weight,
+                            host=str(rdata.target).rstrip("."),
+                            port=rdata.port,
+                            transport=proto,
+                        )
+                    )
+            except (
+                dns.resolver.NXDOMAIN,
+                dns.resolver.NoAnswer,
+                dns.resolver.NoNameservers,
+            ):
                 continue
             except Exception:
                 continue
