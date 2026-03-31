@@ -566,8 +566,8 @@ class Client:
             return final_response
 
         except Exception as e:
-            logger.error(f"Request failed: {e}")
-            raise
+            logger.error("Request failed: %s", e)
+            return None
         finally:
             # Clean up all timers for this transaction
             timer_manager.cancel_all()
