@@ -85,8 +85,6 @@ class DTMFEvent:
         return cls(event=code, **kwargs)
 
 
-
-
 class DTMFSender:
     """Send DTMF digits as RFC 4733 named telephone events."""
 
@@ -115,7 +113,9 @@ class DTMFSender:
         total_duration = duration_ms * samples_per_ms
 
         # Packet 1: start (marker bit set)
-        payload = DTMFEvent(event=event_code, end=False, volume=volume, duration=0).to_bytes()
+        payload = DTMFEvent(
+            event=event_code, end=False, volume=volume, duration=0
+        ).to_bytes()
         pkt = RTPPacket(
             marker=True,
             payload_type=DTMF_PAYLOAD_TYPE,
@@ -134,7 +134,9 @@ class DTMFSender:
 
         # Packet 2: continuation
         mid_duration = total_duration // 2
-        payload = DTMFEvent(event=event_code, end=False, volume=volume, duration=mid_duration).to_bytes()
+        payload = DTMFEvent(
+            event=event_code, end=False, volume=volume, duration=mid_duration
+        ).to_bytes()
         pkt = RTPPacket(
             marker=False,
             payload_type=DTMF_PAYLOAD_TYPE,
@@ -152,7 +154,9 @@ class DTMFSender:
         time.sleep(duration_ms / 2000.0)
 
         # Packet 3: end (E bit set, send 3 times per RFC 4733)
-        payload = DTMFEvent(event=event_code, end=True, volume=volume, duration=total_duration).to_bytes()
+        payload = DTMFEvent(
+            event=event_code, end=True, volume=volume, duration=total_duration
+        ).to_bytes()
         for _ in range(3):
             pkt = RTPPacket(
                 marker=False,

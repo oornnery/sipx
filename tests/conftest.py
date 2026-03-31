@@ -32,7 +32,9 @@ class MockTransport(BaseTransport):
         super().__init__(config)
         self.sent: list[tuple[bytes, TransportAddress]] = []
         self._response_queue: deque[bytes] = deque()
-        self._source_address = TransportAddress(host="127.0.0.1", port=5060, protocol="UDP")
+        self._source_address = TransportAddress(
+            host="127.0.0.1", port=5060, protocol="UDP"
+        )
 
     def queue_response(self, data: bytes) -> None:
         """Enqueue raw response bytes to be returned by receive()."""

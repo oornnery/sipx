@@ -31,9 +31,9 @@ from sipx import (
     StateManager,
     DialogState,
     TransportAddress,
-    console,
 )
 from sipx._server import SIPServer
+from sipx._utils import console
 from sipx._utils import (
     EOL,
     SCHEME,

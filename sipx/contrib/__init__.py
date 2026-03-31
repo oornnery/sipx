@@ -2,7 +2,14 @@
 
 from sipx.contrib._ivr import IVR, Menu, MenuItem, Prompt
 from sipx.contrib._sipi import SipI
-from sipx.contrib._sipi_br import ATI, ATIResult, SipIBR, normalize_br_number, is_valid_br_number, is_mobile
+from sipx.contrib._sipi_br import (
+    ATI,
+    ATIResult,
+    SipIBR,
+    normalize_br_number,
+    is_valid_br_number,
+    is_mobile,
+)
 from sipx.media._tts import BaseTTS
 from sipx.media._stt import BaseSTT
 

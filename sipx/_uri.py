@@ -135,7 +135,7 @@ class SipURI:
             return result
 
         result.scheme = match.group(1).lower()
-        rest = uri[match.end():]
+        rest = uri[match.end() :]
 
         # Extract headers (after ?)
         if "?" in rest:
@@ -181,7 +181,7 @@ class SipURI:
             bracket_end = hostport.find("]")
             if bracket_end != -1:
                 result.host = hostport[1:bracket_end]
-                after = hostport[bracket_end + 1:]
+                after = hostport[bracket_end + 1 :]
                 if after.startswith(":"):
                     result.port = int(after[1:])
         elif ":" in hostport:
@@ -199,9 +199,7 @@ class SipURI:
 
     def to_dict(self) -> dict[str, str]:
         """Convert to dict (backward compat with MessageParser.parse_uri)."""
-        params_str = ";".join(
-            f"{k}={v}" if v else k for k, v in self.params.items()
-        )
+        params_str = ";".join(f"{k}={v}" if v else k for k, v in self.params.items())
         return {
             "scheme": self.scheme,
             "user": self.user,

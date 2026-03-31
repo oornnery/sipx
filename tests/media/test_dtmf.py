@@ -67,6 +67,7 @@ class TestDTMFEvent:
 
     def test_from_digit_invalid(self):
         import pytest
+
         with pytest.raises(ValueError):
             DTMFEvent.from_digit("X")
 

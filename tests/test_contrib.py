@@ -68,6 +68,7 @@ class TestIVR:
     def test_menu_item_fields(self):
         def handler():
             pass
+
         item = MenuItem(digit="5", prompt=Prompt(text="Five"), handler=handler)
         assert item.digit == "5"
         assert item.prompt.text == "Five"

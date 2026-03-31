@@ -20,7 +20,9 @@ class TestResolvedTarget:
         assert sorted([t1, t2]) == [t2, t1]
 
     def test_repr(self):
-        t = ResolvedTarget(priority=10, weight=60, host="sip1.example.com", port=5060, transport="UDP")
+        t = ResolvedTarget(
+            priority=10, weight=60, host="sip1.example.com", port=5060, transport="UDP"
+        )
         r = repr(t)
         assert "UDP" in r
         assert "sip1.example.com" in r
@@ -248,6 +250,6 @@ class TestSipResolverInit:
         with patch.dict("sys.modules", {"dns": None, "dns.resolver": None}):
             # Force fresh attempt
             resolver._dns_resolver = None
-            result = resolver._get_resolver()
+            resolver._get_resolver()  # noqa: F841
             # May return None if dnspython not installed
             # Just verify it doesn't crash

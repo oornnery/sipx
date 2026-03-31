@@ -28,7 +28,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 # Import types from centralized _types module
 from ._types import (
@@ -153,7 +153,7 @@ class Transaction:
 
     # Metadata
     dialog_id: Optional[str] = None  # Associated dialog
-    metadata: Dict[str, any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def transition_to(self, new_state: TransactionState) -> None:
         """
@@ -348,7 +348,7 @@ class Dialog:
     transactions: List[str] = field(default_factory=list)  # Transaction IDs
 
     # Metadata
-    metadata: Dict[str, any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def transition_to(self, new_state: DialogState) -> None:
         """
@@ -770,6 +770,9 @@ class StateManager:
         via = request.headers.get("Via", "")
         if isinstance(via, bytes):
             via = via.decode("utf-8", errors="ignore")
+
+        if not via:
+            return ""
 
         # Simple extraction - real implementation should properly parse Via
         if ";branch=" in via:

@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from sipx._client import Client
     from sipx._models._body import SDPBody
     from sipx._models._message import Response
+    from sipx.media._codecs import Codec
 
 
 # ============================================================================
@@ -56,7 +57,9 @@ class AsyncDTMFHelper:
         from ._dtmf import DTMFCollector
 
         effective = max_digits if max_digits > 0 else 9999
-        collector = DTMFCollector(self._rtp._sync, max_digits=effective, timeout=timeout)
+        collector = DTMFCollector(
+            self._rtp._sync, max_digits=effective, timeout=timeout
+        )
         return await asyncio.to_thread(collector.collect)
 
 
@@ -76,7 +79,7 @@ class AsyncRTPSession:
         remote_port: int,
         payload_type: int = 0,
         clock_rate: int = 8000,
-        codec: object | None = None,
+        codec: "Codec | None" = None,
     ) -> None:
         self._sync = RTPSession(
             local_ip=local_ip,

@@ -426,6 +426,8 @@ class Response(SIPMessage):
         "_body",
         "_request",
         "_challenge",
+        "_raw",
+        "_transport_info",
     )
 
     def __init__(
@@ -445,6 +447,8 @@ class Response(SIPMessage):
         )
         self._request = request
         self._challenge = None  # Lazy-loaded auth challenge
+        self._raw: bytes | None = None
+        self._transport_info: dict | None = None
 
         # Reason phrase
         if reason_phrase is None:
@@ -535,6 +539,26 @@ class Response(SIPMessage):
             self._headers["Content-Length"] = str(len(self._content))
 
     @property
+    def raw(self) -> bytes | None:
+        """Return the raw bytes this response was parsed from."""
+        return self._raw
+
+    @raw.setter
+    def raw(self, value: bytes | None) -> None:
+        """Set the raw bytes."""
+        self._raw = value
+
+    @property
+    def transport_info(self) -> dict | None:
+        """Return transport metadata (source address, protocol, etc.)."""
+        return self._transport_info
+
+    @transport_info.setter
+    def transport_info(self, value: dict | None) -> None:
+        """Set transport metadata."""
+        self._transport_info = value
+
+    @property
     def request(self) -> Request | None:
         """Return associated request if available."""
         return self._request
@@ -607,7 +631,7 @@ class Response(SIPMessage):
             )
             for ch in www_challenges:
                 if hasattr(ch, "is_proxy"):
-                    ch.is_proxy = False
+                    typing.cast(typing.Any, ch).is_proxy = False
             challenges.extend(www_challenges)
 
         # Check Proxy-Authenticate
@@ -617,7 +641,7 @@ class Response(SIPMessage):
             )
             for ch in proxy_challenges:
                 if hasattr(ch, "is_proxy"):
-                    ch.is_proxy = True
+                    typing.cast(typing.Any, ch).is_proxy = True
             challenges.extend(proxy_challenges)
 
         return challenges

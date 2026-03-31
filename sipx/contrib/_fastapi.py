@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import AsyncIterator
-from typing import Callable, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -145,7 +145,7 @@ class SIPRouter:
     # ------------------------------------------------------------------
 
     @property
-    def lifespan(self) -> Callable[["FastAPI"], AsyncIterator[None]]:
+    def lifespan(self) -> Any:
         """
         Return a FastAPI lifespan context manager.
 

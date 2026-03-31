@@ -8,23 +8,12 @@ version = "0.0.3"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-    "rich>=14.1.0",
-    "typer>=0.17.4",
-    "textual>=6.1.0",
-]
+dependencies = ["rich>=14.1.0"]
 
 [dependency-groups]
-dev = [
-    "textual-dev>=1.8.0",
-    "pre-commit>=4.3.0",
-    "pytest>=8.4.2",
-    "pytest-asyncio>=1.1.0",
-    "pytest-cov>=6.3.0",
-    "ruff>=0.12.12",
-    "taskipy>=1.14.1",
-    "ty>=0.0.1a20",
-]
+cli = ["typer>=0.17.4"]
+dev = ["pre-commit>=4.3.0", "ruff>=0.12.12", "taskipy>=1.14.1", "ty>=0.0.1a20"]
+test = ["pytest>=8.4.2", "pytest-asyncio>=1.1.0", "pytest-cov>=6.3.0"]
 
 [tool.taskipy.tasks]
 # Quality
@@ -38,23 +27,11 @@ test = "pytest tests/ -v"
 cov = "pytest tests/ --cov=sipx --cov-report=term-missing"
 cov-html = "pytest tests/ --cov=sipx --cov-report=html && open htmlcov/index.html"
 
-# Run examples
-example-ivr = "python examples/ivr.py"
-example-asterisk = "python examples/asterisk.py"
-example-server = "python examples/server.py"
-example-sdp = "python examples/sdp.py"
-example-audio = "python examples/audio.py"
-example-parser = "python examples/parser.py"
-
-# Docker
-asterisk-up = "docker-compose -f docker/asterisk/docker-compose.yml up -d"
-asterisk-down = "docker-compose -f docker/asterisk/docker-compose.yml down"
-
 # CI (run in order)
 ci = "task check && task test"
 
 [tool.setuptools]
-package-dir = {"" = "."}
+package-dir = { "" = "." }
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -36,10 +36,12 @@ class TestSessionTimerParseResponse:
         assert timer.config.min_se == 120
 
     def test_enforce_min_se(self):
-        timer = self._make_timer({
-            "Session-Expires": "60",
-            "Min-SE": "90",
-        })
+        timer = self._make_timer(
+            {
+                "Session-Expires": "60",
+                "Min-SE": "90",
+            }
+        )
         # interval < min_se, so interval should be bumped to min_se
         assert timer.config.interval == 90
 

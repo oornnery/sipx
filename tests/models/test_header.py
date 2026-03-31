@@ -237,7 +237,7 @@ class TestHeaderParserValues:
         assert result == {"value": "application/sdp"}
 
     def test_parse_header_value_with_params(self):
-        result = HeaderParser.parse_header_value('application/sdp; charset=utf-8')
+        result = HeaderParser.parse_header_value("application/sdp; charset=utf-8")
         assert result["value"] == "application/sdp"
         assert result["charset"] == "utf-8"
 
@@ -255,9 +255,7 @@ class TestHeaderParserValues:
         assert result == "application/sdp; charset=utf-8"
 
     def test_format_header_value_quotes_special_chars(self):
-        result = HeaderParser.format_header_value(
-            "text/plain", {"boundary": "a b"}
-        )
+        result = HeaderParser.format_header_value("text/plain", {"boundary": "a b"})
         assert '"a b"' in result
 
 

@@ -203,9 +203,7 @@ class TestDigestAuthSHA256:
 
 class TestQopAuth:
     def test_nonce_count_increments(self):
-        challenge = DigestChallenge(
-            realm="test.com", nonce="nonce1", qop="auth"
-        )
+        challenge = DigestChallenge(realm="test.com", nonce="nonce1", qop="auth")
         creds = DigestCredentials(username="user", password="pass")
         auth = DigestAuth(credentials=creds, challenge=challenge)
 
@@ -218,9 +216,7 @@ class TestQopAuth:
         assert auth.nonce_count == 2
 
     def test_cnonce_generated_and_reused(self):
-        challenge = DigestChallenge(
-            realm="test.com", nonce="nonce1", qop="auth"
-        )
+        challenge = DigestChallenge(realm="test.com", nonce="nonce1", qop="auth")
         creds = DigestCredentials(username="user", password="pass")
         auth = DigestAuth(credentials=creds, challenge=challenge)
 
@@ -231,6 +227,7 @@ class TestQopAuth:
 
         r2 = auth.build_authorization(method="REGISTER", uri="sip:test.com")
         cnonce2_match = re.search(r'cnonce="([^"]+)"', r2)
+        assert cnonce2_match is not None
         cnonce2 = cnonce2_match.group(1)
 
         # cnonce should be reused for same challenge
@@ -255,15 +252,11 @@ class TestQopAuth:
         creds = DigestCredentials(username="user", password="pass")
         auth = DigestAuth(credentials=creds, challenge=challenge)
 
-        result = auth.build_authorization(
-            method="REGISTER", uri="sip:test.com"
-        )
+        result = auth.build_authorization(method="REGISTER", uri="sip:test.com")
         assert "qop=auth" in result
 
     def test_no_qop_means_no_nc_cnonce(self):
-        challenge = DigestChallenge(
-            realm="test.com", nonce="nonce1", qop=None
-        )
+        challenge = DigestChallenge(realm="test.com", nonce="nonce1", qop=None)
         creds = DigestCredentials(username="user", password="pass")
         auth = DigestAuth(credentials=creds, challenge=challenge)
 
@@ -280,9 +273,11 @@ class TestQopAuth:
 
 class TestAuthParserWWWAuthenticate:
     def test_parse_www_authenticate(self):
-        headers = Headers({
-            "WWW-Authenticate": 'Digest realm="atlanta.com", nonce="abc123"',
-        })
+        headers = Headers(
+            {
+                "WWW-Authenticate": 'Digest realm="atlanta.com", nonce="abc123"',
+            }
+        )
         challenge = AuthParser.parse_from_headers(headers)
         assert challenge is not None
         assert isinstance(challenge, DigestChallenge)
@@ -290,12 +285,15 @@ class TestAuthParserWWWAuthenticate:
         assert challenge.is_proxy is False
 
     def test_www_authenticate_takes_priority(self):
-        headers = Headers({
-            "WWW-Authenticate": 'Digest realm="www.com", nonce="www"',
-            "Proxy-Authenticate": 'Digest realm="proxy.com", nonce="proxy"',
-        })
+        headers = Headers(
+            {
+                "WWW-Authenticate": 'Digest realm="www.com", nonce="www"',
+                "Proxy-Authenticate": 'Digest realm="proxy.com", nonce="proxy"',
+            }
+        )
         challenge = AuthParser.parse_from_headers(headers)
         assert challenge is not None
+        assert isinstance(challenge, DigestChallenge)
         assert challenge.realm == "www.com"
         assert challenge.is_proxy is False
 
@@ -311,9 +309,11 @@ class TestAuthParserWWWAuthenticate:
 
 class TestAuthParserProxyAuthenticate:
     def test_parse_proxy_authenticate(self):
-        headers = Headers({
-            "Proxy-Authenticate": 'Digest realm="proxy.com", nonce="proxynonce"',
-        })
+        headers = Headers(
+            {
+                "Proxy-Authenticate": 'Digest realm="proxy.com", nonce="proxynonce"',
+            }
+        )
         challenge = AuthParser.parse_from_headers(headers)
         assert challenge is not None
         assert isinstance(challenge, DigestChallenge)
@@ -328,15 +328,11 @@ class TestAuthParserProxyAuthenticate:
 
 class TestGetAuthHeaderName:
     def test_www_authenticate_returns_authorization(self):
-        challenge = DigestChallenge(
-            realm="test.com", nonce="abc", is_proxy=False
-        )
+        challenge = DigestChallenge(realm="test.com", nonce="abc", is_proxy=False)
         assert AuthParser.get_auth_header_name(challenge) == "Authorization"
 
     def test_proxy_authenticate_returns_proxy_authorization(self):
-        challenge = DigestChallenge(
-            realm="test.com", nonce="abc", is_proxy=True
-        )
+        challenge = DigestChallenge(realm="test.com", nonce="abc", is_proxy=True)
         assert AuthParser.get_auth_header_name(challenge) == "Proxy-Authorization"
 
 
@@ -361,6 +357,7 @@ class TestParseMultipleChallenges:
         val = 'Digest realm="atlanta.com", nonce="abc"'
         challenges = AuthParser.parse_multiple_challenges(val)
         assert len(challenges) == 1
+        assert isinstance(challenges[0], DigestChallenge)
         assert challenges[0].realm == "atlanta.com"
 
     def test_empty_returns_empty(self):
@@ -376,6 +373,7 @@ class TestParseMultipleChallenges:
 class TestAuthGenerateChallenge:
     def test_401_returns_www_authenticate(self):
         from sipx._models._message import Response
+
         resp = Response(
             401,
             headers={"WWW-Authenticate": 'Digest realm="test", nonce="abc"'},
@@ -386,6 +384,7 @@ class TestAuthGenerateChallenge:
 
     def test_407_returns_proxy_authenticate(self):
         from sipx._models._message import Response
+
         resp = Response(
             407,
             headers={"Proxy-Authenticate": 'Digest realm="proxy", nonce="xyz"'},
@@ -396,6 +395,7 @@ class TestAuthGenerateChallenge:
 
     def test_missing_header_returns_empty(self):
         from sipx._models._message import Response
+
         resp = Response(401)
         val = Auth.generate_challenge(resp)
         assert val == ""
@@ -414,5 +414,7 @@ class TestDigestCredentials:
         assert creds.realm is None
 
     def test_with_realm(self):
-        creds = DigestCredentials(username="alice", password="secret", realm="example.com")
+        creds = DigestCredentials(
+            username="alice", password="secret", realm="example.com"
+        )
         assert creds.realm == "example.com"

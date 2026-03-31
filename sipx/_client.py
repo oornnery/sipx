@@ -82,7 +82,7 @@ class Client:
         local_port: int = 5060,
         transport: str = "UDP",
         events: Optional[Events] = None,
-        auth: Optional[SipAuthCredentials] = None,
+        auth: Optional[Union[SipAuthCredentials, tuple]] = None,
         auto_auth: bool = True,
     ) -> None:
         """
@@ -93,7 +93,7 @@ class Client:
             local_port: Local port to bind (default: 5060)
             transport: Transport protocol - UDP, TCP, or TLS (default: UDP)
             events: Optional Events instance for handling SIP messages
-            auth: Optional authentication credentials (from Auth.Digest())
+            auth: Optional authentication credentials (from Auth.Digest() or tuple)
             auto_auth: Automatically retry on 401/407 if auth is set (default: True)
         """
         # Transport configuration
@@ -111,8 +111,17 @@ class Client:
 
         # Events and Auth
         self._events = events
-        self._auth = auth
         self._auto_auth = auto_auth
+
+        # Convert tuple auth to SipAuthCredentials
+        if isinstance(auth, tuple) and len(auth) == 2:
+            self._auth: Optional[SipAuthCredentials] = SipAuthCredentials(
+                username=str(auth[0]), password=str(auth[1])
+            )
+        elif isinstance(auth, SipAuthCredentials):
+            self._auth = auth
+        else:
+            self._auth = None
 
         # Client state
         self._closed = False
@@ -179,10 +188,12 @@ class Client:
         """
         if isinstance(credentials, tuple) and len(credentials) == 2:
             self._auth = SipAuthCredentials(
-                username=credentials[0], password=credentials[1]
+                username=str(credentials[0]), password=str(credentials[1])
             )
-        else:
+        elif isinstance(credentials, SipAuthCredentials):
             self._auth = credentials
+        else:
+            self._auth = None
 
     def retry_with_auth(
         self, response: Response, auth: Optional[SipAuthCredentials] = None
@@ -418,11 +429,10 @@ class Client:
         """
         # Auto-extract host/port from URI if not provided
         if host is None:
-            host, auto_port = self._extract_host_port(uri)
-            if port is None:
-                port = auto_port
-        elif port is None:
-            port = 5060
+            host, extracted_port = self._extract_host_port(uri)
+            port = port if port is not None else extracted_port
+        else:
+            port = port if port is not None else 5060
 
         # Build request
         request = Request(
@@ -710,6 +720,8 @@ class Client:
         """
         # Extract destination from response
         request = response.request
+        if request is None:
+            raise ValueError("Response has no associated request")
         host = kwargs.pop("host", None)
         port = kwargs.pop("port", 5060)
 
@@ -721,7 +733,7 @@ class Client:
         headers["From"] = request.headers.get("From")
         headers["To"] = response.headers.get("To")
         headers["Call-ID"] = request.headers.get("Call-ID")
-        headers["CSeq"] = f"{request.headers.get('CSeq', '1').split()[0]} ACK"
+        headers["CSeq"] = f"{(request.headers.get('CSeq') or '1').split()[0]} ACK"
         headers["Via"] = request.headers.get("Via")
 
         ack_request = Request(
@@ -765,16 +777,20 @@ class Client:
         """
         if response is None and dialog_id is None:
             raise ValueError("Either response or dialog_id must be provided")
+        if response is None:
+            raise ValueError("Response is required when dialog_id is not implemented")
 
         # Extract dialog info from response
         request = response.request
+        if request is None:
+            raise ValueError("Response has no associated request")
         headers = kwargs.pop("headers", {})
         headers["From"] = request.headers.get("From")
         headers["To"] = response.headers.get("To")
         headers["Call-ID"] = request.headers.get("Call-ID")
 
         # Increment CSeq
-        cseq_num = int(request.headers.get("CSeq", "1").split()[0]) + 1
+        cseq_num = int((request.headers.get("CSeq") or "1").split()[0]) + 1
         headers["CSeq"] = f"{cseq_num} BYE"
 
         return self.request(
@@ -800,11 +816,13 @@ class Client:
             SIP response
         """
         request = response.request
+        if request is None:
+            raise ValueError("Response has no associated request")
         headers = kwargs.pop("headers", {})
         headers["From"] = request.headers.get("From")
         headers["To"] = request.headers.get("To")
         headers["Call-ID"] = request.headers.get("Call-ID")
-        headers["CSeq"] = f"{request.headers.get('CSeq', '1').split()[0]} CANCEL"
+        headers["CSeq"] = f"{(request.headers.get('CSeq') or '1').split()[0]} CANCEL"
         headers["Via"] = request.headers.get("Via")
 
         return self.request(
@@ -938,6 +956,8 @@ class Client:
     ) -> Response:
         """Send PRACK (Provisional Response Acknowledgement)."""
         request = response.request
+        if request is None:
+            raise ValueError("Response has no associated request")
         headers = kwargs.pop("headers", {})
         headers["From"] = request.headers.get("From")
         headers["To"] = response.headers.get("To")

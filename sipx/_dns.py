@@ -167,7 +167,11 @@ class SipResolver:
                             transport=proto,
                         )
                     )
-            except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+            except (
+                dns.resolver.NXDOMAIN,
+                dns.resolver.NoAnswer,
+                dns.resolver.NoNameservers,
+            ):
                 continue
             except Exception:
                 continue

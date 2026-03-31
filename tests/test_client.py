@@ -30,7 +30,9 @@ class MockTransport(BaseTransport):
     def receive(self, timeout=None):
         if not self._response_queue:
             raise TimeoutError("No queued responses")
-        return self._response_queue.pop(0), TransportAddress(host="127.0.0.1", port=5060)
+        return self._response_queue.pop(0), TransportAddress(
+            host="127.0.0.1", port=5060
+        )
 
     def handle_request(self, request, destination):
         raise NotImplementedError
@@ -348,6 +350,7 @@ class TestTupleAuth:
         mock_create.return_value = MockTransport()
         client = Client(local_port=0)
         client.auth = ("alice", "secret")
+        assert client.auth is not None
         assert client.auth.username == "alice"
         assert client.auth.password == "secret"
         client.close()
@@ -357,6 +360,7 @@ class TestTupleAuth:
         mock_create.return_value = MockTransport()
         client = Client(local_port=0)
         client.auth = Auth.Digest("alice", "secret")
+        assert client.auth is not None
         assert client.auth.username == "alice"
         client.close()
 

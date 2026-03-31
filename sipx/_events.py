@@ -116,9 +116,9 @@ def event_handler(
             statuses = tuple(status)
 
         # Store metadata on function
-        func._event_handler_method = methods
-        func._event_handler_status = statuses
-        func._is_event_handler = True
+        setattr(func, "_event_handler_method", methods)
+        setattr(func, "_event_handler_status", statuses)
+        setattr(func, "_is_event_handler", True)
 
         return func
 

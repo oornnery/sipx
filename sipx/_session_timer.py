@@ -191,7 +191,9 @@ class SessionTimer:
                 request.headers["Supported"] = "timer"
 
     @staticmethod
-    def add_session_expires(request, interval: int = 1800, refresher: str = "uac") -> None:
+    def add_session_expires(
+        request, interval: int = 1800, refresher: str = "uac"
+    ) -> None:
         """Add Session-Expires header to a request."""
         request.headers["Session-Expires"] = f"{interval};refresher={refresher}"
 

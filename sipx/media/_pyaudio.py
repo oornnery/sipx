@@ -38,8 +38,7 @@ def _import_pyaudio():
         return pyaudio
     except ImportError:
         raise ImportError(
-            "PyAudio integration requires 'pyaudio'. "
-            "Install with: pip install pyaudio"
+            "PyAudio integration requires 'pyaudio'. Install with: pip install pyaudio"
         )
 
 

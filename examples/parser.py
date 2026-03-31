@@ -2,6 +2,7 @@
 """sipx — Parse raw SIP messages and headers."""
 
 from sipx import MessageParser, Headers
+from sipx._models._message import Request, Response
 from sipx._utils import console
 
 # --- Parse a raw SIP request ---
@@ -19,6 +20,7 @@ raw = (
 )
 
 msg = MessageParser.parse(raw)
+assert isinstance(msg, Request)
 console.print(f"Type: {type(msg).__name__}")
 console.print(f"Method: {msg.method}, URI: {msg.uri}")
 console.print(f"Via: {msg.via}")
@@ -39,6 +41,7 @@ raw_resp = (
 )
 
 resp = MessageParser.parse(raw_resp)
+assert isinstance(resp, Response)
 console.print(f"\nResponse: {resp.status_code} {resp.reason_phrase}")
 console.print(f"is_error={resp.is_error}, is_client_error={resp.is_client_error}")
 

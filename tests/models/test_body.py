@@ -206,7 +206,9 @@ class TestSDPBodyCreateAnswer:
             origin_address="192.168.1.101",
             connection_address="192.168.1.101",
         )
-        assert int(answer.origin_session_version) == int(offer.origin_session_version) + 1
+        assert (
+            int(answer.origin_session_version) == int(offer.origin_session_version) + 1
+        )
 
     def test_create_answer_reject_media(self):
         offer = self._make_offer()
@@ -583,7 +585,9 @@ class TestBodyParser:
 
     def test_parse_sdp_with_charset_param(self):
         sdp_text = "v=0\r\no=- 1 0 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\n"
-        body = BodyParser.parse(sdp_text.encode("utf-8"), "application/sdp; charset=utf-8")
+        body = BodyParser.parse(
+            sdp_text.encode("utf-8"), "application/sdp; charset=utf-8"
+        )
         assert isinstance(body, SDPBody)
 
     def test_parse_text_plain_returns_raw(self):
