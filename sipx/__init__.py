@@ -97,6 +97,7 @@ from ._depends import (
 
 from ._uri import SipURI
 from ._session_timer import SessionTimer, SessionTimerConfig
+from ._routing import RouteSet
 
 # ============================================================================
 # FSM
@@ -222,6 +223,7 @@ __all__ = [
     "SipURI",
     "SessionTimer",
     "SessionTimerConfig",
+    "RouteSet",
     "Events",
     "EventContext",
     "event_handler",
