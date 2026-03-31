@@ -96,6 +96,7 @@ from ._depends import (
 # ============================================================================
 
 from ._uri import SipURI
+from ._session_timer import SessionTimer, SessionTimerConfig
 
 # ============================================================================
 # FSM
@@ -219,6 +220,8 @@ __all__ = [
     "AsyncClient",
     "SIPServer",
     "SipURI",
+    "SessionTimer",
+    "SessionTimerConfig",
     "Events",
     "EventContext",
     "event_handler",
