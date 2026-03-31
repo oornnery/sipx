@@ -7,6 +7,7 @@ and automatically responds with appropriate status codes.
 
 from __future__ import annotations
 
+import asyncio
 import threading
 from typing import Callable, Dict, Optional
 
@@ -414,42 +415,136 @@ class SIPServer:
 
 
 class AsyncSIPServer:
-    """
-    Async SIP server (placeholder for future async implementation).
-
-    For now, uses the sync SIPServer internally.
-    """
+    """Async SIP server wrapping sync ``SIPServer`` via ``asyncio.to_thread``."""
 
     def __init__(
         self,
         local_host: str = "0.0.0.0",
         local_port: int = 5060,
         config: Optional[TransportConfig] = None,
-    ):
-        self._server = SIPServer(local_host, local_port, config)
+        transport: str = "UDP",
+        events: Optional[Dict[str, Callable]] = None,
+    ) -> None:
+        self._sync = SIPServer(
+            local_host=local_host,
+            local_port=local_port,
+            config=config,
+            transport=transport,
+            events=events,
+        )
 
-    async def start(self) -> None:
-        """Start the async server."""
-        self._server.start()
+    # ------------------------------------------------------------------
+    # Decorators (delegate to sync server)
+    # ------------------------------------------------------------------
 
-    async def stop(self) -> None:
-        """Stop the async server."""
-        self._server.stop()
+    def handle(self, method: str):
+        """Decorator to register a handler for a SIP method."""
+        return self._sync.handle(method)
+
+    @property
+    def invite(self):
+        """Decorator to register an INVITE handler."""
+        return self._sync.invite
+
+    @property
+    def register(self):
+        """Decorator to register a REGISTER handler."""
+        return self._sync.register
+
+    @property
+    def options(self):
+        """Decorator to register an OPTIONS handler."""
+        return self._sync.options
+
+    @property
+    def bye(self):
+        """Decorator to register a BYE handler."""
+        return self._sync.bye
+
+    @property
+    def cancel(self):
+        """Decorator to register a CANCEL handler."""
+        return self._sync.cancel
+
+    @property
+    def message(self):
+        """Decorator to register a MESSAGE handler."""
+        return self._sync.message
+
+    @property
+    def subscribe(self):
+        """Decorator to register a SUBSCRIBE handler."""
+        return self._sync.subscribe
+
+    @property
+    def notify(self):
+        """Decorator to register a NOTIFY handler."""
+        return self._sync.notify
+
+    @property
+    def refer(self):
+        """Decorator to register a REFER handler."""
+        return self._sync.refer
+
+    @property
+    def info(self):
+        """Decorator to register an INFO handler."""
+        return self._sync.info
+
+    @property
+    def update(self):
+        """Decorator to register an UPDATE handler."""
+        return self._sync.update
+
+    @property
+    def prack(self):
+        """Decorator to register a PRACK handler."""
+        return self._sync.prack
+
+    @property
+    def publish(self):
+        """Decorator to register a PUBLISH handler."""
+        return self._sync.publish
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def state_manager(self) -> StateManager:
+        """Access the server's state manager."""
+        return self._sync.state_manager
+
+    # ------------------------------------------------------------------
+    # Registration
+    # ------------------------------------------------------------------
 
     def register_handler(
         self,
         method: str,
         handler: Callable[[Request, TransportAddress], Response],
     ) -> None:
-        """Register a handler (sync for now)."""
-        self._server.register_handler(method, handler)
+        """Register a custom handler for a SIP method."""
+        self._sync.register_handler(method, handler)
+
+    # ------------------------------------------------------------------
+    # Lifecycle (async via to_thread)
+    # ------------------------------------------------------------------
+
+    async def start(self) -> None:
+        """Start the server in a background thread."""
+        await asyncio.to_thread(self._sync.start)
+
+    async def stop(self) -> None:
+        """Stop the server."""
+        await asyncio.to_thread(self._sync.stop)
 
     async def __aenter__(self):
         """Async context manager entry."""
         await self.start()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, *_) -> bool:
         """Async context manager exit."""
         await self.stop()
         return False
