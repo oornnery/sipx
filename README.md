@@ -201,44 +201,44 @@ if r.status_code == 401:
 
 ## Supported Methods
 
-| Method | Description | Example |
-|--------|-------------|---------|
-| INVITE | Establish a call | `client.invite('sip:bob@ex.com', body=sdp)` |
-| ACK | Acknowledge INVITE | `client.ack()` (auto dialog) |
-| BYE | Terminate a call | `client.bye()` (auto dialog) |
-| CANCEL | Cancel pending INVITE | `client.cancel(response=r)` |
-| REGISTER | Register location | `client.register('sip:alice@ex.com')` |
-| OPTIONS | Query capabilities | `client.options('sip:ex.com')` |
-| MESSAGE | Instant message | `client.message('sip:bob@ex.com', content='Hi')` |
-| SUBSCRIBE | Subscribe to events | `client.subscribe('sip:bob@ex.com')` |
-| NOTIFY | Event notification | `client.notify('sip:bob@ex.com')` |
-| REFER | Call transfer | `client.refer('sip:bob@ex.com', refer_to='sip:carol@ex.com')` |
-| INFO | Mid-dialog info (DTMF) | `client.info('sip:bob@ex.com', content=dtmf)` |
-| UPDATE | Update session | `client.update('sip:bob@ex.com', sdp_content=sdp)` |
-| PRACK | Provisional ACK | `client.prack(response=r)` |
-| PUBLISH | Publish state | `client.publish('sip:bob@ex.com')` |
+| Method    | Description            | Example                                                       |
+| --------- | ---------------------- | ------------------------------------------------------------- |
+| INVITE    | Establish a call       | `client.invite('sip:bob@ex.com', body=sdp)`                   |
+| ACK       | Acknowledge INVITE     | `client.ack()` (auto dialog)                                  |
+| BYE       | Terminate a call       | `client.bye()` (auto dialog)                                  |
+| CANCEL    | Cancel pending INVITE  | `client.cancel(response=r)`                                   |
+| REGISTER  | Register location      | `client.register('sip:alice@ex.com')`                         |
+| OPTIONS   | Query capabilities     | `client.options('sip:ex.com')`                                |
+| MESSAGE   | Instant message        | `client.message('sip:bob@ex.com', content='Hi')`              |
+| SUBSCRIBE | Subscribe to events    | `client.subscribe('sip:bob@ex.com')`                          |
+| NOTIFY    | Event notification     | `client.notify('sip:bob@ex.com')`                             |
+| REFER     | Call transfer          | `client.refer('sip:bob@ex.com', refer_to='sip:carol@ex.com')` |
+| INFO      | Mid-dialog info (DTMF) | `client.info('sip:bob@ex.com', content=dtmf)`                 |
+| UPDATE    | Update session         | `client.update('sip:bob@ex.com', sdp_content=sdp)`            |
+| PRACK     | Provisional ACK        | `client.prack(response=r)`                                    |
+| PUBLISH   | Publish state          | `client.publish('sip:bob@ex.com')`                            |
 
 ## RFC Compliance
 
-| RFC | Title | Status |
-|-----|-------|--------|
-| 3261 | SIP: Session Initiation Protocol | Complete (auto 100 Trying, retransmission) |
-| 2617 | HTTP Digest Authentication | Complete (MD5, SHA-256) |
-| 7616 | HTTP Digest (SHA-256) | Complete |
-| 4566 | SDP: Session Description Protocol | Complete (ICE, SRTP, DTLS) |
-| 3264 | Offer/Answer Model with SDP | Complete |
-| 3550 | RTP: Real-time Transport Protocol | Complete (sync + async) |
-| 4733 | DTMF via RTP (telephone-event) | Complete |
-| 3263 | DNS SRV Resolution | Complete (auto in Client) |
-| 4028 | Session Timers | Complete |
+| RFC  | Title                             | Status                                     |
+| ---- | --------------------------------- | ------------------------------------------ |
+| 3261 | SIP: Session Initiation Protocol  | Complete (auto 100 Trying, retransmission) |
+| 2617 | HTTP Digest Authentication        | Complete (MD5, SHA-256)                    |
+| 7616 | HTTP Digest (SHA-256)             | Complete                                   |
+| 4566 | SDP: Session Description Protocol | Complete (ICE, SRTP, DTLS)                 |
+| 3264 | Offer/Answer Model with SDP       | Complete                                   |
+| 3550 | RTP: Real-time Transport Protocol | Complete (sync + async)                    |
+| 4733 | DTMF via RTP (telephone-event)    | Complete                                   |
+| 3263 | DNS SRV Resolution                | Complete (auto in Client)                  |
+| 4028 | Session Timers                    | Complete                                   |
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [docs/SDD.md](docs/SDD.md) | Software Design Document (full spec, diagrams, roadmap) |
-| [examples/README.md](examples/README.md) | Examples catalog (22 examples) |
-| [docker/asterisk/](docker/asterisk/) | Asterisk test environment |
+| Document                                 | Description                                             |
+| ---------------------------------------- | ------------------------------------------------------- |
+| [docs/SDD.md](docs/SDD.md)               | Software Design Document (full spec, diagrams, roadmap) |
+| [examples/README.md](examples/README.md) | Examples catalog (22 examples)                          |
+| [docker/asterisk/](docker/asterisk/)     | Asterisk test environment                               |
 
 ## Testing with Asterisk
 
@@ -252,14 +252,14 @@ uv run python examples/asterisk.py
 
 See [examples/README.md](examples/README.md) for the full list. Highlights:
 
-| Example | What it shows |
-|---------|---------------|
-| [quickstart.py](examples/quickstart.py) | One-liner register, options, call, send |
-| [call.py](examples/call.py) | REGISTER -> INVITE -> ACK -> BYE |
-| [server.py](examples/server.py) | SIPServer with decorators + DI |
-| [ivr.py](examples/ivr.py) | Async IVR with RTP + DTMF |
+| Example                                               | What it shows                            |
+| ----------------------------------------------------- | ---------------------------------------- |
+| [quickstart.py](examples/quickstart.py)               | One-liner register, options, call, send  |
+| [call.py](examples/call.py)                           | REGISTER -> INVITE -> ACK -> BYE         |
+| [server.py](examples/server.py)                       | SIPServer with decorators + DI           |
+| [ivr.py](examples/ivr.py)                             | Async IVR with RTP + DTMF                |
 | [response_builders.py](examples/response_builders.py) | request.ok/trying/error, dialog tracking |
-| [asterisk.py](examples/asterisk.py) | Comprehensive integration test |
+| [asterisk.py](examples/asterisk.py)                   | Comprehensive integration test           |
 
 ## Roadmap
 
