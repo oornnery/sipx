@@ -63,9 +63,9 @@ class User:
 
 
 USERS = [
-    User("1111", "1111xxx", 5061),
-    User("2222", "2222xxx", 5062),
-    User("3333", "3333xxx", 5063),
+    User("1111", "1111xxx", 5061),  # Auth required for ALL methods
+    User("2222", "2222xxx", 5062),  # OPTIONS open (ACL), auth for REGISTER/INVITE
+    User("3333", "3333xxx", 5063),  # Strict security (same as 1111)
 ]
 
 
@@ -130,7 +130,7 @@ class FullEvents(Events):
 # Helpers
 # ---------------------------------------------------------------------------
 def make_sdp(client: Client, username: str, port: int = 8000) -> SDPBody:
-    return SDPBody.audio(ip=client.local_address.host, port=port)
+    return client.create_sdp(port=port)
 
 
 def contact(username: str, client: Client) -> dict:
@@ -241,6 +241,20 @@ def demo_server() -> dict:
     finally:
         server.stop()
 
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Section N: OPTIONS without auth (anonymous endpoint)
+# ---------------------------------------------------------------------------
+def test_options_no_auth() -> dict:
+    results = {}
+    console.print("\n[bold]N.1 OPTIONS (no auth)[/bold]")
+    with Client(local_host="127.0.0.1", local_port=5070) as client:
+        # No client.auth — tests anonymous endpoint in pjsip.conf
+        r = client.options(f"sip:{HOST}")
+        results["options_no_auth"] = r is not None and r.status_code == 200
+        console.print(f"  -> {r.status_code if r else 'None'}")
     return results
 
 
@@ -452,6 +466,7 @@ def main():
         return
 
     results: dict[str, dict] = {}
+    start = time.monotonic()
 
     try:
         console.rule("Section 0: Offline")
@@ -460,6 +475,10 @@ def main():
         console.rule("Section S: SIPServer")
         results["S-server"] = demo_server()
         time.sleep(1)
+
+        console.rule("Section N: OPTIONS (no auth)")
+        results["N-no-auth"] = test_options_no_auth()
+        time.sleep(0.5)
 
         for i, user in enumerate(USERS, start=1):
             console.rule(f"Section {i}: User {user.username}")
@@ -473,6 +492,8 @@ def main():
         console.rule("Section L: Late Offer (2222)")
         results["L-late"] = test_late_offer(USERS[1])
 
+        elapsed = time.monotonic() - start
+        console.print(f"\n[dim]Completed in {elapsed:.1f}s[/dim]")
         print_summary(results)
 
     except KeyboardInterrupt:
