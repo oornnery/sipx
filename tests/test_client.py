@@ -285,21 +285,17 @@ class TestExtractHostPort:
         assert port == 5060
 
     def test_sip_uri_with_port(self):
-        """Note: urlparse doesn't parse SIP URI ports the same as HTTP.
-        The implementation falls back to port 5060 for sip: URIs
-        where the port is embedded after the host in the path component."""
+        """SipURI parser correctly extracts explicit port from SIP URI."""
         client = self._make_client()
         host, port = client._extract_host_port("sip:bob@example.com:5080")
         assert host == "example.com"
-        # urlparse treats :5080 as part of the path for sip: scheme,
-        # so the implementation defaults to 5060
-        assert port == 5060
+        assert port == 5080
 
     def test_sips_uri(self):
         client = self._make_client()
         host, port = client._extract_host_port("sips:bob@example.com")
         assert host == "example.com"
-        assert port == 5060
+        assert port == 5061  # SIPS default per RFC 3261
 
     def test_bare_uri_gets_sip_prefix(self):
         client = self._make_client()
