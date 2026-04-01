@@ -24,6 +24,9 @@ from .._types import (
 from ._base import AsyncBaseTransport, BaseTransport
 
 from ..models._message import Request, Response
+from .._utils import logger
+
+_log = logger.getChild("transport.tcp")
 
 
 class TCPTransport(BaseTransport):
@@ -67,7 +70,12 @@ class TCPTransport(BaseTransport):
             # Listen for incoming connections (for server mode)
             self._socket.listen(5)
 
+            _log.info(
+                "TCP bound to %s:%d", self.config.local_host, self.config.local_port
+            )
+
         except OSError as e:
+            _log.error("TCP socket init failed: %s", e)
             raise TransportError(f"Failed to initialize TCP socket: {e}") from e
 
     def _ensure_connected(self, destination: TransportAddress) -> None:
@@ -89,6 +97,8 @@ class TCPTransport(BaseTransport):
 
         # Create new connection
         try:
+            _log.info("TCP connecting to %s:%d", destination.host, destination.port)
+
             # Create a new client socket
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -101,7 +111,10 @@ class TCPTransport(BaseTransport):
             # Set socket to non-blocking for I/O operations
             self._socket.settimeout(self.config.read_timeout)
 
+            _log.info("TCP connected")
+
         except OSError as e:
+            _log.error("TCP connection error: %s", e)
             raise ConnectionError(
                 f"Failed to connect to {destination.host}:{destination.port}: {e}"
             ) from e
@@ -195,7 +208,10 @@ class TCPTransport(BaseTransport):
                     raise WriteError("Socket connection broken")
                 total_sent += sent
 
+            _log.debug("TCP send %d bytes", len(data))
+
         except OSError as e:
+            _log.error("TCP send failed: %s", e)
             raise WriteError(f"Failed to send TCP data: {e}") from e
 
     def receive(
@@ -255,12 +271,15 @@ class TCPTransport(BaseTransport):
                         # We know expected size
                         if total_size >= body_start + content_length:
                             # Complete message received
+                            complete = data_so_far[: body_start + content_length]
+                            _log.debug("TCP recv %d bytes", len(complete))
                             return (
-                                data_so_far[: body_start + content_length],
+                                complete,
                                 self._connected_to or TransportAddress("", 0, "TCP"),
                             )
                     elif total_size > body_start:
                         # No Content-Length, assume message ends after headers
+                        _log.debug("TCP recv %d bytes", len(data_so_far))
                         return (
                             data_so_far,
                             self._connected_to or TransportAddress("", 0, "TCP"),
@@ -269,6 +288,7 @@ class TCPTransport(BaseTransport):
         except socket.timeout as e:
             raise TimeoutError("TCP receive timeout") from e
         except OSError as e:
+            _log.error("TCP receive failed: %s", e)
             raise ReadError(f"Failed to receive TCP data: {e}") from e
         finally:
             if timeout is not None:
@@ -282,6 +302,7 @@ class TCPTransport(BaseTransport):
         """Close TCP connection and socket."""
         self._disconnect()
         self._closed = True
+        _log.info("TCP closed")
 
     def _get_protocol_name(self) -> str:
         """Return protocol name."""
@@ -334,17 +355,25 @@ class AsyncTCPTransport(AsyncBaseTransport):
 
         # Create new connection
         try:
+            _log.info("TCP connecting to %s:%d", destination.host, destination.port)
+
             self._reader, self._writer = await asyncio.wait_for(
                 asyncio.open_connection(destination.host, destination.port),
                 timeout=self.config.connect_timeout,
             )
             self._connected_to = destination
 
+            _log.info("TCP connected")
+
         except asyncio.TimeoutError as e:
+            _log.error(
+                "TCP connection timeout to %s:%d", destination.host, destination.port
+            )
             raise ConnectionError(
                 f"Connection timeout to {destination.host}:{destination.port}"
             ) from e
         except OSError as e:
+            _log.error("TCP connection error: %s", e)
             raise ConnectionError(
                 f"Failed to connect to {destination.host}:{destination.port}: {e}"
             ) from e
@@ -443,7 +472,9 @@ class AsyncTCPTransport(AsyncBaseTransport):
         try:
             self._writer.write(data)
             await self._writer.drain()
+            _log.debug("TCP send %d bytes", len(data))
         except Exception as e:
+            _log.error("TCP send failed: %s", e)
             raise WriteError(f"Failed to send TCP data: {e}") from e
 
     async def receive(
@@ -497,18 +528,22 @@ class AsyncTCPTransport(AsyncBaseTransport):
                         # We know expected size
                         if total_size >= body_start + content_length:
                             # Complete message received
+                            complete = data_so_far[: body_start + content_length]
+                            _log.debug("TCP recv %d bytes", len(complete))
                             return (
-                                data_so_far[: body_start + content_length],
+                                complete,
                                 self._connected_to or TransportAddress("", 0, "TCP"),
                             )
                     elif total_size > body_start:
                         # No Content-Length, assume message ends after headers
+                        _log.debug("TCP recv %d bytes", len(data_so_far))
                         return (
                             data_so_far,
                             self._connected_to or TransportAddress("", 0, "TCP"),
                         )
 
         except Exception as e:
+            _log.error("TCP receive failed: %s", e)
             raise ReadError(f"Failed to receive TCP data: {e}") from e
 
     @staticmethod
@@ -523,6 +558,7 @@ class AsyncTCPTransport(AsyncBaseTransport):
             await self._server.wait_closed()
             self._server = None
         self._closed = True
+        _log.info("TCP closed")
 
     def _get_protocol_name(self) -> str:
         """Return protocol name."""

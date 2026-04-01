@@ -17,6 +17,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from ._utils import logger
+
+_log = logger.getChild("routing")
+
 if TYPE_CHECKING:
     from .models._message import Request, Response
 
@@ -78,6 +82,9 @@ class RouteSet:
         """
         if not self.routes:
             return
+        _log.debug(
+            "Applying route set (%d routes, loose=%s)", len(self.routes), self.is_loose
+        )
 
         # Check if first route uses loose routing
         first = self.routes[0]

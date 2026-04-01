@@ -11,6 +11,9 @@ from .._types import (
     TransactionType,
 )
 from ._models import Dialog, Transaction
+from .._utils import logger
+
+_log = logger.getChild("fsm")
 
 if TYPE_CHECKING:
     from ..models._message import Request, Response
@@ -82,6 +85,14 @@ class StateManager:
         # Store transaction
         self._transactions[transaction.id] = transaction
 
+        _log.debug(
+            "Transaction %s created: %s %s (type=%s)",
+            transaction.id[:8],
+            request.method,
+            branch,
+            transaction_type.name,
+        )
+
         return transaction
 
     def get_transaction(self, transaction_id: str) -> Optional[Transaction]:
@@ -138,9 +149,19 @@ class StateManager:
         transaction = self.get_transaction(transaction_id)
         if transaction:
             transaction.add_response(response)
+            _log.debug(
+                "Transaction %s updated: %s -> %s",
+                transaction_id[:8],
+                transaction.state.name
+                if hasattr(transaction.state, "name")
+                else transaction.state,
+                response.status_code,
+            )
 
             # Trigger handlers
             self._trigger_transaction_handlers(transaction)
+        else:
+            _log.warning("Transaction %s not found", transaction_id[:8])
 
     def remove_transaction(self, transaction_id: str) -> None:
         """
@@ -151,6 +172,7 @@ class StateManager:
         """
         if transaction_id in self._transactions:
             del self._transactions[transaction_id]
+            _log.debug("Transaction %s removed", transaction_id[:8])
 
     def cleanup_transactions(self, max_age: float = 300.0) -> int:
         """
@@ -212,6 +234,8 @@ class StateManager:
         dialog_key = dialog.get_dialog_id()
         self._dialogs[dialog_key] = dialog
 
+        _log.debug("Dialog created: call-id=%s", call_id)
+
         return dialog
 
     def get_dialog(self, dialog_id: str) -> Optional[Dialog]:
@@ -267,9 +291,12 @@ class StateManager:
                 if hasattr(dialog, key):
                     setattr(dialog, key, value)
             dialog.updated_at = time.time()
+            _log.debug("Dialog %s updated: %s", dialog_id[:8], list(kwargs.keys()))
 
             # Trigger handlers
             self._trigger_dialog_handlers(dialog)
+        else:
+            _log.warning("Dialog %s not found", dialog_id[:8])
 
     def remove_dialog(self, dialog_id: str) -> None:
         """
@@ -280,6 +307,7 @@ class StateManager:
         """
         if dialog_id in self._dialogs:
             del self._dialogs[dialog_id]
+            _log.debug("Dialog %s removed", dialog_id[:8])
 
     def cleanup_dialogs(self, max_age: float = 3600.0) -> int:
         """

@@ -12,8 +12,6 @@ import socket
 import ssl
 from typing import Optional, Tuple
 
-import logging
-
 from ._utils import parse_content_length
 from .._types import (
     ConnectionError,
@@ -27,6 +25,9 @@ from .._types import (
 from ._base import AsyncBaseTransport, BaseTransport
 
 from ..models._message import Request, Response
+from .._utils import logger
+
+_log = logger.getChild("transport.tls")
 
 
 class TLSTransport(BaseTransport):
@@ -63,7 +64,7 @@ class TLSTransport(BaseTransport):
 
         # Configure verification
         if not self.config.verify_mode:
-            logging.getLogger("sipx").warning(
+            _log.warning(
                 "TLS certificate verification is DISABLED — "
                 "connections are vulnerable to MitM attacks"
             )
@@ -107,6 +108,8 @@ class TLSTransport(BaseTransport):
 
         # Create new TLS connection
         try:
+            _log.info("TLS connecting to %s:%d", destination.host, destination.port)
+
             # Create raw socket
             raw_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             raw_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -125,11 +128,15 @@ class TLSTransport(BaseTransport):
             # Set socket timeout for I/O operations
             self._socket.settimeout(self.config.read_timeout)
 
+            _log.info("TLS handshake complete")
+
         except ssl.SSLError as e:
+            _log.error("TLS handshake failed: %s", e)
             raise ConnectionError(
                 f"TLS handshake failed with {destination.host}:{destination.port}: {e}"
             ) from e
         except OSError as e:
+            _log.error("TLS connection error: %s", e)
             raise ConnectionError(
                 f"Failed to connect to {destination.host}:{destination.port}: {e}"
             ) from e
@@ -225,9 +232,13 @@ class TLSTransport(BaseTransport):
                     raise WriteError("Socket connection broken")
                 total_sent += sent
 
+            _log.debug("TLS send %d bytes", len(data))
+
         except ssl.SSLError as e:
+            _log.error("TLS send failed: %s", e)
             raise WriteError(f"TLS send error: {e}") from e
         except OSError as e:
+            _log.error("TLS send failed: %s", e)
             raise WriteError(f"Failed to send TLS data: {e}") from e
 
     def receive(
@@ -284,12 +295,15 @@ class TLSTransport(BaseTransport):
                         # We know expected size
                         if total_size >= body_start + content_length:
                             # Complete message received
+                            complete = data_so_far[: body_start + content_length]
+                            _log.debug("TLS recv %d bytes", len(complete))
                             return (
-                                data_so_far[: body_start + content_length],
+                                complete,
                                 self._connected_to or TransportAddress("", 0, "TLS"),
                             )
                     elif total_size > body_start:
                         # No Content-Length, assume message ends after headers
+                        _log.debug("TLS recv %d bytes", len(data_so_far))
                         return (
                             data_so_far,
                             self._connected_to or TransportAddress("", 0, "TLS"),
@@ -298,8 +312,10 @@ class TLSTransport(BaseTransport):
         except socket.timeout as e:
             raise TimeoutError("TLS receive timeout") from e
         except ssl.SSLError as e:
+            _log.error("TLS receive failed: %s", e)
             raise ReadError(f"TLS receive error: {e}") from e
         except OSError as e:
+            _log.error("TLS receive failed: %s", e)
             raise ReadError(f"Failed to receive TLS data: {e}") from e
         finally:
             if timeout is not None:
@@ -313,6 +329,7 @@ class TLSTransport(BaseTransport):
         """Close TLS connection and socket."""
         self._disconnect()
         self._closed = True
+        _log.info("TLS closed")
 
     def _get_protocol_name(self) -> str:
         """Return protocol name."""
@@ -372,7 +389,7 @@ class AsyncTLSTransport(AsyncBaseTransport):
 
         # Configure verification
         if not self.config.verify_mode:
-            logging.getLogger("sipx").warning(
+            _log.warning(
                 "TLS certificate verification is DISABLED — "
                 "connections are vulnerable to MitM attacks"
             )
@@ -416,6 +433,8 @@ class AsyncTLSTransport(AsyncBaseTransport):
 
         # Create new TLS connection
         try:
+            _log.info("TLS connecting to %s:%d", destination.host, destination.port)
+
             self._reader, self._writer = await asyncio.wait_for(
                 asyncio.open_connection(
                     destination.host,
@@ -427,15 +446,22 @@ class AsyncTLSTransport(AsyncBaseTransport):
             )
             self._connected_to = destination
 
+            _log.info("TLS handshake complete")
+
         except asyncio.TimeoutError as e:
+            _log.error(
+                "TLS connection timeout to %s:%d", destination.host, destination.port
+            )
             raise ConnectionError(
                 f"TLS connection timeout to {destination.host}:{destination.port}"
             ) from e
         except ssl.SSLError as e:
+            _log.error("TLS handshake failed: %s", e)
             raise ConnectionError(
                 f"TLS handshake failed with {destination.host}:{destination.port}: {e}"
             ) from e
         except OSError as e:
+            _log.error("TLS connection error: %s", e)
             raise ConnectionError(
                 f"Failed to connect to {destination.host}:{destination.port}: {e}"
             ) from e
@@ -544,7 +570,9 @@ class AsyncTLSTransport(AsyncBaseTransport):
         try:
             self._writer.write(data)
             await self._writer.drain()
+            _log.debug("TLS send %d bytes", len(data))
         except Exception as e:
+            _log.error("TLS send failed: %s", e)
             raise WriteError(f"Failed to send TLS data: {e}") from e
 
     async def receive(
@@ -598,18 +626,22 @@ class AsyncTLSTransport(AsyncBaseTransport):
                         # We know expected size
                         if total_size >= body_start + content_length:
                             # Complete message received
+                            complete = data_so_far[: body_start + content_length]
+                            _log.debug("TLS recv %d bytes", len(complete))
                             return (
-                                data_so_far[: body_start + content_length],
+                                complete,
                                 self._connected_to or TransportAddress("", 0, "TLS"),
                             )
                     elif total_size > body_start:
                         # No Content-Length, assume message ends after headers
+                        _log.debug("TLS recv %d bytes", len(data_so_far))
                         return (
                             data_so_far,
                             self._connected_to or TransportAddress("", 0, "TLS"),
                         )
 
         except Exception as e:
+            _log.error("TLS receive failed: %s", e)
             raise ReadError(f"Failed to receive TLS data: {e}") from e
 
     @staticmethod
@@ -620,6 +652,7 @@ class AsyncTLSTransport(AsyncBaseTransport):
         """Close TLS connection."""
         await self._disconnect()
         self._closed = True
+        _log.info("TLS closed")
 
     def _get_protocol_name(self) -> str:
         """Return protocol name."""

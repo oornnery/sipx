@@ -19,6 +19,10 @@ import re
 from dataclasses import dataclass, field
 from urllib.parse import unquote
 
+from ._utils import logger
+
+_log = logger.getChild("uri")
+
 
 @dataclass
 class SipURI:
@@ -125,12 +129,14 @@ class SipURI:
         result = cls()
 
         if not uri:
+            _log.error("Empty URI provided")
             return result
 
         # Extract scheme
         match = re.match(r"^(sips?|tel):", uri, re.IGNORECASE)
         if not match:
             # No scheme — treat entire string as host
+            _log.error("No SIP/SIPS/TEL scheme in URI: %s", uri)
             result.host = uri
             return result
 

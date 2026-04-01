@@ -25,6 +25,10 @@ import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional
 
+from .._utils import logger
+
+_log = logger.getChild("session.timer")
+
 if TYPE_CHECKING:
     from ..client import AsyncClient, Client
     from ..models._message import Response
@@ -124,6 +128,11 @@ class SessionTimer:
         if self._running:
             return
         self._running = True
+        _log.info(
+            "Timer started, interval=%ds refresher=%s",
+            self.config.interval,
+            self.config.refresher,
+        )
         self._schedule_next()
 
     def stop(self):
@@ -132,6 +141,7 @@ class SessionTimer:
         if self._timer:
             self._timer.cancel()
             self._timer = None
+        _log.info("Timer stopped after %d refreshes", self._refresh_count)
 
     def _schedule_next(self):
         """Schedule the next refresh."""
@@ -171,12 +181,19 @@ class SessionTimer:
                 )
 
             self._refresh_count += 1
+            _log.debug(
+                "Refresh #%d sent via %s", self._refresh_count, self.config.method
+            )
 
             if self.on_refresh and refresh_response:
                 self.on_refresh(refresh_response)
 
         except Exception:
-            pass  # silently continue -- next refresh will retry
+            _log.warning(
+                "Refresh #%d failed, will retry next cycle",
+                self._refresh_count + 1,
+                exc_info=True,
+            )
 
         # Schedule next refresh
         self._schedule_next()
@@ -279,6 +296,11 @@ class AsyncSessionTimer:
         if self._running:
             return
         self._running = True
+        _log.info(
+            "Async timer started, interval=%ds refresher=%s",
+            self.config.interval,
+            self.config.refresher,
+        )
         self._task = asyncio.create_task(self._refresh_loop())
 
     async def stop(self) -> None:
@@ -287,6 +309,7 @@ class AsyncSessionTimer:
         if self._task:
             self._task.cancel()
             self._task = None
+        _log.info("Async timer stopped after %d refreshes", self._refresh_count)
 
     async def _refresh_loop(self) -> None:
         """Periodically send session refreshes until stopped."""
@@ -316,6 +339,11 @@ class AsyncSessionTimer:
                     )
 
                 self._refresh_count += 1
+                _log.debug(
+                    "Async refresh #%d sent via %s",
+                    self._refresh_count,
+                    self.config.method,
+                )
 
                 if self.on_refresh and refresh_response:
                     if asyncio.iscoroutinefunction(self.on_refresh):
@@ -326,7 +354,7 @@ class AsyncSessionTimer:
             except asyncio.CancelledError:
                 break
             except Exception:
-                # Back off on error, then retry on next cycle
+                _log.warning("Async refresh failed, backing off 30s", exc_info=True)
                 await asyncio.sleep(30)
 
     @staticmethod

@@ -20,6 +20,9 @@ from .._types import (
 )
 from ._base import AsyncBaseTransport, BaseTransport
 from ..models._message import Request, Response
+from .._utils import logger
+
+_log = logger.getChild("transport.udp")
 
 
 class UDPTransport(BaseTransport):
@@ -57,7 +60,12 @@ class UDPTransport(BaseTransport):
             actual_addr = self._socket.getsockname()
             self.config.local_port = actual_addr[1]
 
+            _log.info(
+                "UDP bound to %s:%d", self.config.local_host, self.config.local_port
+            )
+
         except OSError as e:
+            _log.error("UDP socket init failed: %s", e)
             raise TransportError(f"Failed to initialize UDP socket: {e}") from e
 
     def handle_request(
@@ -141,7 +149,14 @@ class UDPTransport(BaseTransport):
             sent = self._socket.sendto(data, (destination.host, destination.port))
             if sent != len(data):
                 raise WriteError(f"Incomplete send: sent {sent} of {len(data)} bytes")
+            _log.debug(
+                "UDP send %d bytes -> %s:%d",
+                len(data),
+                destination.host,
+                destination.port,
+            )
         except OSError as e:
+            _log.error("UDP send failed: %s", e)
             raise WriteError(f"Failed to send UDP datagram: {e}") from e
 
     def receive(
@@ -170,6 +185,8 @@ class UDPTransport(BaseTransport):
 
             data, addr = self._socket.recvfrom(self.config.buffer_size)
 
+            _log.debug("UDP recv %d bytes <- %s:%d", len(data), addr[0], addr[1])
+
             source = TransportAddress(
                 host=addr[0],
                 port=addr[1],
@@ -192,6 +209,7 @@ class UDPTransport(BaseTransport):
             self._socket.close()
             self._socket = None
             self._closed = True
+            _log.info("UDP transport closed")
 
     def _get_protocol_name(self) -> str:
         """Return protocol name."""
@@ -241,6 +259,7 @@ class AsyncUDPTransport(AsyncBaseTransport):
             self.config.local_port = actual_addr[1]
 
         self._initialized = True
+        _log.info("UDP bound to %s:%d", self.config.local_host, self.config.local_port)
 
     async def handle_request(
         self,
@@ -316,7 +335,14 @@ class AsyncUDPTransport(AsyncBaseTransport):
 
         try:
             self._transport.sendto(data, (destination.host, destination.port))
+            _log.debug(
+                "UDP send %d bytes -> %s:%d",
+                len(data),
+                destination.host,
+                destination.port,
+            )
         except Exception as e:
+            _log.error("UDP send failed: %s", e)
             raise WriteError(f"Failed to send UDP datagram: {e}") from e
 
     async def receive(
@@ -350,6 +376,8 @@ class AsyncUDPTransport(AsyncBaseTransport):
             else:
                 data, addr = await self._protocol.receive()
 
+            _log.debug("UDP recv %d bytes <- %s:%d", len(data), addr[0], addr[1])
+
             source = TransportAddress(
                 host=addr[0],
                 port=addr[1],
@@ -371,6 +399,7 @@ class AsyncUDPTransport(AsyncBaseTransport):
             self._protocol = None
             self._initialized = False
             self._closed = True
+            _log.info("UDP transport closed")
 
     def _get_protocol_name(self) -> str:
         """Return protocol name."""
@@ -420,9 +449,7 @@ class _UDPProtocol(asyncio.DatagramProtocol):
         Args:
             exc: The exception
         """
-        # Log error or handle as needed
-        # For now, we'll just ignore protocol-level errors
-        pass
+        _log.warning("UDP protocol error: %s", exc)
 
     async def receive(self) -> Tuple[bytes, Tuple[str, int]]:
         """

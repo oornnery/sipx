@@ -15,6 +15,9 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from .._types import TransportAddress, TransportConfig
 from ._base import AsyncBaseTransport, BaseTransport
+from .._utils import logger
+
+_log = logger.getChild("transport.ws")
 
 if TYPE_CHECKING:
     from ..models._message import Request, Response
@@ -73,12 +76,14 @@ class WSTransport(BaseTransport):
         if self._ws is not None and not self._closed:
             return
 
+        _log.info("WS connecting to %s", self._uri)
         connect = _import_websockets_sync()
         self._ws = connect(
             self._uri,
             subprotocols=["sip"],
             open_timeout=self.config.connect_timeout,
         )
+        _log.info("WS connected")
 
     def handle_request(
         self,
@@ -118,6 +123,7 @@ class WSTransport(BaseTransport):
         with self._lock:
             self._ensure_connected()
             self._ws.send(data.decode("utf-8"))
+            _log.debug("WS send %d bytes", len(data))
 
     def receive(
         self, timeout: Optional[float] = None
@@ -137,6 +143,7 @@ class WSTransport(BaseTransport):
         t = timeout if timeout is not None else self.config.read_timeout
         raw = self._ws.recv(timeout=t)
         data = raw.encode("utf-8") if isinstance(raw, str) else raw
+        _log.debug("WS recv %d bytes", len(data))
         return data, self.local_address
 
     def close(self) -> None:
@@ -151,6 +158,7 @@ class WSTransport(BaseTransport):
             except Exception:
                 pass
             self._ws = None
+        _log.info("WS closed")
 
     def _get_protocol_name(self) -> str:
         return "WS"
@@ -182,12 +190,14 @@ class AsyncWSTransport(AsyncBaseTransport):
         if self._ws is not None and not self._closed:
             return
 
+        _log.info("WS connecting to %s", self._uri)
         websockets = _import_websockets()
         self._ws = await websockets.connect(
             self._uri,
             subprotocols=["sip"],
             open_timeout=self.config.connect_timeout,
         )
+        _log.info("WS connected")
 
     async def handle_request(
         self,
@@ -229,6 +239,7 @@ class AsyncWSTransport(AsyncBaseTransport):
         """
         await self._ensure_connected()
         await self._ws.send(data.decode("utf-8"))
+        _log.debug("WS send %d bytes", len(data))
 
     async def receive(
         self, timeout: Optional[float] = None
@@ -248,6 +259,7 @@ class AsyncWSTransport(AsyncBaseTransport):
         t = timeout if timeout is not None else self.config.read_timeout
         raw = await asyncio.wait_for(self._ws.recv(), timeout=t)
         data = raw.encode("utf-8") if isinstance(raw, str) else raw
+        _log.debug("WS recv %d bytes", len(data))
         return data, self.local_address
 
     async def close(self) -> None:
@@ -262,6 +274,7 @@ class AsyncWSTransport(AsyncBaseTransport):
             except Exception:
                 pass
             self._ws = None
+        _log.info("WS closed")
 
     def _get_protocol_name(self) -> str:
         return "WS"

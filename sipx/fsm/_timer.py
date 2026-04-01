@@ -6,6 +6,10 @@ import asyncio
 import threading
 from typing import Callable, Dict, List
 
+from .._utils import logger
+
+_log = logger.getChild("timer")
+
 
 class TimerManager:
     """
@@ -40,6 +44,7 @@ class TimerManager:
             timer.name = f"SIP-{name}"
             self._timers[name] = timer
             timer.start()
+            _log.debug("Timer %s started (%.1fs)", name, delay)
 
     def cancel_timer(self, name: str) -> None:
         """
@@ -52,10 +57,12 @@ class TimerManager:
             timer = self._timers.pop(name, None)
             if timer is not None:
                 timer.cancel()
+                _log.debug("Timer %s cancelled", name)
 
     def cancel_all(self) -> None:
         """Cancel all active timers."""
         with self._lock:
+            _log.debug("Cancelled %d timers", len(self._timers))
             for timer in self._timers.values():
                 timer.cancel()
             self._timers.clear()
@@ -92,6 +99,7 @@ class AsyncTimerManager:
         """
         self.cancel_timer(name)
         self._tasks[name] = asyncio.ensure_future(self._run(name, delay, callback))
+        _log.debug("Async timer %s started (%.1fs)", name, delay)
 
     async def _run(self, name: str, delay: float, callback: Callable) -> None:
         """Internal coroutine that sleeps then invokes callback."""
@@ -115,9 +123,11 @@ class AsyncTimerManager:
         task = self._tasks.pop(name, None)
         if task and not task.done():
             task.cancel()
+            _log.debug("Async timer %s cancelled", name)
 
     def cancel_all(self) -> None:
         """Cancel all active timers."""
+        _log.debug("Cancelled %d async timers", len(self._tasks))
         for task in self._tasks.values():
             if not task.done():
                 task.cancel()

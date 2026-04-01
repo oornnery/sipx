@@ -8,17 +8,17 @@ P-Charging-Vector), and multipart/mixed body encoding for SDP + ISUP.
 
 from __future__ import annotations
 
-import logging
 import re
 import uuid
 from typing import TYPE_CHECKING, Union
 
+from sipx._utils import logger
 from sipx.contrib._isup import ISUPMessage
+
+_log = logger.getChild("contrib.sipi")
 
 if TYPE_CHECKING:
     from ..models._message import Request, Response
-
-logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # ISUP cause -> SIP status  (ITU-T Q.1912.5 / RFC 3398)
@@ -180,6 +180,11 @@ class SipI:
         body = b"".join(parts)
         content_type = f"multipart/mixed; boundary={boundary}"
 
+        _log.debug(
+            "Created SIP-I body: SDP + %s, %d bytes",
+            isup_msg.message_type.name,
+            len(body),
+        )
         return (content_type, body)
 
     @staticmethod
@@ -200,7 +205,7 @@ class SipI:
         # Extract boundary from Content-Type
         match = re.search(r"boundary=([^\s;]+)", content_type)
         if not match:
-            logger.warning("No boundary found in Content-Type: %s", content_type)
+            _log.warning("No boundary found in Content-Type: %s", content_type)
             return (None, None)
 
         boundary = match.group(1).strip('"')
@@ -241,7 +246,7 @@ class SipI:
                 try:
                     isup_msg = ISUPMessage.from_bytes(part_body)
                 except (ValueError, IndexError) as exc:
-                    logger.warning("Failed to decode ISUP part: %s", exc)
+                    _log.warning("Failed to decode ISUP part: %s", exc)
 
         return (sdp_text, isup_msg)
 

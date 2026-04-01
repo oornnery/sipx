@@ -18,6 +18,10 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
+from .._utils import logger
+
+_log = logger.getChild("media.session")
+
 if TYPE_CHECKING:
     from sipx.client import Client
     from sipx.models._message import Response
@@ -103,6 +107,7 @@ class CallSession:
         self._rtp: RTPSession | None = None
         self._dtmf: DTMFHelper | None = None
         self._setup_rtp()
+        _log.info("CallSession created for rtp_port=%d", rtp_port)
 
     def _setup_rtp(self) -> None:
         """Create an RTPSession from the response SDP if available."""
@@ -209,11 +214,13 @@ class CallSession:
     def __enter__(self) -> CallSession:
         if self._rtp is not None:
             self._rtp.start()
+        _log.info("CallSession started")
         return self
 
     def __exit__(self, *_: object) -> None:
         if self._rtp is not None:
             self._rtp.stop()
+        _log.info("CallSession stopped")
 
 
 # ============================================================================

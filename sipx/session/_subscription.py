@@ -20,6 +20,10 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Callable, Optional
 
+from .._utils import logger
+
+_log = logger.getChild("session.sub")
+
 if TYPE_CHECKING:
     from ..client import AsyncClient, Client
     from ..models._message import Response
@@ -65,6 +69,9 @@ class Subscription:
         if expires is not None:
             self.expires = expires
 
+        _log.info(
+            "Subscribing to %s event=%s expires=%d", self.uri, self.event, self.expires
+        )
         r = self.client.subscribe(
             uri=self.uri,
             event=self.event,
@@ -79,11 +86,15 @@ class Subscription:
             self._schedule_refresh()
         else:
             self.state = SubscriptionState.TERMINATED
+            _log.warning(
+                "Subscription failed, status=%s", r.status_code if r else "None"
+            )
 
         return r
 
     def unsubscribe(self) -> Response | None:
         """Send SUBSCRIBE with Expires: 0 to unsubscribe."""
+        _log.info("Unsubscribing from %s event=%s", self.uri, self.event)
         self._cancel_refresh()
         r = self.client.subscribe(
             uri=self.uri,
@@ -116,10 +127,14 @@ class Subscription:
             body: NOTIFY body content (e.g. PIDF XML for presence).
             subscription_state: Subscription-State header value.
         """
+        _log.debug(
+            "NOTIFY received, state=%s body_len=%d", subscription_state, len(body)
+        )
         self.last_notify_body = body
 
         if "terminated" in subscription_state.lower():
             self.state = SubscriptionState.TERMINATED
+            _log.info("Subscription terminated by NOTIFY")
             self._cancel_refresh()
         elif "active" in subscription_state.lower():
             self.state = SubscriptionState.ACTIVE
@@ -143,6 +158,7 @@ class Subscription:
         if self.expires <= 0:
             return
         delay = self.expires * 0.8
+        _log.debug("Scheduling refresh in %.0fs", delay)
         self._timer = threading.Timer(delay, self._do_refresh)
         self._timer.daemon = True
         self._timer.start()
@@ -191,6 +207,12 @@ class AsyncSubscription:
         if expires is not None:
             self.expires = expires
 
+        _log.info(
+            "Async subscribing to %s event=%s expires=%d",
+            self.uri,
+            self.event,
+            self.expires,
+        )
         r = await self.client.subscribe(
             uri=self.uri,
             event=self.event,
@@ -205,11 +227,15 @@ class AsyncSubscription:
             self._schedule_refresh()
         else:
             self.state = SubscriptionState.TERMINATED
+            _log.warning(
+                "Async subscription failed, status=%s", r.status_code if r else "None"
+            )
 
         return r
 
     async def unsubscribe(self) -> Response | None:
         """Send SUBSCRIBE with Expires: 0 to unsubscribe."""
+        _log.info("Async unsubscribing from %s event=%s", self.uri, self.event)
         self._cancel_refresh()
         r = await self.client.subscribe(
             uri=self.uri,

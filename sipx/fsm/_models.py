@@ -12,6 +12,9 @@ from .._types import (
     TransactionState,
     TransactionType,
 )
+from .._utils import logger
+
+_log = logger.getChild("fsm")
 
 if TYPE_CHECKING:
     from ..models._message import Request, Response
@@ -82,6 +85,9 @@ class Transaction:
         old_state = self.state
         self.state = new_state
         self.updated_at = time.time()
+        _log.debug(
+            "Transaction %s: %s -> %s", self.id[:8], old_state.name, new_state.name
+        )
 
         # Trigger state-specific actions
         self._on_state_change(old_state, new_state)
@@ -318,6 +324,11 @@ class Dialog:
         """
         self.state = new_state
         self.updated_at = time.time()
+        _log.debug(
+            "Dialog %s: state -> %s",
+            self.call_id[:8] if self.call_id else "?",
+            new_state.name,
+        )
 
     def get_dialog_id(self) -> str:
         """

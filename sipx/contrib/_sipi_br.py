@@ -20,6 +20,10 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Union
 
+from sipx._utils import logger
+
+_log = logger.getChild("contrib.sipi_br")
+
 if TYPE_CHECKING:
     from ..models._message import Request, Response
 
@@ -170,6 +174,7 @@ class ATI:
         """
         # Normalize number
         number = normalize_br_number(number)
+        _log.debug("ATI query for %s", number)
 
         # Send INVITE to ATI server
         r = self.client.invite(
@@ -199,6 +204,7 @@ class AsyncATI:
     async def query(self, number: str) -> ATIResult:
         """Query ATI asynchronously."""
         number = SipIBR.normalize(number)
+        _log.debug("Async ATI query for %s", number)
         r = await self.client.invite(to_uri=f"sip:{number}@{self.ati_server}")
         if r and r.status_code == 302:
             contact = (r.headers.get("Contact") or "").strip("<>").strip()

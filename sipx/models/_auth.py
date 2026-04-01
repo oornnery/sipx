@@ -23,7 +23,10 @@ import secrets
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from .._utils import logger
 from .._types import HeaderTypes
+
+_log = logger.getChild("auth")
 
 
 # ============================================================================
@@ -303,7 +306,7 @@ class DigestChallenge(Challenge):
         if "realm" not in params or "nonce" not in params:
             raise ValueError("Digest challenge missing required realm or nonce")
 
-        return cls(
+        challenge = cls(
             realm=params["realm"],
             nonce=params["nonce"],
             algorithm=params.get("algorithm", "MD5"),
@@ -313,6 +316,12 @@ class DigestChallenge(Challenge):
             domain=params.get("domain"),
             _raw_params=params,
         )
+        _log.debug(
+            "Parsed Digest challenge realm=%s algorithm=%s",
+            challenge.realm,
+            challenge.algorithm,
+        )
+        return challenge
 
 
 @dataclass
@@ -451,7 +460,11 @@ class DigestAuth(AuthMethod):
                 ]
             )
 
-        return "Digest " + ", ".join(parts)
+        result = "Digest " + ", ".join(parts)
+        _log.debug(
+            "Built digest authorization for %s %s (nc=%s)", method, uri, nc_value
+        )
+        return result
 
     def _calculate_response(
         self,
@@ -472,11 +485,7 @@ class DigestAuth(AuthMethod):
         elif algorithm.upper() in ("SHA-256", "SHA-256-SESS"):
             hash_func = hashlib.sha256
         else:
-            import logging
-
-            logging.getLogger("sipx").warning(
-                f"Unknown digest algorithm '{algorithm}', falling back to MD5"
-            )
+            _log.warning("Unknown digest algorithm %r, falling back to MD5", algorithm)
             hash_func = hashlib.md5
 
         # Calculate A1

@@ -12,11 +12,12 @@ References:
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
 
-logger = logging.getLogger(__name__)
+from sipx._utils import logger
+
+_log = logger.getChild("contrib.isup")
 
 
 # ---------------------------------------------------------------------------
@@ -431,6 +432,12 @@ class ISUPMessage:
         if optional_codes:
             buf.append(0x00)  # end of optional parameters
 
+        _log.debug(
+            "Encoded %s CIC=%d size=%d bytes",
+            self.message_type.name,
+            self.circuit_id,
+            len(buf),
+        )
         return bytes(buf)
 
     @classmethod
@@ -511,11 +518,14 @@ class ISUPMessage:
                 length = data[opt_pos]
                 opt_pos += 1
                 if opt_pos + length > len(data):
-                    logger.warning("Truncated optional param 0x%02X", param_code)
+                    _log.warning("Truncated optional param 0x%02X", param_code)
                     break
                 params[param_code] = data[opt_pos : opt_pos + length]
                 opt_pos += length
 
+        _log.debug(
+            "Decoded %s CIC=%d from %d bytes", message_type.name, circuit_id, len(data)
+        )
         return cls(
             message_type=message_type,
             circuit_id=circuit_id,

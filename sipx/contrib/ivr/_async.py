@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Callable, Optional
 
+from sipx._utils import logger
 from sipx.media._tts import BaseTTS
 
 from ._models import Menu, Prompt
@@ -12,7 +12,7 @@ from ._models import Menu, Prompt
 if TYPE_CHECKING:
     from sipx.media._async import AsyncRTPSession
 
-logger = logging.getLogger(__name__)
+_log = logger.getChild("ivr")
 
 
 class AsyncIVR:
@@ -57,6 +57,7 @@ class AsyncIVR:
 
     async def run_menu(self, menu: Menu) -> None:
         """Run IVR menu loop (async)."""
+        _log.info("Async IVR session started")
         for cb in self._on_call_start:
             cb()
         try:
@@ -64,6 +65,7 @@ class AsyncIVR:
         finally:
             for cb in self._on_call_end:
                 cb()
+            _log.info("Async IVR session ended")
 
     async def _run_menu_loop(self, menu: Menu) -> None:
         retries = 0
@@ -71,10 +73,15 @@ class AsyncIVR:
             await self.play_prompt(menu.greeting)
             digit = await self.collect_digit(timeout=menu.greeting.timeout)
             if not digit:
+                _log.debug(
+                    "No DTMF received, retry %d/%d", retries + 1, menu.max_retries
+                )
                 retries += 1
                 continue
+            _log.debug("DTMF collected: %s", digit)
             item = menu._item_map.get(digit)
             if item is None:
+                _log.debug("Invalid digit %s", digit)
                 await self.play_prompt(menu.invalid_prompt)
                 retries += 1
                 continue

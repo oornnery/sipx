@@ -14,6 +14,10 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .._utils import logger
+
+_log = logger.getChild("dtmf")
+
 if TYPE_CHECKING:
     from ._rtp import RTPSession
 
@@ -104,6 +108,7 @@ class DTMFSender:
         """
         from ._rtp import RTPPacket
 
+        _log.debug("DTMF send: digit=%s", digit)
         event_code = DTMF_EVENTS.get(digit.upper())
         if event_code is None:
             raise ValueError(f"Invalid DTMF digit: {digit}")
@@ -229,6 +234,9 @@ class DTMFCollector:
                     continue
                 last_end_ts = pkt.timestamp
                 if evt.digit is not None:
+                    _log.debug("DTMF recv: digit=%s", evt.digit)
                     digits.append(evt.digit)
 
-        return "".join(digits)
+        collected = "".join(digits)
+        _log.debug("DTMF collected: %s", collected)
+        return collected

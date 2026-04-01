@@ -16,7 +16,10 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
+from .._utils import logger
 from ._codecs import PCMA, PCMU, Codec
+
+_log = logger.getChild("rtp")
 
 if TYPE_CHECKING:
     from sipx.models._body import SDPBody
@@ -190,6 +193,13 @@ class RTPSession:
             target=self._recv_loop, daemon=True, name="rtp-recv"
         )
         self._recv_thread.start()
+        _log.info(
+            "RTP session %s:%d -> %s:%d",
+            self.local_ip,
+            self.local_port,
+            self.remote_ip,
+            self.remote_port,
+        )
 
     def stop(self) -> None:
         """Stop threads and close the socket."""
@@ -203,6 +213,7 @@ class RTPSession:
             except OSError:
                 pass
             self._socket = None
+        _log.info("RTP session stopped")
 
     # ------------------------------------------------------------------
     # Context manager
@@ -225,6 +236,12 @@ class RTPSession:
             raise RuntimeError("RTPSession is not started")
         data = packet.to_bytes()
         self._socket.sendto(data, (self.remote_ip, self.remote_port))
+        _log.debug(
+            "RTP send: seq=%d ts=%d %d bytes",
+            packet.sequence_number,
+            packet.timestamp,
+            len(packet.payload),
+        )
 
     def send_audio(self, pcm_data: bytes) -> None:
         """
@@ -288,9 +305,16 @@ class RTPSession:
                 if len(data) >= 12:
                     packet = RTPPacket.from_bytes(data)
                     self._recv_buffer.put(packet)
+                    _log.debug(
+                        "RTP recv: seq=%d ts=%d %d bytes",
+                        packet.sequence_number,
+                        packet.timestamp,
+                        len(packet.payload),
+                    )
             except socket.timeout:
                 continue
-            except OSError:
+            except OSError as err:
+                _log.error("RTP error: %s", err)
                 break
 
     # ------------------------------------------------------------------

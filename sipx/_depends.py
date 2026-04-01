@@ -26,8 +26,11 @@ import typing
 from abc import ABC, abstractmethod
 from typing import Any
 
+from ._utils import logger
 from .models._message import Request
 from ._types import TransportAddress
+
+_log = logger.getChild("di")
 
 
 # ============================================================================
@@ -58,6 +61,7 @@ class Extractor(ABC):
         """
         import inspect
 
+        _log.debug("Resolving handler %s", getattr(handler, "__name__", handler))
         hints = typing.get_type_hints(handler, include_extras=True)
         kwargs: dict[str, Any] = {}
 
@@ -75,9 +79,11 @@ class Extractor(ABC):
             if hasattr(hint, "__metadata__"):
                 for meta in hint.__metadata__:
                     if isinstance(meta, cls):
+                        _log.debug("Extracting %s via %s", name, type(meta).__name__)
                         kwargs[name] = meta.extract(request, source)
                         break
                     if isinstance(meta, type) and issubclass(meta, cls):
+                        _log.debug("Extracting %s via %s()", name, meta.__name__)
                         kwargs[name] = meta().extract(request, source)
                         break
 

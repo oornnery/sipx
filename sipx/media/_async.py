@@ -10,7 +10,10 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Optional
 
+from .._utils import logger
 from ._rtp import RTPPacket
+
+_log = logger.getChild("rtp")
 
 if TYPE_CHECKING:
     from sipx.client import Client
@@ -149,6 +152,12 @@ class _RTPProtocol(asyncio.DatagramProtocol):
             try:
                 packet = RTPPacket.from_bytes(data)
                 self._queue.put_nowait(packet)
+                _log.debug(
+                    "RTP recv: seq=%d ts=%d %d bytes",
+                    packet.sequence_number,
+                    packet.timestamp,
+                    len(packet.payload),
+                )
             except Exception:
                 pass
 
@@ -205,16 +214,30 @@ class AsyncRTPSession:
             _RTPProtocol,
             local_addr=(self.local_ip, self.local_port),
         )
+        _log.info(
+            "RTP session %s:%d -> %s:%d",
+            self.local_ip,
+            self.local_port,
+            self.remote_ip,
+            self.remote_port,
+        )
 
     async def stop(self) -> None:
         if self._transport:
             self._transport.close()
             self._transport = None
+        _log.info("RTP session stopped")
 
     async def send_packet(self, packet: RTPPacket) -> None:
         if self._transport:
             self._transport.sendto(
                 packet.to_bytes(), (self.remote_ip, self.remote_port)
+            )
+            _log.debug(
+                "RTP send: seq=%d ts=%d %d bytes",
+                packet.sequence_number,
+                packet.timestamp,
+                len(packet.payload),
             )
 
     async def recv_packet(self, timeout: float = 1.0) -> Optional[RTPPacket]:

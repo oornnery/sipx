@@ -11,6 +11,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from .._utils import logger
+
+_log = logger.getChild("sdp")
+
 
 # ============================================================================
 # Base Classes
@@ -1188,7 +1192,13 @@ class BodyParser:
         mime_type = content_type.split(";")[0].strip().lower()
 
         if mime_type == "application/sdp":
-            return BodyParser.parse_sdp(content)
+            try:
+                return BodyParser.parse_sdp(content)
+            except Exception:
+                _log.error(
+                    "Failed to parse SDP body (%d bytes)", len(content), exc_info=True
+                )
+                return RawBody(content, content_type)
         else:
             return RawBody(content, content_type)
 

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Callable, Optional
 
+from sipx._utils import logger
 from sipx.media._audio import AudioPlayer
 from sipx.media._dtmf import DTMFCollector
 from sipx.media._tts import BaseTTS
@@ -14,7 +14,7 @@ from ._models import Menu, Prompt
 if TYPE_CHECKING:
     from sipx.media._rtp import RTPSession
 
-logger = logging.getLogger(__name__)
+_log = logger.getChild("ivr")
 
 
 class IVR:
@@ -54,6 +54,7 @@ class IVR:
         return collector.collect()
 
     def run_menu(self, menu: Menu) -> None:
+        _log.info("IVR session started")
         for cb in self._on_call_start:
             cb()
         try:
@@ -61,6 +62,7 @@ class IVR:
         finally:
             for cb in self._on_call_end:
                 cb()
+            _log.info("IVR session ended")
 
     def _run_menu_loop(self, menu: Menu) -> None:
         retries = 0
@@ -68,10 +70,15 @@ class IVR:
             self.play_prompt(menu.greeting)
             digit = self.collect_digit(timeout=menu.greeting.timeout)
             if not digit:
+                _log.debug(
+                    "No DTMF received, retry %d/%d", retries + 1, menu.max_retries
+                )
                 retries += 1
                 continue
+            _log.debug("DTMF collected: %s", digit)
             item = menu._item_map.get(digit)
             if item is None:
+                _log.debug("Invalid digit %s", digit)
                 self.play_prompt(menu.invalid_prompt)
                 retries += 1
                 continue
