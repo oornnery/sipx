@@ -74,6 +74,9 @@ def _get_app():
                 f"[bold]Registering [cyan]{aor}[/cyan] via {host}:{port}...[/bold]"
             )
             response = client.register(aor=aor, registrar=f"sip:{host}:{port}")
+            if response is None:
+                console.print("[red]No response (timeout)[/red]")
+                raise typer.Exit(1)
             console.print(
                 f"[green]{response.status_code} {response.reason_phrase}[/green]"
             )
@@ -98,6 +101,9 @@ def _get_app():
                 f"[bold]OPTIONS [cyan]{uri}[/cyan] via {host}:{port}...[/bold]"
             )
             response = client.options(uri=uri)
+            if response is None:
+                console.print("[red]No response (timeout)[/red]")
+                raise typer.Exit(1)
             console.print(
                 f"[green]{response.status_code} {response.reason_phrase}[/green]"
             )
@@ -133,6 +139,9 @@ def _get_app():
         ) as client:
             console.print(f"[bold]INVITE [cyan]{uri}[/cyan]...[/bold]")
             response = client.invite(to_uri=uri)
+            if response is None:
+                console.print("[red]No response (timeout)[/red]")
+                raise typer.Exit(1)
             console.print(
                 f"[green]{response.status_code} {response.reason_phrase}[/green]"
             )
@@ -149,9 +158,10 @@ def _get_app():
                 # Send BYE
                 console.print("[bold]Sending BYE...[/bold]")
                 bye_resp = client.bye(to_uri=uri)
-                console.print(
-                    f"[green]{bye_resp.status_code} {bye_resp.reason_phrase}[/green]"
-                )
+                if bye_resp:
+                    console.print(
+                        f"[green]{bye_resp.status_code} {bye_resp.reason_phrase}[/green]"
+                    )
             else:
                 console.print(
                     f"[red]Call failed: {response.status_code} {response.reason_phrase}[/red]"
@@ -184,6 +194,9 @@ def _get_app():
         ) as client:
             console.print(f"[bold]MESSAGE [cyan]{uri}[/cyan]: {text}[/bold]")
             response = client.message(to_uri=uri, content=text)
+            if response is None:
+                console.print("[red]No response (timeout)[/red]")
+                raise typer.Exit(1)
             console.print(
                 f"[green]{response.status_code} {response.reason_phrase}[/green]"
             )

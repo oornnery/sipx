@@ -4,15 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sipx"
-version = "0.0.3"
+dynamic = ["version"]
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = ["rich>=14.1.0"]
 
+[project.scripts]
+sipx = "sipx.main:main"
+
 [dependency-groups]
 cli = ["typer>=0.17.4"]
-dev = ["pre-commit>=4.3.0", "ruff>=0.12.12", "taskipy>=1.14.1", "ty>=0.0.1a20"]
+dev = [
+    "fastapi[standard]>=0.135.2",
+    "pre-commit>=4.3.0",
+    "ruff>=0.12.12",
+    "taskipy>=1.14.1",
+    "ty>=0.0.1a20",
+]
 test = ["pytest>=8.4.2", "pytest-asyncio>=1.1.0", "pytest-cov>=6.3.0"]
 
 [tool.taskipy.tasks]
@@ -24,6 +33,7 @@ typecheck = "ty check"
 
 # Test
 test = "pytest tests/ -v"
+test-asterisk = "ASTERISK_INTEGRATION=1 pytest tests/integration/test_asterisk.py -v"
 cov = "pytest tests/ --cov=sipx --cov-report=term-missing"
 cov-html = "pytest tests/ --cov=sipx --cov-report=html && open htmlcov/index.html"
 
@@ -32,6 +42,9 @@ ci = "task check && task test"
 
 [tool.setuptools]
 package-dir = { "" = "." }
+
+[tool.setuptools.dynamic]
+version = { attr = "sipx._version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]
