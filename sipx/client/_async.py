@@ -16,6 +16,9 @@ from ..models._message import MessageParser, Request, Response
 from ..transports import TransportAddress, TransportConfig
 from ._base import (
     DialogTracker,
+    ForkTracker,
+    _FORK_WINDOW,
+    _ack_and_bye_forked_async,
     _build_auth_header,
     _create_async_transport,
     _detect_auth_challenge,
@@ -50,6 +53,7 @@ class AsyncClient:
         auth: Optional[Union[SipAuthCredentials, tuple]] = None,
         auto_auth: bool = True,
         auto_dns: bool = True,
+        fork_policy: str = "first",
     ) -> None:
         self.config = TransportConfig(local_host=local_host, local_port=local_port)
         self.transport_protocol = transport.upper()
@@ -74,6 +78,7 @@ class AsyncClient:
 
         self._dialog = DialogTracker()
         self._auto_dns = auto_dns
+        self._fork_policy = fork_policy
         self._resolver = None
 
     # --- Properties ---
@@ -224,6 +229,8 @@ class AsyncClient:
             parser = MessageParser()
             final_response = None
             deadline = time.monotonic() + self._transport.config.read_timeout
+            fork_tracker = ForkTracker() if method == "INVITE" else None
+            fork_deadline: float | None = None
 
             while time.monotonic() < deadline:
                 try:
@@ -233,6 +240,8 @@ class AsyncClient:
                 except (asyncio.TimeoutError, Exception):
                     if transaction.is_terminated():
                         break
+                    if fork_deadline is not None and time.monotonic() >= fork_deadline:
+                        break  # Fork collection window expired
                     continue
 
                 response = parser.parse(response_data)
@@ -296,10 +305,35 @@ class AsyncClient:
                     response = self._events._call_response_handlers(response, context)
 
                 if response.status_code >= 200:
-                    final_response = response
-                    break
+                    if fork_tracker is not None and response.status_code == 200:
+                        # INVITE 200: collect forks for a short window
+                        fork_tracker.add(response)
+                        if fork_deadline is None:
+                            fork_deadline = time.monotonic() + _FORK_WINDOW
+                        if time.monotonic() >= fork_deadline:
+                            break
+                        continue
+                    elif fork_deadline is not None:
+                        # Non-200 final during fork collection: stop
+                        break
+                    else:
+                        final_response = response
+                        break
                 if final_response is None:
                     final_response = response
+
+            # Resolve final response from fork tracker (INVITE)
+            if fork_tracker is not None and fork_tracker.best is not None:
+                final_response = fork_tracker.best
+                if self._fork_policy == "first" and fork_tracker.extra:
+                    logger.debug(
+                        "Forking: %d extra legs detected — auto-ACK+BYE",
+                        len(fork_tracker.extra),
+                    )
+                    for extra in fork_tracker.extra:
+                        await _ack_and_bye_forked_async(
+                            self._transport, extra, destination
+                        )
 
             if final_response is None:
                 logger.warning("Request timed out")

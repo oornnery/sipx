@@ -14,6 +14,9 @@ from ..models._message import Request, Response, MessageParser
 from ..transports import TransportAddress, TransportConfig
 from ._base import (
     DialogTracker,
+    ForkTracker,
+    _FORK_WINDOW,
+    _ack_and_bye_forked,
     _create_sync_transport,
     _extract_host_port,
     _build_auth_header,
@@ -53,6 +56,7 @@ class Client:
         auth: Optional[Union[SipAuthCredentials, tuple]] = None,
         auto_auth: bool = True,
         auto_dns: bool = True,
+        fork_policy: str = "first",
     ) -> None:
         """
         Initialize SIP client.
@@ -65,6 +69,8 @@ class Client:
             auth: Optional authentication credentials (from Auth.Digest() or tuple)
             auto_auth: Automatically retry on 401/407 if auth is set (default: True)
             auto_dns: Automatically resolve SIP URIs via DNS SRV (default: True)
+            fork_policy: How to handle forked INVITE responses.
+                ``"first"`` (default) — return the first 200, auto-ACK+BYE extras.
         """
         # Transport configuration
         self.config = TransportConfig(
@@ -97,6 +103,7 @@ class Client:
         self._closed = False
         self._dialog = DialogTracker()
         self._auto_dns = auto_dns
+        self._fork_policy = fork_policy
         self._resolver = None
 
         # Re-registration support
@@ -477,6 +484,8 @@ class Client:
             final_response = None
             deadline = _time.monotonic() + self._transport.config.read_timeout
             poll_interval = 0.1  # 100ms -- responsive to Ctrl+C and FSM timers
+            fork_tracker = ForkTracker() if method == "INVITE" else None
+            fork_deadline: float | None = None
 
             while _time.monotonic() < deadline:
                 try:
@@ -488,6 +497,8 @@ class Client:
                     if transaction.is_terminated():
                         logger.debug("Transaction terminated by timer")
                         break
+                    if fork_deadline is not None and _time.monotonic() >= fork_deadline:
+                        break  # Fork collection window expired
                     continue
 
                 response = parser.parse(response_data)
@@ -564,12 +575,35 @@ class Client:
 
                 # Check for final response
                 if response.status_code >= 200:
-                    final_response = response
-                    break
+                    if fork_tracker is not None and response.status_code == 200:
+                        # INVITE 200: collect forks for a short window
+                        fork_tracker.add(response)
+                        if fork_deadline is None:
+                            fork_deadline = _time.monotonic() + _FORK_WINDOW
+                        if _time.monotonic() >= fork_deadline:
+                            break
+                        continue
+                    elif fork_deadline is not None:
+                        # Non-200 final arrived during fork collection: stop
+                        break
+                    else:
+                        final_response = response
+                        break
 
                 # Store provisional response
                 if final_response is None:
                     final_response = response
+
+            # Resolve final response from fork tracker (INVITE)
+            if fork_tracker is not None and fork_tracker.best is not None:
+                final_response = fork_tracker.best
+                if self._fork_policy == "first" and fork_tracker.extra:
+                    logger.debug(
+                        "Forking: %d extra legs detected — auto-ACK+BYE",
+                        len(fork_tracker.extra),
+                    )
+                    for extra in fork_tracker.extra:
+                        _ack_and_bye_forked(self._transport, extra, destination)
 
             if final_response is None:
                 logger.warning(
