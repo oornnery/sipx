@@ -7,7 +7,6 @@ import uuid
 from typing import Optional, Union, Callable
 
 from .._utils import logger
-from .._types import TimeoutError
 from ..models._auth import SipAuthCredentials
 from .._events import Events, EventContext
 from ..fsm import StateManager, TimerManager
@@ -363,7 +362,7 @@ class Client:
         headers: Optional[dict] = None,
         content: Optional[Union[str, bytes]] = None,
         **kwargs,
-    ) -> Response:
+    ) -> Optional[Response]:
         """
         Send a SIP request and return the response.
 
@@ -377,14 +376,15 @@ class Client:
             **kwargs: Additional request parameters
 
         Returns:
-            SIP response
-
-        Raises:
-            TimeoutError: If no response is received within the configured timeout.
+            SIP response, or None if request timed out.
         """
         # Auto-extract host/port from URI if not provided
         if host is None:
             host, extracted_port = _extract_host_port(uri)
+            port = port if port is not None else extracted_port
+        elif host.startswith(("sip:", "sips:")):
+            # Caller passed a full SIP URI as host (e.g. "sip:127.0.0.1:5060")
+            host, extracted_port = _extract_host_port(host)
             port = port if port is not None else extracted_port
         else:
             port = port if port is not None else 5060
@@ -437,6 +437,9 @@ class Client:
             request.to_bytes(), destination
         )
 
+        # Trigger initial state timers (Timer A/E for retransmission)
+        transaction._on_state_change(transaction.state, transaction.state)
+
         # Create event context
         context = EventContext(
             request=request,
@@ -451,11 +454,13 @@ class Client:
 
         # Log request
         logger.debug(
-            ">>> SENDING %s (%s -> %s:%s)",
+            ">>> %s %s | %s -> %s:%s | Call-ID: %s",
             method,
+            uri,
             self._transport.local_address,
             host,
             port,
+            request.headers.get("Call-ID", "-"),
         )
         logger.debug(request.to_string())
 
@@ -471,7 +476,7 @@ class Client:
             parser = MessageParser()
             final_response = None
             deadline = _time.monotonic() + self._transport.config.read_timeout
-            poll_interval = 0.5  # 500ms -- matches Timer A initial value
+            poll_interval = 0.1  # 100ms -- responsive to Ctrl+C and FSM timers
 
             while _time.monotonic() < deadline:
                 try:
@@ -504,11 +509,12 @@ class Client:
                 }
 
                 logger.debug(
-                    "<<< RECEIVED %s %s (%s -> %s)",
+                    "<<< %s %s | %s -> %s | Call-ID: %s",
                     response.status_code,
                     response.reason_phrase,
                     source,
                     self._transport.local_address,
+                    response.headers.get("Call-ID", "-"),
                 )
                 logger.debug(response.to_string())
 
@@ -536,9 +542,11 @@ class Client:
                     final_response = response
 
             if final_response is None:
-                raise TimeoutError(
-                    f"Request timed out after {self._transport.config.read_timeout:.0f}s"
+                logger.warning(
+                    "Request timed out after %.0fs",
+                    self._transport.config.read_timeout,
                 )
+                return None
 
             # Auto-retry on 401/407 if auth is set
             if (

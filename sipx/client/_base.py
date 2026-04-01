@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import MutableMapping
-from urllib.parse import urlparse
 
 from .._utils import logger
 from ..models._auth import (
@@ -48,15 +47,13 @@ def _create_async_transport(protocol: str, config: TransportConfig):
 
 
 def _extract_host_port(uri: str) -> tuple[str, int]:
-    """Extract host and port from SIP URI."""
-    if not uri.startswith("sip:") and not uri.startswith("sips:"):
+    """Extract host and port from SIP URI using SipURI parser."""
+    from .._uri import SipURI
+
+    if not uri.startswith(("sip:", "sips:", "tel:")):
         uri = f"sip:{uri}"
-
-    parsed = urlparse(uri)
-    host = parsed.hostname or parsed.path.split("@")[-1].split(":")[0]
-    port = parsed.port or 5060
-
-    return host, port
+    parsed = SipURI.parse(uri)
+    return parsed.host, parsed.effective_port
 
 
 def _build_auth_header(

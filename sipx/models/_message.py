@@ -11,10 +11,12 @@ import re
 import typing
 from abc import ABC, abstractmethod
 
-from .._utils import BRANCH, EOL, REASON_PHRASES, SCHEME, VERSION
+from .._utils import BRANCH, EOL, REASON_PHRASES, SCHEME, VERSION, logger
 from .._types import HeaderTypes
 from ._header import Headers, HeaderParser
 from ._body import BodyParser, MessageBody
+
+_log = logger.getChild("parser")
 
 if typing.TYPE_CHECKING:
     pass
@@ -835,6 +837,7 @@ class MessageParser:
         # Parse start line and headers
         lines = header_data.split(eol_bytes)
         if not lines or not lines[0]:
+            _log.error("Empty SIP message received")
             raise ValueError("Empty SIP message")
 
         start_line = lines[0]
@@ -866,6 +869,7 @@ class MessageParser:
         # Parse request line
         parts = start_line.decode("utf-8").split(None, 2)
         if len(parts) < 3:
+            _log.error("Invalid request line: %s", start_line)
             raise ValueError(f"Invalid request line: {start_line}")
 
         method, uri, version = parts
@@ -902,6 +906,7 @@ class MessageParser:
         # Parse status line
         parts = start_line.decode("utf-8").split(None, 2)
         if len(parts) < 2:
+            _log.error("Invalid status line: %s", start_line)
             raise ValueError(f"Invalid status line: {start_line}")
 
         version = parts[0]

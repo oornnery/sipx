@@ -155,6 +155,9 @@ class AsyncClient:
         if host is None:
             host, extracted_port = _extract_host_port(uri)
             port = port if port is not None else extracted_port
+        elif host.startswith(("sip:", "sips:")):
+            host, extracted_port = _extract_host_port(host)
+            port = port if port is not None else extracted_port
         else:
             port = port if port is not None else 5060
 
@@ -193,6 +196,9 @@ class AsyncClient:
             self._transport.send(request.to_bytes(), destination)
         )
 
+        # Trigger initial state timers (Timer A/E for retransmission)
+        transaction._on_state_change(transaction.state, transaction.state)
+
         context = EventContext(
             request=request,
             destination=destination,
@@ -203,11 +209,13 @@ class AsyncClient:
             request = self._events._call_request_handlers(request, context)
 
         logger.debug(
-            ">>> SENDING %s (%s -> %s:%s)",
+            ">>> %s %s | %s -> %s:%s | Call-ID: %s",
             method,
+            uri,
             self._transport.local_address,
             host,
             port,
+            request.headers.get("Call-ID", "-"),
         )
 
         try:
@@ -240,7 +248,12 @@ class AsyncClient:
                 }
 
                 logger.debug(
-                    "<<< RECEIVED %s %s", response.status_code, response.reason_phrase
+                    "<<< %s %s | %s -> %s | Call-ID: %s",
+                    response.status_code,
+                    response.reason_phrase,
+                    source,
+                    self._transport.local_address,
+                    response.headers.get("Call-ID", "-"),
                 )
                 self._state_manager.update_transaction(transaction.id, response)
                 context.response = response
