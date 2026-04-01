@@ -5,16 +5,38 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sipx"
 dynamic = ["version"]
-description = "Add your description here"
+description = "Modern, high-performance SIP library for Python — httpx-inspired API, async-native, IVR, RTP, DTMF"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = ["rich>=14.1.0"]
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Fabio Souza", email = "oornnery@gmail.com" }]
+keywords = ["sip", "voip", "rtp", "dtmf", "ivr", "asterisk", "telephony", "async"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Telephony",
+    "Topic :: Internet",
+    "Framework :: AsyncIO",
+]
+dependencies = [
+    "rich>=14.1.0",
+    "typer>=0.17.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/oornnery/sipx"
+Repository = "https://github.com/oornnery/sipx"
+Issues = "https://github.com/oornnery/sipx/issues"
+Changelog = "https://github.com/oornnery/sipx/blob/master/CHANGELOG.md"
 
 [project.scripts]
 sipx = "sipx.main:main"
 
 [dependency-groups]
-cli = ["typer>=0.17.4"]
 dev = [
     "fastapi[standard]>=0.135.2",
     "pre-commit>=4.3.0",

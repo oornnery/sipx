@@ -61,7 +61,7 @@ uv add sipx
 pip install sipx
 
 # From source
-git clone https://github.com/yourusername/sipx.git
+git clone https://github.com/oornnery/sipx.git
 cd sipx
 uv sync
 ```
@@ -274,7 +274,7 @@ See [docs/SDD.md](docs/SDD.md) for the full roadmap. Key upcoming work:
 ## Development
 
 ```bash
-git clone https://github.com/yourusername/sipx.git
+git clone https://github.com/oornnery/sipx.git
 cd sipx
 uv sync
 uv run ruff check sipx
