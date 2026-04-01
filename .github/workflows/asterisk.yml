@@ -1,0 +1,63 @@
+name: Asterisk Integration
+
+on:
+  pull_request:
+    branches: [dev, master]
+    paths:
+      - ".github/workflows/asterisk.yml"
+      - "docker/asterisk/**"
+      - "pyproject.toml"
+      - "sipx/**"
+      - "tests/integration/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: asterisk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --all-groups
+
+      - name: Build and start Asterisk
+        run: docker compose -f docker/asterisk/docker-compose.yml up -d --build
+
+      - name: Wait for Asterisk to be ready
+        run: |
+          for attempt in $(seq 1 30); do
+            if docker exec sipx-asterisk asterisk -rx "core show version" >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker/asterisk/docker-compose.yml logs --no-color
+          exit 1
+
+      - name: Run Asterisk smoke tests
+        run: uv run task test-asterisk
+
+      - name: Print Asterisk logs on failure
+        if: failure()
+        run: docker compose -f docker/asterisk/docker-compose.yml logs --no-color
+
+      - name: Stop Asterisk
+        if: always()
+        run: docker compose -f docker/asterisk/docker-compose.yml down -v

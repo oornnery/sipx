@@ -2,43 +2,38 @@ name: CI
 
 on:
   push:
-    branches: [dev, master]
+    branches: [dev]
   pull_request:
     branches: [dev, master]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  validate:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.13"]
 
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
 
-      - uses: astral-sh/setup-uv@v4
+      - uses: astral-sh/setup-uv@v6
         with:
-          version: "latest"
+          enable-cache: true
 
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+      - name: Set up Python 3.13
+        run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --all-groups
 
       - name: Lint
-        run: |
-          uv run ruff format --check sipx/ tests/
-          uv run ruff check sipx/ tests/
+        run: uv run task check
 
       - name: Test
-        run: uv run pytest tests/ -v --cov=sipx --cov-report=xml
-
-      - name: Upload coverage
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage.xml
+        run: uv run task test
