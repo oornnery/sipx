@@ -18,3 +18,4 @@ htmlcov
 
 .claude/settings.json
 .codex
+.rumdl_cache
