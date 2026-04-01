@@ -105,6 +105,7 @@ class Client:
         self._auto_dns = auto_dns
         self._fork_policy = fork_policy
         self._resolver = None
+        self._presence_etag: Optional[str] = None  # RFC 3903 SIP-ETag
 
         # Re-registration support
         self._reregister_timer: Optional[threading.Timer] = None
@@ -1115,19 +1116,44 @@ class Client:
         event: str = "presence",
         content: Optional[str] = None,
         expires: int = 3600,
+        etag: Optional[str] = None,
         **kwargs,
     ) -> Response:
-        """Send PUBLISH request."""
+        """Send PUBLISH request (RFC 3903).
+
+        Args:
+            uri: Presentity URI or ESC address.
+            event: Event package name (default: ``"presence"``).
+            content: Body content (e.g. PIDF-XML string).  When omitted the
+                PUBLISH refreshes an existing state using ``etag``.
+            expires: Publication expiry in seconds.
+            etag: ``SIP-If-Match`` value from a previous 200 OK, used to
+                refresh or modify an existing event state.  When omitted a
+                new publication is created.
+            **kwargs: Extra parameters forwarded to :meth:`request`.
+
+        Returns:
+            SIP response.  On 200 OK the ``SIP-ETag`` header is stored on
+            the client as ``_presence_etag`` for use in subsequent refreshes.
+        """
         headers = kwargs.pop("headers", {})
         headers["Event"] = event
         headers["Expires"] = str(expires)
 
+        if etag:
+            headers["SIP-If-Match"] = etag
+
         if content:
             headers["Content-Type"] = "application/pidf+xml"
 
-        return self.request(
+        r = self.request(
             method="PUBLISH", uri=uri, headers=headers, content=content, **kwargs
         )
+        if r and r.status_code == 200:
+            new_etag = r.headers.get("SIP-ETag")
+            if new_etag:
+                self._presence_etag = new_etag
+        return r
 
     def close(self) -> None:
         """Close the transport."""

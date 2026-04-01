@@ -80,6 +80,7 @@ class AsyncClient:
         self._auto_dns = auto_dns
         self._fork_policy = fork_policy
         self._resolver = None
+        self._presence_etag: Optional[str] = None  # RFC 3903 SIP-ETag
 
     # --- Properties ---
 
@@ -698,16 +699,33 @@ class AsyncClient:
         event: str = "presence",
         content: Optional[str] = None,
         expires: int = 3600,
+        etag: Optional[str] = None,
         **kwargs,
     ) -> Optional[Response]:
+        """Send PUBLISH request (RFC 3903).
+
+        Args:
+            uri: Presentity URI or ESC address.
+            event: Event package (default: ``"presence"``).
+            content: PIDF-XML body.  Omit to refresh via ``etag``.
+            expires: Publication expiry in seconds.
+            etag: ``SIP-If-Match`` from previous 200 OK for refresh.
+        """
         headers = kwargs.pop("headers", {})
         headers["Event"] = event
         headers["Expires"] = str(expires)
+        if etag:
+            headers["SIP-If-Match"] = etag
         if content:
             headers["Content-Type"] = "application/pidf+xml"
-        return await self.request(
+        r = await self.request(
             method="PUBLISH", uri=uri, headers=headers, content=content, **kwargs
         )
+        if r and r.status_code == 200:
+            new_etag = r.headers.get("SIP-ETag")
+            if new_etag:
+                self._presence_etag = new_etag
+        return r
 
     async def unregister(self, aor: str, **kwargs) -> Optional[Response]:
         if self._reregister_aor == aor:
