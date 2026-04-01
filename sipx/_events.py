@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 from ._utils import logger
 
 # Import at runtime for isinstance checks
-from ._models._message import Request, Response
+from .models._message import Request, Response
 
 if TYPE_CHECKING:
     pass
@@ -116,13 +116,17 @@ def event_handler(
             statuses = tuple(status)
 
         # Store metadata on function
-        func._event_handler_method = methods
-        func._event_handler_status = statuses
-        func._is_event_handler = True
+        setattr(func, "_event_handler_method", methods)
+        setattr(func, "_event_handler_status", statuses)
+        setattr(func, "_is_event_handler", True)
 
         return func
 
     return decorator
+
+
+# Short alias: @on('INVITE', status=200)
+on = event_handler
 
 
 class Events:
@@ -268,23 +272,21 @@ class Events:
         # First call the generic on_request
         request = self.on_request(request, context)
 
-        # Then call matching decorated handlers
+        # Then call matching decorated handlers (request-only: skip status-filtered handlers)
         for handler, methods, statuses in self._handlers:
-            # Request handlers only match on method
+            # Skip handlers that filter on status — they are response-only
+            if statuses is not None:
+                continue
             if self._matches_method(request.method, methods):
                 try:
-                    # Get handler signature to determine what to pass
                     sig = inspect.signature(handler)
                     params = list(sig.parameters.keys())
 
-                    # Call with appropriate parameters
-                    # Handler signature: (request, context) or (request, response, context)
-                    if len(params) == 2:  # self, request, context
+                    if len(params) == 2:
                         result = handler(request, context)
-                    else:  # self, request, response, context
+                    else:
                         result = handler(request, None, context)
 
-                    # If handler returns a Request, use it
                     if isinstance(result, Request):
                         request = result
 

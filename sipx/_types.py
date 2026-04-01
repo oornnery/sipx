@@ -14,9 +14,9 @@ from enum import Enum, auto
 from typing import Any, Optional
 
 if typing.TYPE_CHECKING:
-    from .headers import Headers
-    from ._models._message import Request, Response
-    from ._fsm import Transaction, Dialog
+    from .models._header import Headers
+    from .models._message import Request, Response
+    from .fsm import Transaction, Dialog
 
 
 # =============================================================================
@@ -216,6 +216,8 @@ class TransactionType(Enum):
 
     INVITE = auto()  # INVITE transaction (ICT)
     NON_INVITE = auto()  # All other methods: REGISTER, OPTIONS, BYE, etc. (NICT)
+    INVITE_SERVER = auto()  # Invite Server Transaction (IST)
+    NON_INVITE_SERVER = auto()  # Non-Invite Server Transaction (NIST)
 
 
 # =============================================================================
@@ -232,14 +234,6 @@ AddressLike = typing.Union[TransportAddress, str, tuple[str, int]]
 # Callback types
 TransactionCallback = typing.Callable[["Transaction"], None]
 DialogCallback = typing.Callable[["Dialog"], None]
-
-# Handler types (forward references for _handlers module)
-if typing.TYPE_CHECKING:
-    from ._handlers import EventHandler, AsyncEventHandler
-
-    HandlerType = typing.Union[EventHandler, AsyncEventHandler]
-    SyncHandlerType = EventHandler
-    AsyncHandlerType = AsyncEventHandler
 
 
 # =============================================================================

@@ -4,30 +4,47 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sipx"
-version = "0.0.3"
+dynamic = ["version"]
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-    "rich>=14.1.0",
-    "typer>=0.17.4",
-    "textual>=6.1.0",
-]
+dependencies = ["rich>=14.1.0"]
+
+[project.scripts]
+sipx = "sipx.main:main"
 
 [dependency-groups]
+cli = ["typer>=0.17.4"]
 dev = [
-    "textual-dev>=1.8.0",
+    "fastapi[standard]>=0.135.2",
     "pre-commit>=4.3.0",
-    "pytest>=8.4.2",
-    "pytest-asyncio>=1.1.0",
-    "pytest-cov>=6.3.0",
     "ruff>=0.12.12",
     "taskipy>=1.14.1",
     "ty>=0.0.1a20",
 ]
+test = ["pytest>=8.4.2", "pytest-asyncio>=1.1.0", "pytest-cov>=6.3.0"]
+
+[tool.taskipy.tasks]
+# Quality
+lint = "ruff check sipx/ tests/ examples/"
+format = "ruff format sipx/ tests/ examples/"
+check = "ruff format --check sipx/ tests/ examples/ && ruff check sipx/ tests/ examples/"
+typecheck = "ty check"
+
+# Test
+test = "pytest tests/ -v"
+test-asterisk = "ASTERISK_INTEGRATION=1 pytest tests/integration/test_asterisk.py -v"
+cov = "pytest tests/ --cov=sipx --cov-report=term-missing"
+cov-html = "pytest tests/ --cov=sipx --cov-report=html && open htmlcov/index.html"
+
+# CI (run in order)
+ci = "task check && task test"
 
 [tool.setuptools]
-package-dir = {"" = "."}
+package-dir = { "" = "." }
+
+[tool.setuptools.dynamic]
+version = { attr = "sipx._version.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]

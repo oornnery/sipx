@@ -1,89 +1,89 @@
-# Asterisk Docker para Testes SIPX
+# Asterisk Docker for SIPX Testing
 
-Container Docker com Asterisk configurado para testar a biblioteca SIPX com 3 políticas de autenticação diferentes.
+Docker container with Asterisk configured to test the SIPX library with 3 different authentication policies.
 
-**Versão**: 2.0.0  
-**Asterisk**: 18+  
-**Status**: ✅ Produção
+**Version**: 0.3.0
+**Asterisk**: 18+
+**Status**: Production
 
-## 🚀 Como Usar
+## How to Use
 
-### 1. Build e Start
+### 1. Build and Start
 
 ```bash
 cd docker/asterisk
 docker-compose up -d --build
 ```
 
-### 2. Verificar Logs
+### 2. Check Logs
 
 ```bash
 docker-compose logs -f
 ```
 
-### 3. Conectar ao CLI do Asterisk
+### 3. Connect to Asterisk CLI
 
 ```bash
 docker exec -it sipx-asterisk asterisk -rvvv
 ```
 
-### 4. Verificar Registro
+### 4. Check Registration
 
-No CLI do Asterisk:
+In the Asterisk CLI:
 ```
 pjsip show endpoints
 pjsip show registrations
 pjsip show contacts
 ```
 
-## 📞 Usuários Configurados
+## Configured Users
 
-### Políticas de Autenticação
+### Authentication Policies
 
-Este setup possui **3 usuários com políticas diferentes** para testar diversos cenários de autenticação:
+This setup has **3 users with different policies** to test various authentication scenarios:
 
-| Username | Password | Política | Porta Cliente | Contexto |
-|----------|----------|----------|---------------|----------|
-| **1111** | 1111xxx  | 🔐 **Auth para TODOS os métodos** | 5061 | sipx-test |
-| **2222** | 2222xxx  | 🔓 **OPTIONS sem auth, outros com auth** | 5062 | sipx-test |
-| **3333** | 3333xxx  | 🚫 **OPTIONS rejeitado, strict security** | 5063 | sipx-test |
+| Username | Password | Policy | Client Port | Context |
+|----------|----------|--------|-------------|---------|
+| **1111** | 1111xxx  | **Auth for ALL methods** | 5061 | sipx-test |
+| **2222** | 2222xxx  | **OPTIONS without auth, others with auth** | 5062 | sipx-test |
+| **3333** | 3333xxx  | **OPTIONS rejected, strict security** | 5063 | sipx-test |
 
-### Detalhes das Políticas
+### Policy Details
 
-#### 🔐 Usuário 1111 - Autenticação Completa
-- Requer autenticação para **todos** os métodos (OPTIONS, REGISTER, INVITE)
-- Ideal para testar fluxo completo de autenticação
-- Usado para testar `retry_with_auth()` em todos os cenários
+#### User 1111 - Full Authentication
+- Requires authentication for **all** methods (OPTIONS, REGISTER, INVITE)
+- Ideal for testing the complete authentication flow
+- Used to test `retry_with_auth()` in all scenarios
 
-#### 🔓 Usuário 2222 - OPTIONS Aberto (Relaxed)
-- **OPTIONS**: Aceita sem autenticação (para health checks)
-- **REGISTER/INVITE**: Requer autenticação
-- Ideal para testar servidores que permitem OPTIONS sem credenciais
-- Usado para testar:
-  - INVITE com late offer (SDP answer)
+#### User 2222 - Open OPTIONS (Relaxed)
+- **OPTIONS**: Accepted without authentication (for health checks)
+- **REGISTER/INVITE**: Requires authentication
+- Ideal for testing servers that allow OPTIONS without credentials
+- Used to test:
+  - INVITE with late offer (SDP answer)
   - Early media detection (183 Session Progress)
   - Codec negotiation
 
-#### 🚫 Usuário 3333 - Segurança Restritiva (Paranoid)
-- **OPTIONS**: Rejeitado (403 Forbidden)
-- **REGISTER/INVITE**: Requer autenticação
-- Ideal para testar:
-  - Credenciais inválidas (403)
-  - Políticas de segurança estritas
-  - Auto re-registration com threading
-  - Handling de rejeições
+#### User 3333 - Restrictive Security (Paranoid)
+- **OPTIONS**: Rejected (403 Forbidden)
+- **REGISTER/INVITE**: Requires authentication
+- Ideal for testing:
+  - Invalid credentials (403)
+  - Strict security policies
+  - Auto re-registration with threading
+  - Rejection handling
 
-## 🔧 Configuração do Cliente SIPX
+## SIPX Client Configuration
 
-### Exemplo Básico
+### Basic Example
 
 ```python
 from sipx import Client, Auth
 
-# Credenciais
+# Credentials
 auth = Auth.Digest(username="1111", password="1111xxx")
 
-# Cliente (use porta diferente de 5060!)
+# Client (use a port other than 5060!)
 with Client(local_port=5061, auth=auth) as client:
     response = client.register(aor="sip:1111@127.0.0.1")
     if response.status_code == 401:
@@ -91,63 +91,63 @@ with Client(local_port=5061, auth=auth) as client:
     print(f"Status: {response.status_code}")
 ```
 
-**Importante**: 
-- Cliente usa porta **5061+** (não 5060)
-- Servidor Asterisk usa porta **5060**
-- Evita conflito "Address already in use"
+**Important**:
+- Client uses port **5061+** (not 5060)
+- Asterisk server uses port **5060**
+- Avoids "Address already in use" conflict
 
-## 🧪 Testes Disponíveis
+## Available Tests
 
 ### Echo Test
-Disque `100` para testar áudio (echo)
+Dial `100` to test audio (echo)
 
 ### Music on Hold
-Disque `200` para ouvir música
+Dial `200` to listen to music
 
 ### Voicemail Test
-Disque `300` para ouvir mensagem de voicemail
+Dial `300` to listen to a voicemail message
 
 ### Time Announcement
-Disque `400` para ouvir o horário
+Dial `400` to hear the time
 
 ### Conference Room
-Disque `500` para entrar em sala de conferência
+Dial `500` to enter a conference room
 
-### Chamadas Entre Extensões
-Disque `1111`, `2222` ou `3333` para chamar outros usuários
+### Calls Between Extensions
+Dial `1111`, `2222`, or `3333` to call other users
 
-## ⚠️ Notas Importantes
+## Important Notes
 
-### Portas
+### Ports
 
-- **Asterisk Docker**: Porta `5060` (UDP/TCP)
-- **Cliente SIPX**: Use portas `5061`, `5062`, `5063` etc
-- **Motivo**: Evitar conflito "Address already in use"
+- **Asterisk Docker**: Port `5060` (UDP/TCP)
+- **SIPX Client**: Use ports `5061`, `5062`, `5063`, etc.
+- **Reason**: Avoid "Address already in use" conflict
 
-### Autenticação
+### Authentication
 
-A biblioteca SIPX v2.0 usa **autenticação manual explícita**:
+The SIPX library v0.3.0 uses **explicit manual authentication**:
 
 ```python
-# Enviar request
+# Send request
 response = client.register(aor="sip:1111@127.0.0.1")
 
-# Verificar se precisa autenticação
+# Check if authentication is needed
 if response.status_code == 401:
-    # Retry com autenticação
+    # Retry with authentication
     response = client.retry_with_auth(response)
 ```
 
-**Não há retry automático** - você controla quando e como autenticar.
+**There is no automatic retry** -- you control when and how to authenticate.
 
-## 📊 Monitoramento
+## Monitoring
 
-### Ver chamadas ativas
+### View active calls
 ```bash
 docker exec sipx-asterisk asterisk -rx "core show channels"
 ```
 
-### Ver endpoints registrados
+### View registered endpoints
 ```bash
 docker exec sipx-asterisk asterisk -rx "pjsip show endpoints"
 ```
@@ -157,105 +157,105 @@ docker exec sipx-asterisk asterisk -rx "pjsip show endpoints"
 docker exec sipx-asterisk asterisk -rx "pjsip set logger on"
 ```
 
-### Ver logs em tempo real
+### View logs in real time
 ```bash
 docker exec sipx-asterisk tail -f /var/log/asterisk/messages
 ```
 
-## 🛑 Parar e Remover
+## Stop and Remove
 
 ```bash
-# Parar containers
+# Stop containers
 docker-compose down
 
-# Parar e remover volumes (limpa dados)
+# Stop and remove volumes (clears data)
 docker-compose down -v
 ```
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
-### RTP não funciona
-- Verifique se as portas 10000-10099/udp estão abertas
-- Use `network_mode: host` no docker-compose.yml (já configurado)
-- No Windows, pode ser necessário usar portas mapeadas em vez de host mode
+### RTP does not work
+- Check if ports 10000-10099/udp are open
+- Use `network_mode: host` in docker-compose.yml (already configured)
+- On Windows, you may need to use mapped ports instead of host mode
 
-### Autenticação falha
-- Verifique username/password em `config/pjsip.conf`
-- Veja logs: `docker-compose logs asterisk`
-- Confirme que o cliente está usando as credenciais corretas
+### Authentication fails
+- Check username/password in `config/pjsip.conf`
+- View logs: `docker-compose logs asterisk`
+- Confirm that the client is using the correct credentials
 
-### Sem áudio em chamadas
-- Configure `direct_media=no` em pjsip.conf (já configurado)
-- Verifique NAT settings em rtp.conf
-- Teste com `100` (echo test) para verificar fluxo RTP
+### No audio in calls
+- Configure `direct_media=no` in pjsip.conf (already configured)
+- Check NAT settings in rtp.conf
+- Test with `100` (echo test) to verify RTP flow
 
-### Container não inicia
-- Verifique se a porta 5060 não está em uso: `netstat -an | findstr 5060` (Windows)
-- Veja logs detalhados: `docker-compose logs asterisk`
-- Rebuilde a imagem: `docker-compose build --no-cache`
+### Container does not start
+- Check if port 5060 is not in use: `netstat -an | findstr 5060` (Windows)
+- View detailed logs: `docker-compose logs asterisk`
+- Rebuild the image: `docker-compose build --no-cache`
 
-### Chamadas caem imediatamente
-- Verifique dialplan em `config/extensions.conf`
-- Confirme que o contexto está correto (`sipx-test`)
-- Veja logs do Asterisk no CLI: `asterisk -rvvv`
+### Calls drop immediately
+- Check dialplan in `config/extensions.conf`
+- Confirm that the context is correct (`sipx-test`)
+- View Asterisk logs in the CLI: `asterisk -rvvv`
 
-## 📝 Comandos Úteis do Asterisk CLI
+## Useful Asterisk CLI Commands
 
 ```bash
-# Conectar ao CLI
+# Connect to the CLI
 docker exec -it sipx-asterisk asterisk -rvvv
 
-# Dentro do CLI:
-pjsip show endpoints          # Lista endpoints
-pjsip show registrations      # Lista registros ativos
-pjsip show contacts           # Lista contatos
-core show channels            # Mostra chamadas ativas
-dialplan show sipx-test       # Mostra dialplan do contexto
-pjsip set logger on           # Ativa debug SIP
-pjsip set logger off          # Desativa debug SIP
-core reload                   # Recarrega configurações
-core restart now              # Reinicia Asterisk
+# Inside the CLI:
+pjsip show endpoints          # List endpoints
+pjsip show registrations      # List active registrations
+pjsip show contacts           # List contacts
+core show channels            # Show active calls
+dialplan show sipx-test       # Show context dialplan
+pjsip set logger on           # Enable SIP debug
+pjsip set logger off          # Disable SIP debug
+core reload                   # Reload configuration
+core restart now              # Restart Asterisk
 
-# Sair do CLI: Ctrl+C ou 'exit'
+# Exit the CLI: Ctrl+C or 'exit'
 ```
 
-## 🧪 Testando com SIPX
+## Testing with SIPX
 
-### Demo Completo (Recomendado) ⭐
+### Full Demo (Recommended)
 
-Execute o demo completo com interface Rich que testa todos os 3 usuários:
+Run the full demo with Rich interface that tests all 3 users:
 
 ```bash
 uv run examples/asterisk_demo.py
 ```
 
-**Este demo executa 16 testes**:
+**This demo runs 16 tests**:
 
-#### User 1111 (5 testes)
-- ✅ OPTIONS com autenticação
-- ✅ REGISTER (expires=3600)
-- ✅ REGISTER update (expires=1800)
-- ✅ INVITE com create_offer (early offer)
-- ✅ UNREGISTER
+#### User 1111 (5 tests)
+- OPTIONS with authentication
+- REGISTER (expires=3600)
+- REGISTER update (expires=1800)
+- INVITE with create_offer (early offer)
+- UNREGISTER
 
-#### User 2222 (5 testes)
-- ✅ OPTIONS sem autenticação
-- ✅ REGISTER
-- ✅ INVITE com create_answer (late offer)
-- ✅ Early media detection (183)
-- ✅ UNREGISTER
+#### User 2222 (5 tests)
+- OPTIONS without authentication
+- REGISTER
+- INVITE with create_answer (late offer)
+- Early media detection (183)
+- UNREGISTER
 
-#### User 3333 (6 testes)
-- ❌ OPTIONS (deve ser rejeitado - esperado)
-- ✅ REGISTER com credenciais inválidas (deve falhar)
-- ✅ REGISTER com credenciais válidas
-- ✅ INVITE
-- ✅ Auto re-registration (5s interval)
-- ✅ UNREGISTER
+#### User 3333 (6 tests)
+- OPTIONS (should be rejected -- expected)
+- REGISTER with invalid credentials (should fail)
+- REGISTER with valid credentials
+- INVITE
+- Auto re-registration (5s interval)
+- UNREGISTER
 
-**Resultado esperado**: 15/16 testes passam (1 falha intencional)
+**Expected result**: 15/16 tests pass (1 intentional failure)
 
-### Exemplo 1: Registro Simples
+### Example 1: Simple Registration
 
 ```python
 from sipx import Client, Auth
@@ -263,17 +263,17 @@ from sipx import Client, Auth
 auth = Auth.Digest(username="1111", password="1111xxx")
 
 with Client(local_port=5061, auth=auth) as client:
-    # Fazer registro
+    # Register
     response = client.register(aor="sip:1111@127.0.0.1")
-    
-    # Tratar autenticação
+
+    # Handle authentication
     if response.status_code == 401:
         response = client.retry_with_auth(response)
-    
-    print(f"Registro: {response.status_code} {response.reason_phrase}")
+
+    print(f"Registration: {response.status_code} {response.reason_phrase}")
 ```
 
-### Exemplo 2: Chamada para Echo Test
+### Example 2: Call to Echo Test
 
 ```python
 from sipx import Client, Auth, SDPBody
@@ -282,7 +282,7 @@ import time
 auth = Auth.Digest(username="1111", password="1111xxx")
 
 with Client(local_port=5061, auth=auth) as client:
-    # Criar SDP offer
+    # Create SDP offer
     sdp_offer = SDPBody.create_offer(
         session_name="Echo Test",
         origin_username="1111",
@@ -297,27 +297,27 @@ with Client(local_port=5061, auth=auth) as client:
             ]
         }]
     )
-    
-    # Chamar extensão 100 (echo test)
+
+    # Call extension 100 (echo test)
     response = client.invite(
         to_uri="sip:100@127.0.0.1",
         from_uri=f"sip:1111@{client.local_address.host}",
         body=sdp_offer.to_string(),
         headers={"Contact": f"<sip:1111@{client.local_address.host}:5061>"}
     )
-    
-    # Autenticação
+
+    # Authentication
     if response.status_code == 401:
         response = client.retry_with_auth(response)
-    
+
     if response.status_code == 200:
-        print(f"✅ INVITE: {response.status_code}")
+        print(f"INVITE: {response.status_code}")
         client.ack(response=response)
         time.sleep(5)
         client.bye(response=response)
 ```
 
-### Exemplo 3: Auto Re-Registration
+### Example 3: Auto Re-Registration
 
 ```python
 from sipx import Client, Auth
@@ -326,167 +326,85 @@ import time
 auth = Auth.Digest(username="1111", password="1111xxx")
 
 with Client(local_port=5061, auth=auth) as client:
-    # Registrar inicialmente
+    # Initial registration
     response = client.register(aor="sip:1111@127.0.0.1")
     if response.status_code == 401:
         response = client.retry_with_auth(response)
-    
-    # Ativar auto re-registration (threading.Timer)
+
+    # Enable auto re-registration (threading.Timer)
     client.enable_auto_reregister(
         aor="sip:1111@127.0.0.1",
-        interval=300  # Re-registrar a cada 5 minutos
+        interval=300  # Re-register every 5 minutes
     )
-    
-    print("✅ Auto re-registration habilitado")
-    
-    # Manter rodando (re-registro acontece automaticamente)
-    time.sleep(600)  # 10 minutos
-    
-    # Desabilitar e remover registro
+
+    print("Auto re-registration enabled")
+
+    # Keep running (re-registration happens automatically)
+    time.sleep(600)  # 10 minutes
+
+    # Disable and remove registration
     client.disable_auto_reregister()
     response = client.unregister(aor="sip:1111@127.0.0.1")
     if response.status_code == 401:
         response = client.retry_with_auth(response)
 ```
 
-### Exemplo 4: Early Media Detection (183)
-
-```python
-from sipx import Client, Auth, Events, event_handler, SDPBody
-from sipx._types import Response, RequestContext
-
-class EarlyMediaEvents(Events):
-    def __init__(self):
-        super().__init__()
-        self.early_media_detected = False
-    
-    @event_handler("response")
-    def on_response(self, response: Response, context: RequestContext):
-        if response.status_code == 183:
-            print("🎵 Early Media (183 Session Progress)")
-            self.early_media_detected = True
-            
-            if response.body:
-                codecs = response.body.get_codecs_summary()
-                print(f"   Codecs: {', '.join(codecs)}")
-        
-        return response
-
-auth = Auth.Digest(username="2222", password="2222xxx")
-events = EarlyMediaEvents()
-
-with Client(local_port=5062, auth=auth, events=events) as client:
-    # INVITE sem SDP (late offer)
-    response = client.invite(
-        to_uri="sip:100@127.0.0.1",
-        from_uri=f"sip:2222@{client.local_address.host}",
-        body=None,
-        headers={"Contact": f"<sip:2222@{client.local_address.host}:5062>"}
-    )
-    
-    if response.status_code == 401:
-        response = client.retry_with_auth(response)
-    
-    if events.early_media_detected:
-        print("✅ Early media foi detectado!")
-```
-
-### Exemplo 5: Event Handlers Customizados
-
-```python
-from sipx import Client, Auth, Events, event_handler
-from sipx._types import Request, Response, RequestContext
-
-class CustomEvents(Events):
-    """Event handlers com Rich console output"""
-    
-    @event_handler("request")
-    def on_request(self, request: Request, context: RequestContext):
-        print(f"📤 {request.method} → {request.uri}")
-        return request
-    
-    @event_handler("response")
-    def on_response(self, response: Response, context: RequestContext):
-        if response.status_code >= 200 and response.status_code < 300:
-            print(f"✅ {response.status_code} {response.reason_phrase}")
-        elif response.status_code == 401:
-            print(f"🔐 401 Unauthorized")
-        else:
-            print(f"❌ {response.status_code} {response.reason_phrase}")
-        return response
-
-auth = Auth.Digest(username="1111", password="1111xxx")
-events = CustomEvents()
-
-with Client(local_port=5061, auth=auth, events=events) as client:
-    # Requests acionam os event handlers automaticamente
-    response = client.register(aor="sip:1111@127.0.0.1")
-    if response.status_code == 401:
-        response = client.retry_with_auth(response)
-    
-    # Output:
-    # 📤 REGISTER → sip:1111@127.0.0.1
-    # 🔐 401 Unauthorized
-    # 📤 REGISTER → sip:1111@127.0.0.1
-    # ✅ 200 OK
-```
-
-## 🔧 Estrutura dos Arquivos
+## File Structure
 
 ```
 asterisk-docker/
-├── Dockerfile              # Imagem Docker do Asterisk
-├── docker-compose.yml      # Orquestração do container
+├── Dockerfile              # Asterisk Docker image
+├── docker-compose.yml      # Container orchestration
 ├── config/
-│   ├── pjsip.conf         # Configuração PJSIP (usuários, transports)
-│   ├── extensions.conf    # Dialplan (rotas de chamadas)
-│   ├── rtp.conf           # Configuração RTP (portas de áudio)
-│   └── modules.conf       # Módulos carregados
-└── README.md              # Este arquivo
+│   ├── pjsip.conf         # PJSIP configuration (users, transports)
+│   ├── extensions.conf    # Dialplan (call routes)
+│   ├── rtp.conf           # RTP configuration (audio ports)
+│   └── modules.conf       # Loaded modules
+└── README.md              # This file
 ```
 
-## 🎯 Próximos Passos
+## Next Steps
 
-1. **Testar Registro**: Execute o script de registro básico
-2. **Testar Echo**: Chame a extensão 100 para validar RTP
-3. **Testar Chamadas**: Faça chamadas entre 1111, 2222 e 3333
-4. **Monitorar Logs**: Use `pjsip set logger on` para debug detalhado
-5. **Validar ACK**: Verifique envio de ACK com sngrep ou logs
+1. **Test Registration**: Run the basic registration script
+2. **Test Echo**: Call extension 100 to validate RTP
+3. **Test Calls**: Make calls between 1111, 2222, and 3333
+4. **Monitor Logs**: Use `pjsip set logger on` for detailed debug
+5. **Validate ACK**: Verify ACK sending with sngrep or logs
 
-## 📚 Recursos Adicionais
+## Additional Resources
 
 - [Asterisk Official Docs](https://docs.asterisk.org/)
 - [PJSIP Configuration](https://wiki.asterisk.org/wiki/display/AST/Configuring+res_pjsip)
 - [Dialplan Basics](https://wiki.asterisk.org/wiki/display/AST/Dialplan)
 - [RFC 3261 - SIP](https://datatracker.ietf.org/doc/html/rfc3261)
 
-## 🐛 Debug Avançado
+## Advanced Debug
 
-### Capturar tráfego SIP com tcpdump
+### Capture SIP traffic with tcpdump
 
 ```bash
-# No host (não no container)
+# On the host (not in the container)
 sudo tcpdump -i any -s 0 -A 'port 5060'
 ```
 
-### Usar sngrep para visualizar fluxo SIP
+### Use sngrep to visualize SIP flow
 
 ```bash
-# Instalar sngrep (Ubuntu/Debian)
+# Install sngrep (Ubuntu/Debian)
 sudo apt-get install sngrep
 
-# Executar
+# Run
 sudo sngrep port 5060
 ```
 
-### Logs detalhados do Asterisk
+### Detailed Asterisk logs
 
-Edite `config/modules.conf` e adicione:
+Edit `config/modules.conf` and add:
 ```ini
 load => logger.so
 ```
 
-Crie `config/logger.conf`:
+Create `config/logger.conf`:
 ```ini
 [general]
 dateformat=%F %T
@@ -497,21 +415,20 @@ messages => notice,warning,error,verbose
 full => notice,warning,error,debug,verbose
 ```
 
-## 📚 Recursos Adicionais
+## Related Documentation
 
-- **[examples/README.md](../../examples/README.md)** - Guia de exemplos
-- **[docs/QUICK_START.md](../../docs/QUICK_START.md)** - Início rápido
-- **[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)** - Arquitetura
-- **[docs/GUIA_WSL_ASTERISK.md](../../docs/GUIA_WSL_ASTERISK.md)** - Guia WSL
-
----
-
-## 📄 Licença
-
-MIT License - Este setup é fornecido como exemplo para testes.
+- **[examples/README.md](../../examples/README.md)** - Examples guide
+- **[docs/SDD.md](../../docs/SDD.md)** - Full specification and design
+- **[docs/GUIA_WSL_ASTERISK.md](../../docs/GUIA_WSL_ASTERISK.md)** - WSL guide
 
 ---
 
-**Versão**: 2.0.0  
-**Última Atualização**: Outubro 2025  
-**Status**: ✅ Produção
+## License
+
+MIT License - This setup is provided as an example for testing.
+
+---
+
+**Version**: 0.3.0
+**Last Updated**: March 2026
+**Status**: Production

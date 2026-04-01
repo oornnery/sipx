@@ -1,6 +1,7 @@
 """Utilities and constants for SIP protocol."""
 
 import logging
+
 from rich.console import Console
 from rich.logging import RichHandler
 
@@ -9,7 +10,7 @@ console = Console()
 
 # Configure logging with RichHandler
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="%(message)s",
     datefmt="[%X]",
     handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)],

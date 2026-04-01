@@ -8,9 +8,13 @@ wheels/
 
 # Virtual environments
 .venv
-.claude
 .pytest_cache
 .ruff_cache
 .mypy_cache
 __pypackages__/
 .coverage
+htmlcov
+.coverage.*
+
+.claude/settings.json
+.codex
