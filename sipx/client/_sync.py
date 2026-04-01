@@ -975,6 +975,81 @@ class Client:
 
         return self.request(method="REFER", uri=uri, headers=headers, **kwargs)
 
+    def refer_and_wait(
+        self,
+        uri: str,
+        refer_to: str,
+        timeout: float = 30.0,
+        **kwargs,
+    ) -> Optional[Request]:
+        """Send REFER and wait for the transfer result via NOTIFY (RFC 3515).
+
+        Sends REFER, then polls for ``NOTIFY Event: refer`` messages until
+        the transfer completes (final sipfrag or ``Subscription-State:
+        terminated``) or ``timeout`` expires.  Each NOTIFY is automatically
+        acknowledged with 200 OK.
+
+        Args:
+            uri: Target URI (the transferee, e.g. current call party).
+            refer_to: Transfer destination URI.
+            timeout: Maximum seconds to wait for a final NOTIFY.
+            **kwargs: Extra parameters forwarded to :meth:`refer`.
+
+        Returns:
+            The last ``NOTIFY`` :class:`Request` received (its body is the
+            sipfrag), or ``None`` on timeout / REFER rejection.
+
+        Example::
+
+            notify = client.refer_and_wait(
+                "sip:alice@pbx.com",
+                refer_to="sip:carol@pbx.com",
+            )
+            if notify:
+                print(notify.content_text)  # SIP/2.0 200 OK
+        """
+        import time as _time
+
+        r = self.refer(uri, refer_to, **kwargs)
+        if r is None or r.status_code not in (200, 202):
+            return r  # type: ignore[return-value]
+
+        from ..session import ReferSubscription
+        from ..models._message import MessageParser as _MP
+
+        sub = ReferSubscription(refer_to=refer_to)
+        parser = _MP()
+        deadline = _time.monotonic() + timeout
+        last_notify: Optional[Request] = None
+
+        while _time.monotonic() < deadline:
+            try:
+                data, src = self._transport.receive(timeout=1.0)
+            except Exception:
+                continue
+
+            msg = parser.parse(data)
+            if not isinstance(msg, Request) or msg.method != "NOTIFY":
+                continue
+            if "refer" not in msg.headers.get("Event", "").lower():
+                continue
+
+            # Auto-200 OK the NOTIFY
+            self._transport.send(msg.ok().to_bytes(), src)
+            last_notify = msg
+            logger.debug(
+                "<<< NOTIFY (refer) body=%r sub_state=%r",
+                msg.content_text[:60] if msg.content else "",
+                msg.headers.get("Subscription-State", ""),
+            )
+
+            sipfrag = msg.content_text if msg.content else ""
+            sub_state = msg.headers.get("Subscription-State", "")
+            if sub.update(sipfrag, sub_state):
+                break
+
+        return last_notify
+
     def info(
         self,
         uri: str,

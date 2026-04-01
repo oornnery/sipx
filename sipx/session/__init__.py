@@ -1,7 +1,12 @@
 """SIP Session management package."""
 
 from ._timer import SessionTimerConfig, SessionTimer, AsyncSessionTimer
-from ._subscription import SubscriptionState, Subscription, AsyncSubscription
+from ._subscription import (
+    SubscriptionState,
+    Subscription,
+    AsyncSubscription,
+    ReferSubscription,
+)
 
 __all__ = [
     "SessionTimerConfig",
@@ -10,4 +15,5 @@ __all__ = [
     "SubscriptionState",
     "Subscription",
     "AsyncSubscription",
+    "ReferSubscription",
 ]

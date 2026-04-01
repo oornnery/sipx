@@ -313,3 +313,79 @@ class AsyncSubscription:
         if self._task and not self._task.done():
             self._task.cancel()
         self._task = None
+
+
+@dataclass
+class ReferSubscription:
+    """Tracks the implicit subscription created by a REFER (RFC 3515).
+
+    When a REFER is accepted (200/202), the transferee sends NOTIFY
+    messages with ``Event: refer`` and a ``message/sipfrag`` body that
+    contains the status of the transfer attempt (e.g. ``SIP/2.0 100
+    Trying``, ``SIP/2.0 200 OK``).
+
+    This class accumulates sipfrag updates and signals when the transfer
+    has reached a final outcome.
+
+    Example::
+
+        sub = ReferSubscription(refer_to="sip:carol@pbx.com")
+        sub.update("SIP/2.0 100 Trying\\r\\n")   # provisional — not done
+        sub.update("SIP/2.0 200 OK\\r\\n")        # final — transfer succeeded
+        assert sub.is_complete
+        assert sub.final_status == 200
+    """
+
+    refer_to: str
+    state: SubscriptionState = field(default=SubscriptionState.ACTIVE)
+    sipfrag_history: list[str] = field(default_factory=list)
+    final_status: int | None = None
+
+    def update(self, sipfrag: str, subscription_state: str = "") -> bool:
+        """Process a sipfrag body from a NOTIFY.
+
+        Args:
+            sipfrag: Body of the NOTIFY (e.g. ``SIP/2.0 200 OK\\r\\n``).
+            subscription_state: Value of the Subscription-State header.
+
+        Returns:
+            True if the transfer is complete (final sipfrag or terminated).
+        """
+        self.sipfrag_history.append(sipfrag)
+        _log.debug("ReferSubscription sipfrag: %r", sipfrag[:80])
+
+        if "terminated" in subscription_state.lower():
+            self.state = SubscriptionState.TERMINATED
+            _log.info("REFER subscription terminated")
+            return True
+
+        # Parse status code from "SIP/2.0 <code> <reason>"
+        parts = sipfrag.split()
+        if len(parts) >= 2:
+            try:
+                code = int(parts[1])
+                if code >= 200:
+                    self.final_status = code
+                    self.state = SubscriptionState.TERMINATED
+                    _log.info("REFER complete: sipfrag status %d", code)
+                    return True
+            except ValueError:
+                pass
+
+        return False
+
+    @property
+    def is_complete(self) -> bool:
+        """True when the transfer has reached a final outcome."""
+        return self.state == SubscriptionState.TERMINATED
+
+    @property
+    def succeeded(self) -> bool:
+        """True if transfer completed with a 2xx final status."""
+        return self.final_status is not None and 200 <= self.final_status < 300
+
+    def __repr__(self) -> str:
+        return (
+            f"<ReferSubscription(refer_to={self.refer_to!r}, "
+            f"state={self.state.name}, final_status={self.final_status})>"
+        )

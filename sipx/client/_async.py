@@ -595,6 +595,64 @@ class AsyncClient:
         headers["Refer-To"] = f"<{refer_to}>"
         return await self.request(method="REFER", uri=uri, headers=headers, **kwargs)
 
+    async def refer_and_wait(
+        self,
+        uri: str,
+        refer_to: str,
+        timeout: float = 30.0,
+        **kwargs,
+    ) -> Optional[Request]:
+        """Send REFER and wait for the transfer result via NOTIFY (RFC 3515).
+
+        Args:
+            uri: Target URI (the transferee).
+            refer_to: Transfer destination URI.
+            timeout: Maximum seconds to wait for a final NOTIFY.
+            **kwargs: Extra parameters forwarded to :meth:`refer`.
+
+        Returns:
+            The last ``NOTIFY`` :class:`Request` received, or ``None``.
+        """
+        r = await self.refer(uri, refer_to, **kwargs)
+        if r is None or r.status_code not in (200, 202):
+            return r  # type: ignore[return-value]
+
+        from ..session import ReferSubscription
+
+        sub = ReferSubscription(refer_to=refer_to)
+        parser = MessageParser()
+        deadline = time.monotonic() + timeout
+        last_notify: Optional[Request] = None
+
+        while time.monotonic() < deadline:
+            try:
+                data, src = await asyncio.wait_for(
+                    self._transport.receive(), timeout=1.0
+                )
+            except (asyncio.TimeoutError, Exception):
+                continue
+
+            msg = parser.parse(data)
+            if not isinstance(msg, Request) or msg.method != "NOTIFY":
+                continue
+            if "refer" not in msg.headers.get("Event", "").lower():
+                continue
+
+            await self._transport.send(msg.ok().to_bytes(), src)
+            last_notify = msg
+            logger.debug(
+                "<<< NOTIFY (refer) body=%r sub_state=%r",
+                msg.content_text[:60] if msg.content else "",
+                msg.headers.get("Subscription-State", ""),
+            )
+
+            sipfrag = msg.content_text if msg.content else ""
+            sub_state = msg.headers.get("Subscription-State", "")
+            if sub.update(sipfrag, sub_state):
+                break
+
+        return last_notify
+
     async def info(
         self,
         uri: str,
