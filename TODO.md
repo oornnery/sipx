@@ -88,6 +88,12 @@
 - [x] Core: routing, URI parse, DI resolution
 - [x] No print in core — all logging via `logging.getLogger("sipx")`
 
+### CLI
+
+- [x] `sipx` CLI entry point via typer (`uv run sipx`, `uvx sipx`)
+- [x] Commands: register, options, call, message, listen
+- [x] Graceful None-response handling (timeout → exit code 1, no AttributeError)
+
 ### CI/CD
 
 - [x] GitHub Actions CI (lint + test on push to dev, PR to dev/master)
@@ -95,6 +101,7 @@
 - [x] Create Release workflow (auto-create GitHub release on push to master)
 - [x] Publish Package workflow (PyPI publish on release via trusted publisher)
 - [x] Version management (_version.py single source of truth)
+- [x] v0.0.4 released on GitHub + PyPI
 
 ### Testing
 
@@ -120,12 +127,6 @@
 
 ---
 
-## In Progress
-
-### Bug Fixes
-
-- [ ] Verify retransmission logs appear in sngrep when no peer responds (Timer E/A wired but needs live testing)
-
 ---
 
 ## Features Remaining
@@ -135,6 +136,7 @@
 - [ ] SRTP packet encryption (RFC 3711) — AES-128-CM, HMAC-SHA1-80
 - [ ] RTCP sender/receiver reports (RFC 3550 Section 6)
 - [ ] Coverage >80% — current ~60%, need more client/server/media tests
+- [ ] Verify Timer E/A retransmission logs in sngrep (needs live test)
 
 ### Medium Priority
 
@@ -145,7 +147,7 @@
 - [ ] NAPTR DNS records (RFC 3263 full)
 - [ ] Forking (handle multiple 200 OK from different UAS)
 - [ ] Server-side FSM integration (IST/NIST wired into server handlers)
-- [ ] PyPI publishing (package ready, needs trusted publisher config)
+- [ ] Configure PyPI trusted publisher for automated publish
 
 ### Low Priority
 
@@ -157,7 +159,6 @@
 - [ ] Presence agent (PUBLISH/SUBSCRIBE/NOTIFY full flow)
 - [ ] B2BUA (back-to-back user agent)
 - [ ] TUI dashboard (textual — call monitor)
-- [ ] CLI tools (typer — SIP testing CLI)
 
 ### Test Coverage Gaps
 
