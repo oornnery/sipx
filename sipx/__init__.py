@@ -138,7 +138,7 @@ from ._types import (
 # Version
 # ============================================================================
 
-__version__ = "0.3.0"
+from ._version import __version__
 
 
 # ============================================================================
@@ -236,6 +236,7 @@ __all__ = [
     "EventContext",
     "event_handler",
     "on",
+    "__version__",
     # ------ One-liners ------
     "register",
     "options",
