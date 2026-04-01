@@ -98,9 +98,7 @@ async def main() -> None:
             client_addr["addr"] = ("127.0.0.1", local_port)
 
             print("Client: establishing call…")
-            invite_resp = await client.invite(
-                f"sip:bob@127.0.0.1:{SERVER_PORT}"
-            )
+            invite_resp = await client.invite(f"sip:bob@127.0.0.1:{SERVER_PORT}")
             print(f"  INVITE → {invite_resp.status_code if invite_resp else 'timeout'}")
 
             print("Client: transferring call to Carol…")

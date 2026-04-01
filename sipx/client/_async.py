@@ -279,9 +279,7 @@ class AsyncClient:
                     prack_headers = {
                         "Via": request.headers.get("Via", ""),
                         "From": request.headers.get("From", ""),
-                        "To": response.headers.get(
-                            "To", request.headers.get("To", "")
-                        ),
+                        "To": response.headers.get("To", request.headers.get("To", "")),
                         "Call-ID": request.headers.get("Call-ID", ""),
                         "CSeq": f"{invite_cseq_num + 1} PRACK",
                         "RAck": f"{rseq} {invite_cseq}",

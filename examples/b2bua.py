@@ -74,9 +74,7 @@ async def main() -> None:
 
                     # Alice calls the B2BUA
                     print("Alice: calling B2BUA…")
-                    resp = await alice.invite(
-                        f"sip:bob@127.0.0.1:{B2BUA_PORT}"
-                    )
+                    resp = await alice.invite(f"sip:bob@127.0.0.1:{B2BUA_PORT}")
                     print(
                         f"Alice: INVITE → {resp.status_code} {resp.reason_phrase}"
                         if resp

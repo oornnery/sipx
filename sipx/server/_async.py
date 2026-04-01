@@ -126,10 +126,8 @@ class AsyncSIPServer(SIPServerHandlerMixin):
             if message.method == "INVITE":
                 timer_manager = AsyncTimerManager()
                 txn.timer_manager = timer_manager
-                txn._retransmit_fn = (
-                    lambda d=response_data, a=addr: (
-                        transport.sendto(d, a) if transport else None
-                    )
+                txn._retransmit_fn = lambda d=response_data, a=addr: (
+                    transport.sendto(d, a) if transport else None
                 )
                 txn._on_state_change(txn.state, txn.state)
 

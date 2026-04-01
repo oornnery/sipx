@@ -54,7 +54,9 @@ def demo_pidf() -> None:
 
     # --- Parse round-trip ---
     parsed = PIFDBody.parse(alice_online.to_string())
-    print(f"Round-trip: entity={parsed.entity!r} status={parsed.status!r} note={parsed.note!r}")
+    print(
+        f"Round-trip: entity={parsed.entity!r} status={parsed.status!r} note={parsed.note!r}"
+    )
     print()
 
 

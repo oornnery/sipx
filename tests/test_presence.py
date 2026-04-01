@@ -51,7 +51,9 @@ def _make_response(status: int, reason: str, extra: dict | None = None) -> bytes
     }
     if extra:
         headers.update(extra)
-    return Response(status_code=status, reason_phrase=reason, headers=headers).to_bytes()
+    return Response(
+        status_code=status, reason_phrase=reason, headers=headers
+    ).to_bytes()
 
 
 # ============================================================================

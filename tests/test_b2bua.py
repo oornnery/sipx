@@ -29,7 +29,9 @@ def _make_request(method: str, call_id: str = "call1@test") -> Request:
     )
 
 
-def _make_response(status: int, reason: str, request: Request | None = None) -> Response:
+def _make_response(
+    status: int, reason: str, request: Request | None = None
+) -> Response:
     resp = Response(
         status_code=status,
         reason_phrase=reason,
@@ -152,7 +154,8 @@ class TestB2BUAInvite:
         b_resp = _make_response(200, "OK", request=invite_req)
         client.invite.return_value = b_resp
         B2BUA(
-            server, client,
+            server,
+            client,
             target="sip:pbx@127.0.0.1",
             on_bridge=lambda req, resp: bridge_calls.append((req, resp)),
         )
@@ -161,7 +164,9 @@ class TestB2BUAInvite:
         assert len(bridge_calls) == 1
 
     def test_invite_b_leg_rejected_returns_503(self):
-        b2b, server, client, req = self._setup(b_status=503, b_reason="Service Unavailable")
+        b2b, server, client, req = self._setup(
+            b_status=503, b_reason="Service Unavailable"
+        )
         handler = server._handlers["INVITE"]
         resp = handler(req, SOURCE)
         assert resp.status_code == 503
@@ -233,7 +238,8 @@ class TestB2BUABye:
         b_resp = _make_response(200, "OK", request=invite_req)
         client.invite.return_value = b_resp
         B2BUA(
-            server, client,
+            server,
+            client,
             target="sip:pbx@127.0.0.1",
             on_terminate=lambda cid: terminated.append(cid),
         )
