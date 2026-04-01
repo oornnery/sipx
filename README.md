@@ -1,6 +1,6 @@
 # sipx
 
-[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A modern, high-performance SIP library for Python inspired by [httpx](https://www.python-httpx.org/).
@@ -10,59 +10,45 @@ Build voice automation scripts, IVR systems, AI-powered call handlers, and SIP t
 ## Features
 
 - **httpx-inspired API** — `client.invite()`, `client.register()`, sync and async
-- **Declarative events** — `@event_handler('INVITE', status=200)` decorators
-- **Full SIP support** — 14 methods: INVITE, REGISTER, BYE, ACK, CANCEL, OPTIONS, MESSAGE, SUBSCRIBE, NOTIFY, REFER, INFO, UPDATE, PRACK, PUBLISH
-- **Digest authentication** — MD5, SHA-256, automatic challenge parsing, manual retry control
-- **SDP offer/answer** — RFC 4566 compliant, codec negotiation, media analysis
-- **Multiple transports** — UDP, TCP, TLS (sync + async)
-- **State management** — Transaction FSMs (ICT/NICT) and Dialog tracking per RFC 3261
-- **Extensible** — ABC-based transports, body parsers, auth methods
+- **FastAPI-style server** — `@server.invite`, `Annotated` DI extractors
+- **Response builders** — `request.ok()`, `request.trying()`, `request.error(code)`
+- **Dialog tracking** — `client.ack()` / `client.bye()` without passing response
+- **Declarative events** — `@on('INVITE', status=200)` decorators
+- **Full SIP support** — 14 methods, auto 100 Trying, auto DNS SRV resolution
+- **Digest authentication** — MD5, SHA-256, auto-retry on 401/407
+- **RTP + DTMF** — RFC 4733 + SIP INFO + Inband, sync and async
+- **SDP with ICE/SRTP** — RFC 4566, offer/answer, ICE candidates, DTLS
+- **Media pipeline** — RTP, tone generators, TTS/STT adapters, IVR builder
+- **SIP-I** — Real ISUP binary encoding (ITU-T Q.763), Brazilian SIP-I (ANATEL)
+- **Multiple transports** — UDP, TCP, TLS, WebSocket (sync + async)
+- **State management** — Transaction FSMs with Timer A/E retransmission
+- **Extensible** — ABC-based transports, body parsers, custom DI extractors
 
 ## Quick Start
 
 ```python
-from sipx import Client, Events, Auth, event_handler, SDPBody
+import sipx
 
-class MyEvents(Events):
-    @event_handler('INVITE', status=200)
-    def on_call_accepted(self, request, response, context):
-        print(f"Call accepted! SDP: {response.body}")
+# One-liners
+sipx.options("sip:pbx.example.com")
+sipx.register("sip:alice@pbx.com", auth=("alice", "secret"))
+sipx.send("sip:bob@pbx.com", "Hello!", auth=("alice", "secret"))
 
-    @event_handler('INVITE', status=180)
-    def on_ringing(self, request, response, context):
-        print("Ringing...")
+# Full call with dialog tracking
+from sipx import Client
 
-with Client() as client:
-    client.events = MyEvents()
-    client.auth = Auth.Digest('alice', 'secret')
+with Client(local_port=5061) as client:
+    client.auth = ("alice", "secret")
 
-    # Register
-    response = client.register('sip:alice@pbx.example.com')
-    if response.status_code == 401:
-        response = client.retry_with_auth(response)
+    client.register("sip:alice@pbx.com")
 
-    # Make a call
-    sdp = SDPBody.create_offer(
-        session_name="Call",
-        origin_username="alice",
-        origin_address="192.168.1.100",
-        connection_address="192.168.1.100",
-        media_specs=[{
-            "media": "audio",
-            "port": 8000,
-            "codecs": [
-                {"payload": "0", "name": "PCMU", "rate": "8000"},
-                {"payload": "8", "name": "PCMA", "rate": "8000"},
-            ],
-        }],
-    )
-    response = client.invite('sip:bob@pbx.example.com', body=sdp.to_string())
-    if response.status_code == 401:
-        response = client.retry_with_auth(response)
-    if response.status_code == 200:
-        client.ack(response=response)
+    sdp = client.create_sdp(port=8000)
+    r = client.invite("sip:bob@pbx.com", body=sdp.to_string())
+
+    if r.status_code == 200:
+        client.ack()    # uses tracked dialog
         # call is active...
-        client.bye(response=response)
+        client.bye()    # uses tracked dialog
 ```
 
 ## Installation
@@ -80,117 +66,137 @@ cd sipx
 uv sync
 ```
 
-**Requires Python 3.13+**
+### Requirements
+
+Python 3.12+
 
 ## Usage Examples
 
-### Registration
+### SIP Server (FastAPI-style decorators + DI)
 
 ```python
-from sipx import Client, Auth
+from typing import Annotated
+from sipx import SIPServer, Request, FromHeader, Header
 
-with Client(local_port=5061) as client:
-    client.auth = Auth.Digest('alice', 'secret')
-    response = client.register('sip:alice@pbx.example.com')
-    if response.status_code == 401:
-        response = client.retry_with_auth(response)
-    print(f"Status: {response.status_code}")  # 200
-```
+server = SIPServer(local_host="127.0.0.1", local_port=5060)
 
-### Send Message
+@server.register
+def on_register(request: Request, caller: Annotated[str, FromHeader]):
+    print(f"REGISTER from {caller}")
+    return request.ok()
 
-```python
-with Client() as client:
-    response = client.message(
-        to_uri='sip:bob@example.com',
-        content='Hello from sipx!'
-    )
-```
+@server.message
+def on_message(request: Request, caller: Annotated[str, FromHeader]):
+    body = request.content.decode() if request.content else ""
+    print(f"MESSAGE from {caller}: {body}")
+    return request.ok()
 
-### Check Server Capabilities
-
-```python
-with Client() as client:
-    response = client.options('sip:pbx.example.com')
-    print(response.headers.get('Allow'))
+server.start()
 ```
 
 ### Async Client
 
 ```python
 import asyncio
-from sipx import AsyncClient, Auth
+from sipx import AsyncClient
 
 async def main():
     async with AsyncClient(local_port=5061) as client:
-        client.auth = Auth.Digest('alice', 'secret')
-        response = await client.register('sip:alice@pbx.example.com')
-        if response.status_code == 401:
-            response = await client.retry_with_auth(response)
+        client.auth = ("alice", "secret")
+
+        r = await client.register("sip:alice@pbx.com")
+        print(f"REGISTER: {r.status_code}")
+
+        sdp = client.create_sdp(port=8000)
+        r = await client.invite("sip:bob@pbx.com", body=sdp.to_string())
+        if r and r.status_code == 200:
+            await client.ack()
+            await asyncio.sleep(5)
+            await client.bye()
 
 asyncio.run(main())
+```
+
+### FastAPI + SIP Integration
+
+Run a REST API that controls SIP operations:
+
+```bash
+# Terminal 1: SIP server
+uv run python examples/server.py
+
+# Terminal 2: FastAPI
+uv run python examples/fastapi_sip.py
+
+# Terminal 3: test via curl
+curl -X POST http://localhost:8000/message \
+  -H "Content-Type: application/json" \
+  -d '{"uri":"sip:test@127.0.0.1:15090","content":"Hello from FastAPI!"}' | jq
+```
+
+```json
+{
+  "status_code": 200,
+  "reason": "OK"
+}
+```
+
+Full request/response trace with retransmission timers, DI resolution, and FSM state transitions:
+
+```text
+# FastAPI (client side)
+INFO     UDP bound to 0.0.0.0:40703
+DEBUG    Transaction 592b5fee created: MESSAGE (type=NON_INVITE)
+DEBUG    Timer E started (0.5s)          # retransmission armed
+DEBUG    Timer F started (32.0s)         # timeout armed
+DEBUG    UDP send 335 bytes -> 127.0.0.1:15090
+DEBUG    UDP recv 245 bytes <- 127.0.0.1:15090
+DEBUG    <<< 200 OK
+DEBUG    Transaction 592b5fee: TRYING -> COMPLETED
+DEBUG    Timer E cancelled               # retransmission stopped
+DEBUG    Timer F cancelled               # timeout stopped
+
+# SIP Server (server side)
+DEBUG    UDP recv 335 bytes <- 127.0.0.1:40703
+DEBUG    Resolving handler on_message
+DEBUG    Extracting caller via FromHeader()
+  MESSAGE from <sip:user@0.0.0.0>: Hello from FastAPI!
+DEBUG    >>> SENDING 200 OK to 127.0.0.1:40703
+DEBUG    UDP send 245 bytes -> 127.0.0.1:40703
 ```
 
 ### Event Handlers
 
 ```python
-from sipx import Events, event_handler
+from sipx import Events, on
 
 class CallEvents(Events):
-    def on_request(self, request, context):
-        print(f"Sending {request.method}")
-        return request
-
-    def on_response(self, response, context):
-        print(f"Received {response.status_code}")
-        return response
-
-    @event_handler('INVITE', status=200)
+    @on('INVITE', status=200)
     def on_call_ok(self, request, response, context):
         print("Call accepted!")
 
-    @event_handler(status=(401, 407))
+    @on('INVITE', status=(180, 183))
+    def on_ringing(self, request, response, context):
+        print(f"Ringing... ({response.status_code})")
+
+    @on(status=(401, 407))
     def on_auth(self, request, response, context):
-        print("Auth required")
-
-    @event_handler('INVITE', status=183)
-    def on_early_media(self, request, response, context):
-        if response.body and response.body.has_early_media():
-            print("Early media detected")
+        print("Auth challenge received")
 ```
 
-### Transport Selection
+### Authentication
 
 ```python
-# UDP (default)
-client = Client(transport="UDP")
+# Tuple auth (auto-retry on 401/407)
+client.auth = ("alice", "secret")
 
-# TCP (reliable, large messages)
-client = Client(transport="TCP")
+# Or explicit Auth object
+client.auth = Auth.Digest("alice", "secret")
 
-# TLS (encrypted, SIPS)
-client = Client(transport="TLS")
-```
-
-## Authentication
-
-sipx uses **explicit authentication** — you control when to retry:
-
-```python
-client.auth = Auth.Digest('alice', 'secret')
-
-response = client.register('sip:alice@pbx.example.com')
-if response.status_code in (401, 407):
-    response = client.retry_with_auth(response)
-```
-
-This gives full control over the auth flow. You can use different credentials per request:
-
-```python
-response = client.invite('sip:bob@example.com')
-if response.status_code == 401:
-    custom_auth = Auth.Digest('alice', 'different_password')
-    response = client.retry_with_auth(response, auth=custom_auth)
+# Per-request override
+r = client.register("sip:alice@pbx.com")
+if r.status_code == 401:
+    r = client.retry_with_auth(r, auth=Auth.Digest("alice", "other"))
 ```
 
 ## Supported Methods
@@ -198,8 +204,8 @@ if response.status_code == 401:
 | Method | Description | Example |
 |--------|-------------|---------|
 | INVITE | Establish a call | `client.invite('sip:bob@ex.com', body=sdp)` |
-| ACK | Acknowledge INVITE | `client.ack(response=r)` |
-| BYE | Terminate a call | `client.bye(response=r)` |
+| ACK | Acknowledge INVITE | `client.ack()` (auto dialog) |
+| BYE | Terminate a call | `client.bye()` (auto dialog) |
 | CANCEL | Cancel pending INVITE | `client.cancel(response=r)` |
 | REGISTER | Register location | `client.register('sip:alice@ex.com')` |
 | OPTIONS | Query capabilities | `client.options('sip:ex.com')` |
@@ -216,21 +222,22 @@ if response.status_code == 401:
 
 | RFC | Title | Status |
 |-----|-------|--------|
-| 3261 | SIP: Session Initiation Protocol | Core implemented |
-| 2617 | HTTP Digest Authentication | Complete |
+| 3261 | SIP: Session Initiation Protocol | Complete (auto 100 Trying, retransmission) |
+| 2617 | HTTP Digest Authentication | Complete (MD5, SHA-256) |
 | 7616 | HTTP Digest (SHA-256) | Complete |
-| 4566 | SDP: Session Description Protocol | Complete |
+| 4566 | SDP: Session Description Protocol | Complete (ICE, SRTP, DTLS) |
 | 3264 | Offer/Answer Model with SDP | Complete |
+| 3550 | RTP: Real-time Transport Protocol | Complete (sync + async) |
+| 4733 | DTMF via RTP (telephone-event) | Complete |
+| 3263 | DNS SRV Resolution | Complete (auto in Client) |
+| 4028 | Session Timers | Complete |
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
 | [docs/SDD.md](docs/SDD.md) | Software Design Document (full spec, diagrams, roadmap) |
-| [docs/QUICK_START.md](docs/QUICK_START.md) | Quick start guide |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture overview |
-| [docs/MODULES.md](docs/MODULES.md) | Module reference |
-| [examples/](examples/) | Working examples |
+| [examples/README.md](examples/README.md) | Examples catalog (22 examples) |
 | [docker/asterisk/](docker/asterisk/) | Asterisk test environment |
 
 ## Testing with Asterisk
@@ -238,20 +245,31 @@ if response.status_code == 401:
 ```bash
 cd docker/asterisk
 docker-compose up -d
-uv run python examples/asterisk_demo.py
+uv run python examples/asterisk.py
 ```
+
+## Examples
+
+See [examples/README.md](examples/README.md) for the full list. Highlights:
+
+| Example | What it shows |
+|---------|---------------|
+| [quickstart.py](examples/quickstart.py) | One-liner register, options, call, send |
+| [call.py](examples/call.py) | REGISTER -> INVITE -> ACK -> BYE |
+| [server.py](examples/server.py) | SIPServer with decorators + DI |
+| [ivr.py](examples/ivr.py) | Async IVR with RTP + DTMF |
+| [response_builders.py](examples/response_builders.py) | request.ok/trying/error, dialog tracking |
+| [asterisk.py](examples/asterisk.py) | Comprehensive integration test |
 
 ## Roadmap
 
 See [docs/SDD.md](docs/SDD.md) for the full roadmap. Key upcoming work:
 
-- **RTP engine** — send/receive audio (RFC 3550)
-- **DTMF** — RFC 4733 (RTP) + SIP INFO
-- **Codecs** — G.711 (PCMU/PCMA), Opus
-- **TTS/STT adapters** — for AI-powered voice automation
-- **IVR builder** — menus, prompts, DTMF collection
-- **WebSocket transport** — RFC 7118
-- **Native async** — replace sync wrapper with true async
+- **SRTP** — packet encryption (RFC 3711)
+- **RTCP** — control protocol (RFC 3550 Section 6)
+- **Jitter buffer** — for smooth RTP playback
+- **Coverage >80%** — currently 607 tests, ~60%
+- **PyPI publishing** — package ready, CI pipeline configured
 
 ## Development
 
@@ -265,17 +283,20 @@ uv run pytest
 
 ## Inspirations
 
-**API design:**
+API design:
+
 - [httpx](https://www.python-httpx.org/) — Pythonic API, sync/async, extensible
 
-**Reference implementations (studied for patterns and ideas):**
+Reference implementations:
+
 - [sipd](https://github.com/initbar/sipd) — SIP daemon implementation
 - [sipmessage](https://github.com/spacinov/sipmessage) — SIP message parsing
 - [sip-parser](https://github.com/alxgb/sip-parser) — SIP parser
 - [PySipIvr](https://github.com/ersansrck/PySipIvr) — SIP IVR implementation
 - [sip-resources](https://github.com/miconda/sip-resources) — Curated SIP resources and documentation
 
-**Other inspirations:**
+Other inspirations:
+
 - [pyVoIP](https://github.com/tayler6000/pyVoIP) — VoIP functionality
 - [aiosip](https://github.com/Eyepea/aiosip) — Async SIP
 - [b2bua](https://github.com/sippy/b2bua) — Back-to-back user agent
