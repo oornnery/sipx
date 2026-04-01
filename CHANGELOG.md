@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.4] - 2026-03-31
+
+### Added
+
+- **CLI** — `uv run sipx` entry point with typer: `register`, `options`, `call`, `message`, `listen`
+- **Response builders** — `request.ok()`, `request.trying()`, `request.ringing()`, `request.error(code)`, `request.redirect(uri)`
+- **Dialog tracking** — `DialogTracker` in `Client`/`AsyncClient`: implicit `ack()`/`bye()` without passing the response
+- **Auto DNS SRV** — `Client(auto_dns=True)` resolves SIP URIs via RFC 3263 SRV + A fallback (default on)
+- **`create_sdp(port)`** — client helper that generates `SDPBody.audio()` with local IP
+- **Asterisk anonymous endpoint** — unauthenticated OPTIONS returns 200 OK (no 401 challenge)
+- **5 new examples** — `response_builders.py`, `dialog_tracking.py`, `routing.py`, `dns_resolver.py`, `session_timers.py`
+- **Integration tests** — `tests/integration/test_asterisk.py` smoke-tests against Asterisk Docker
+- **CI/CD pipeline** — GitHub Actions: lint+test on PR, Asterisk integration, auto GitHub Release, PyPI publish via trusted publisher
+- **Logging** — 23 previously-silent modules now emit structured logs via child loggers (`sipx.transport.udp`, `sipx.fsm`, `sipx.rtp`, etc.)
+
+### Fixed
+
+- **SIP URI port extraction** — replaced `urlparse` (which ignores `sip:` scheme) with `SipURI.parse`; explicit ports in URIs like `sip:host:5080` now work correctly
+- **Timer A/E retransmission** — `_on_state_change()` was never called on transaction creation (constructor bypasses FSM side-effects); fixed by triggering after timer wiring
+- **Request timeout** — sync `Client.request()` now returns `None` on timeout instead of raising `TimeoutError`
+- **DNS SRV on IP addresses** — `SipResolver.resolve()` now skips SRV lookup for literal IPs (no more `_sip._udp.127.0.0.1` queries)
+- **Ctrl+C responsiveness** — reduced sync poll interval from 500 ms to 100 ms so `KeyboardInterrupt` is handled within one tick (WSL2 / PEP 475)
+
+### Changed
+
+- `Client.request()` return type is now `Optional[Response]` (was `Response`)
+- Log format for sent/received messages now includes `Call-ID` and direction (`>>>` / `<<<`)
+- `examples/README.md` rewritten with all 22 examples categorized by use case
+- `examples/asterisk.py` updated: `test_options_no_auth`, timing counters, `create_sdp()` usage
+
+---
+
 ## [0.0.3] - 2025-01-27
 
 ### Fixed
@@ -243,6 +275,7 @@ if isinstance(response.body, SDPBody):
 
 ---
 
-[0.0.3]: https://github.com/yourusername/sipx/compare/v0.2.0...v0.0.3
-[0.2.0]: https://github.com/yourusername/sipx/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/yourusername/sipx/releases/tag/v0.1.0
+[0.0.4]: https://github.com/oornnery/sipx/compare/v0.0.3...v0.0.4
+[0.0.3]: https://github.com/oornnery/sipx/compare/v0.0.2...v0.0.3
+[0.0.2]: https://github.com/oornnery/sipx/compare/v0.1.0...v0.0.2
+[0.1.0]: https://github.com/oornnery/sipx/releases/tag/v0.1.0
