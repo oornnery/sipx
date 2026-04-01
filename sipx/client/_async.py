@@ -16,6 +16,9 @@ from ..models._message import MessageParser, Request, Response
 from ..transports import TransportAddress, TransportConfig
 from ._base import (
     DialogTracker,
+    ForkTracker,
+    _FORK_WINDOW,
+    _ack_and_bye_forked_async,
     _build_auth_header,
     _create_async_transport,
     _detect_auth_challenge,
@@ -50,6 +53,7 @@ class AsyncClient:
         auth: Optional[Union[SipAuthCredentials, tuple]] = None,
         auto_auth: bool = True,
         auto_dns: bool = True,
+        fork_policy: str = "first",
     ) -> None:
         self.config = TransportConfig(local_host=local_host, local_port=local_port)
         self.transport_protocol = transport.upper()
@@ -74,7 +78,9 @@ class AsyncClient:
 
         self._dialog = DialogTracker()
         self._auto_dns = auto_dns
+        self._fork_policy = fork_policy
         self._resolver = None
+        self._presence_etag: Optional[str] = None  # RFC 3903 SIP-ETag
 
     # --- Properties ---
 
@@ -224,6 +230,8 @@ class AsyncClient:
             parser = MessageParser()
             final_response = None
             deadline = time.monotonic() + self._transport.config.read_timeout
+            fork_tracker = ForkTracker() if method == "INVITE" else None
+            fork_deadline: float | None = None
 
             while time.monotonic() < deadline:
                 try:
@@ -233,6 +241,8 @@ class AsyncClient:
                 except (asyncio.TimeoutError, Exception):
                     if transaction.is_terminated():
                         break
+                    if fork_deadline is not None and time.monotonic() >= fork_deadline:
+                        break  # Fork collection window expired
                     continue
 
                 response = parser.parse(response_data)
@@ -255,6 +265,36 @@ class AsyncClient:
                     self._transport.local_address,
                     response.headers.get("Call-ID", "-"),
                 )
+                logger.debug(response.to_string())
+
+                # Auto-PRACK for reliable provisional responses (RFC 3262)
+                if (
+                    method == "INVITE"
+                    and 100 < response.status_code < 200
+                    and "100rel" in response.headers.get("Require", "")
+                ):
+                    rseq = response.headers.get("RSeq", "1")
+                    invite_cseq = request.headers.get("CSeq", "1 INVITE")
+                    invite_cseq_num = int(invite_cseq.split()[0])
+                    prack_headers = {
+                        "Via": request.headers.get("Via", ""),
+                        "From": request.headers.get("From", ""),
+                        "To": response.headers.get("To", request.headers.get("To", "")),
+                        "Call-ID": request.headers.get("Call-ID", ""),
+                        "CSeq": f"{invite_cseq_num + 1} PRACK",
+                        "RAck": f"{rseq} {invite_cseq}",
+                        "Max-Forwards": "70",
+                        "Content-Length": "0",
+                    }
+                    prack_req = Request(method="PRACK", uri=uri, headers=prack_headers)
+                    await self._transport.send(prack_req.to_bytes(), destination)
+                    logger.debug(
+                        ">>> Auto PRACK (RSeq: %s) to %s:%s",
+                        rseq,
+                        destination.host,
+                        destination.port,
+                    )
+
                 self._state_manager.update_transaction(transaction.id, response)
                 context.response = response
                 context.source = source
@@ -264,10 +304,35 @@ class AsyncClient:
                     response = self._events._call_response_handlers(response, context)
 
                 if response.status_code >= 200:
-                    final_response = response
-                    break
+                    if fork_tracker is not None and response.status_code == 200:
+                        # INVITE 200: collect forks for a short window
+                        fork_tracker.add(response)
+                        if fork_deadline is None:
+                            fork_deadline = time.monotonic() + _FORK_WINDOW
+                        if time.monotonic() >= fork_deadline:
+                            break
+                        continue
+                    elif fork_deadline is not None:
+                        # Non-200 final during fork collection: stop
+                        break
+                    else:
+                        final_response = response
+                        break
                 if final_response is None:
                     final_response = response
+
+            # Resolve final response from fork tracker (INVITE)
+            if fork_tracker is not None and fork_tracker.best is not None:
+                final_response = fork_tracker.best
+                if self._fork_policy == "first" and fork_tracker.extra:
+                    logger.debug(
+                        "Forking: %d extra legs detected — auto-ACK+BYE",
+                        len(fork_tracker.extra),
+                    )
+                    for extra in fork_tracker.extra:
+                        await _ack_and_bye_forked_async(
+                            self._transport, extra, destination
+                        )
 
             if final_response is None:
                 logger.warning("Request timed out")
@@ -373,6 +438,7 @@ class AsyncClient:
         to_uri: str,
         from_uri: Optional[str] = None,
         body: Optional[str] = None,
+        reliable: bool = False,
         **kwargs,
     ) -> Optional[Response]:
         if from_uri is None:
@@ -382,6 +448,9 @@ class AsyncClient:
         headers = kwargs.pop("headers", {})
         headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
         headers["To"] = f"<{to_uri}>"
+        if reliable:
+            headers["Require"] = "100rel"
+            headers["Supported"] = "100rel"
         if body:
             headers["Content-Type"] = "application/sdp"
         return await self.request(
@@ -525,6 +594,64 @@ class AsyncClient:
         headers["Refer-To"] = f"<{refer_to}>"
         return await self.request(method="REFER", uri=uri, headers=headers, **kwargs)
 
+    async def refer_and_wait(
+        self,
+        uri: str,
+        refer_to: str,
+        timeout: float = 30.0,
+        **kwargs,
+    ) -> Optional[Request]:
+        """Send REFER and wait for the transfer result via NOTIFY (RFC 3515).
+
+        Args:
+            uri: Target URI (the transferee).
+            refer_to: Transfer destination URI.
+            timeout: Maximum seconds to wait for a final NOTIFY.
+            **kwargs: Extra parameters forwarded to :meth:`refer`.
+
+        Returns:
+            The last ``NOTIFY`` :class:`Request` received, or ``None``.
+        """
+        r = await self.refer(uri, refer_to, **kwargs)
+        if r is None or r.status_code not in (200, 202):
+            return r  # type: ignore[return-value]
+
+        from ..session import ReferSubscription
+
+        sub = ReferSubscription(refer_to=refer_to)
+        parser = MessageParser()
+        deadline = time.monotonic() + timeout
+        last_notify: Optional[Request] = None
+
+        while time.monotonic() < deadline:
+            try:
+                data, src = await asyncio.wait_for(
+                    self._transport.receive(), timeout=1.0
+                )
+            except (asyncio.TimeoutError, Exception):
+                continue
+
+            msg = parser.parse(data)
+            if not isinstance(msg, Request) or msg.method != "NOTIFY":
+                continue
+            if "refer" not in msg.headers.get("Event", "").lower():
+                continue
+
+            await self._transport.send(msg.ok().to_bytes(), src)
+            last_notify = msg
+            logger.debug(
+                "<<< NOTIFY (refer) body=%r sub_state=%r",
+                msg.content_text[:60] if msg.content else "",
+                msg.headers.get("Subscription-State", ""),
+            )
+
+            sipfrag = msg.content_text if msg.content else ""
+            sub_state = msg.headers.get("Subscription-State", "")
+            if sub.update(sipfrag, sub_state):
+                break
+
+        return last_notify
+
     async def info(
         self,
         uri: str,
@@ -570,16 +697,33 @@ class AsyncClient:
         event: str = "presence",
         content: Optional[str] = None,
         expires: int = 3600,
+        etag: Optional[str] = None,
         **kwargs,
     ) -> Optional[Response]:
+        """Send PUBLISH request (RFC 3903).
+
+        Args:
+            uri: Presentity URI or ESC address.
+            event: Event package (default: ``"presence"``).
+            content: PIDF-XML body.  Omit to refresh via ``etag``.
+            expires: Publication expiry in seconds.
+            etag: ``SIP-If-Match`` from previous 200 OK for refresh.
+        """
         headers = kwargs.pop("headers", {})
         headers["Event"] = event
         headers["Expires"] = str(expires)
+        if etag:
+            headers["SIP-If-Match"] = etag
         if content:
             headers["Content-Type"] = "application/pidf+xml"
-        return await self.request(
+        r = await self.request(
             method="PUBLISH", uri=uri, headers=headers, content=content, **kwargs
         )
+        if r and r.status_code == 200:
+            new_etag = r.headers.get("SIP-ETag")
+            if new_etag:
+                self._presence_etag = new_etag
+        return r
 
     async def unregister(self, aor: str, **kwargs) -> Optional[Response]:
         if self._reregister_aor == aor:

@@ -14,6 +14,9 @@ from ..models._message import Request, Response, MessageParser
 from ..transports import TransportAddress, TransportConfig
 from ._base import (
     DialogTracker,
+    ForkTracker,
+    _FORK_WINDOW,
+    _ack_and_bye_forked,
     _create_sync_transport,
     _extract_host_port,
     _build_auth_header,
@@ -53,6 +56,7 @@ class Client:
         auth: Optional[Union[SipAuthCredentials, tuple]] = None,
         auto_auth: bool = True,
         auto_dns: bool = True,
+        fork_policy: str = "first",
     ) -> None:
         """
         Initialize SIP client.
@@ -65,6 +69,8 @@ class Client:
             auth: Optional authentication credentials (from Auth.Digest() or tuple)
             auto_auth: Automatically retry on 401/407 if auth is set (default: True)
             auto_dns: Automatically resolve SIP URIs via DNS SRV (default: True)
+            fork_policy: How to handle forked INVITE responses.
+                ``"first"`` (default) — return the first 200, auto-ACK+BYE extras.
         """
         # Transport configuration
         self.config = TransportConfig(
@@ -97,7 +103,9 @@ class Client:
         self._closed = False
         self._dialog = DialogTracker()
         self._auto_dns = auto_dns
+        self._fork_policy = fork_policy
         self._resolver = None
+        self._presence_etag: Optional[str] = None  # RFC 3903 SIP-ETag
 
         # Re-registration support
         self._reregister_timer: Optional[threading.Timer] = None
@@ -477,6 +485,8 @@ class Client:
             final_response = None
             deadline = _time.monotonic() + self._transport.config.read_timeout
             poll_interval = 0.1  # 100ms -- responsive to Ctrl+C and FSM timers
+            fork_tracker = ForkTracker() if method == "INVITE" else None
+            fork_deadline: float | None = None
 
             while _time.monotonic() < deadline:
                 try:
@@ -488,6 +498,8 @@ class Client:
                     if transaction.is_terminated():
                         logger.debug("Transaction terminated by timer")
                         break
+                    if fork_deadline is not None and _time.monotonic() >= fork_deadline:
+                        break  # Fork collection window expired
                     continue
 
                 response = parser.parse(response_data)
@@ -518,6 +530,34 @@ class Client:
                 )
                 logger.debug(response.to_string())
 
+                # Auto-PRACK for reliable provisional responses (RFC 3262)
+                if (
+                    method == "INVITE"
+                    and 100 < response.status_code < 200
+                    and "100rel" in response.headers.get("Require", "")
+                ):
+                    rseq = response.headers.get("RSeq", "1")
+                    invite_cseq = request.headers.get("CSeq", "1 INVITE")
+                    invite_cseq_num = int(invite_cseq.split()[0])
+                    prack_headers = {
+                        "Via": request.headers.get("Via", ""),
+                        "From": request.headers.get("From", ""),
+                        "To": response.headers.get("To", request.headers.get("To", "")),
+                        "Call-ID": request.headers.get("Call-ID", ""),
+                        "CSeq": f"{invite_cseq_num + 1} PRACK",
+                        "RAck": f"{rseq} {invite_cseq}",
+                        "Max-Forwards": "70",
+                        "Content-Length": "0",
+                    }
+                    prack_req = Request(method="PRACK", uri=uri, headers=prack_headers)
+                    self._transport.send(prack_req.to_bytes(), destination)
+                    logger.debug(
+                        ">>> Auto PRACK (RSeq: %s) to %s:%s",
+                        rseq,
+                        destination.host,
+                        destination.port,
+                    )
+
                 # Update transaction (triggers state change, cancels retransmit timers)
                 self._state_manager.update_transaction(transaction.id, response)
 
@@ -534,12 +574,35 @@ class Client:
 
                 # Check for final response
                 if response.status_code >= 200:
-                    final_response = response
-                    break
+                    if fork_tracker is not None and response.status_code == 200:
+                        # INVITE 200: collect forks for a short window
+                        fork_tracker.add(response)
+                        if fork_deadline is None:
+                            fork_deadline = _time.monotonic() + _FORK_WINDOW
+                        if _time.monotonic() >= fork_deadline:
+                            break
+                        continue
+                    elif fork_deadline is not None:
+                        # Non-200 final arrived during fork collection: stop
+                        break
+                    else:
+                        final_response = response
+                        break
 
                 # Store provisional response
                 if final_response is None:
                     final_response = response
+
+            # Resolve final response from fork tracker (INVITE)
+            if fork_tracker is not None and fork_tracker.best is not None:
+                final_response = fork_tracker.best
+                if self._fork_policy == "first" and fork_tracker.extra:
+                    logger.debug(
+                        "Forking: %d extra legs detected — auto-ACK+BYE",
+                        len(fork_tracker.extra),
+                    )
+                    for extra in fork_tracker.extra:
+                        _ack_and_bye_forked(self._transport, extra, destination)
 
             if final_response is None:
                 logger.warning(
@@ -574,6 +637,7 @@ class Client:
         to_uri: str,
         from_uri: Optional[str] = None,
         body: Optional[str] = None,
+        reliable: bool = False,
         **kwargs,
     ) -> Response:
         """
@@ -583,6 +647,8 @@ class Client:
             to_uri: Destination URI (e.g., 'sip:bob@example.com')
             from_uri: Source URI (auto-generated if not provided)
             body: SDP body content
+            reliable: If True, add ``Require: 100rel`` for RFC 3262 reliable
+                provisional responses.  The client will auto-send PRACK.
             **kwargs: Additional parameters (host, port, headers, etc.)
 
         Returns:
@@ -602,6 +668,10 @@ class Client:
         headers = kwargs.pop("headers", {})
         headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
         headers["To"] = f"<{to_uri}>"
+
+        if reliable:
+            headers["Require"] = "100rel"
+            headers["Supported"] = "100rel"
 
         if body:
             headers["Content-Type"] = "application/sdp"
@@ -904,6 +974,81 @@ class Client:
 
         return self.request(method="REFER", uri=uri, headers=headers, **kwargs)
 
+    def refer_and_wait(
+        self,
+        uri: str,
+        refer_to: str,
+        timeout: float = 30.0,
+        **kwargs,
+    ) -> Optional[Request]:
+        """Send REFER and wait for the transfer result via NOTIFY (RFC 3515).
+
+        Sends REFER, then polls for ``NOTIFY Event: refer`` messages until
+        the transfer completes (final sipfrag or ``Subscription-State:
+        terminated``) or ``timeout`` expires.  Each NOTIFY is automatically
+        acknowledged with 200 OK.
+
+        Args:
+            uri: Target URI (the transferee, e.g. current call party).
+            refer_to: Transfer destination URI.
+            timeout: Maximum seconds to wait for a final NOTIFY.
+            **kwargs: Extra parameters forwarded to :meth:`refer`.
+
+        Returns:
+            The last ``NOTIFY`` :class:`Request` received (its body is the
+            sipfrag), or ``None`` on timeout / REFER rejection.
+
+        Example::
+
+            notify = client.refer_and_wait(
+                "sip:alice@pbx.com",
+                refer_to="sip:carol@pbx.com",
+            )
+            if notify:
+                print(notify.content_text)  # SIP/2.0 200 OK
+        """
+        import time as _time
+
+        r = self.refer(uri, refer_to, **kwargs)
+        if r is None or r.status_code not in (200, 202):
+            return r  # type: ignore[return-value]
+
+        from ..session import ReferSubscription
+        from ..models._message import MessageParser as _MP
+
+        sub = ReferSubscription(refer_to=refer_to)
+        parser = _MP()
+        deadline = _time.monotonic() + timeout
+        last_notify: Optional[Request] = None
+
+        while _time.monotonic() < deadline:
+            try:
+                data, src = self._transport.receive(timeout=1.0)
+            except Exception:
+                continue
+
+            msg = parser.parse(data)
+            if not isinstance(msg, Request) or msg.method != "NOTIFY":
+                continue
+            if "refer" not in msg.headers.get("Event", "").lower():
+                continue
+
+            # Auto-200 OK the NOTIFY
+            self._transport.send(msg.ok().to_bytes(), src)
+            last_notify = msg
+            logger.debug(
+                "<<< NOTIFY (refer) body=%r sub_state=%r",
+                msg.content_text[:60] if msg.content else "",
+                msg.headers.get("Subscription-State", ""),
+            )
+
+            sipfrag = msg.content_text if msg.content else ""
+            sub_state = msg.headers.get("Subscription-State", "")
+            if sub.update(sipfrag, sub_state):
+                break
+
+        return last_notify
+
     def info(
         self,
         uri: str,
@@ -969,19 +1114,44 @@ class Client:
         event: str = "presence",
         content: Optional[str] = None,
         expires: int = 3600,
+        etag: Optional[str] = None,
         **kwargs,
     ) -> Response:
-        """Send PUBLISH request."""
+        """Send PUBLISH request (RFC 3903).
+
+        Args:
+            uri: Presentity URI or ESC address.
+            event: Event package name (default: ``"presence"``).
+            content: Body content (e.g. PIDF-XML string).  When omitted the
+                PUBLISH refreshes an existing state using ``etag``.
+            expires: Publication expiry in seconds.
+            etag: ``SIP-If-Match`` value from a previous 200 OK, used to
+                refresh or modify an existing event state.  When omitted a
+                new publication is created.
+            **kwargs: Extra parameters forwarded to :meth:`request`.
+
+        Returns:
+            SIP response.  On 200 OK the ``SIP-ETag`` header is stored on
+            the client as ``_presence_etag`` for use in subsequent refreshes.
+        """
         headers = kwargs.pop("headers", {})
         headers["Event"] = event
         headers["Expires"] = str(expires)
 
+        if etag:
+            headers["SIP-If-Match"] = etag
+
         if content:
             headers["Content-Type"] = "application/pidf+xml"
 
-        return self.request(
+        r = self.request(
             method="PUBLISH", uri=uri, headers=headers, content=content, **kwargs
         )
+        if r and r.status_code == 200:
+            new_etag = r.headers.get("SIP-ETag")
+            if new_etag:
+                self._presence_etag = new_etag
+        return r
 
     def close(self) -> None:
         """Close the transport."""

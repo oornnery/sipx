@@ -1146,6 +1146,98 @@ class SDPBody(MessageBody):
 
 
 # ============================================================================
+# PIDF — Presence Information Data Format (RFC 3863)
+# ============================================================================
+
+
+class PIFDBody(MessageBody):
+    """Minimal PIDF presence document (RFC 3863).
+
+    Generates and parses ``application/pidf+xml`` bodies used with the
+    SIP PUBLISH and NOTIFY methods for presence information.
+
+    Args:
+        entity: Presentity URI (e.g. ``sip:alice@example.com``).
+        status: Basic status — ``"open"`` (available) or ``"closed"``
+            (unavailable).  Defaults to ``"open"``.
+        note: Optional human-readable note appended to the tuple.
+        tuple_id: XML tuple element id.  Defaults to ``"t1"``.
+
+    Example::
+
+        pidf = PIFDBody(entity="sip:alice@pbx.com", status="open", note="At desk")
+        print(pidf.to_string())
+    """
+
+    CONTENT_TYPE = "application/pidf+xml"
+
+    def __init__(
+        self,
+        entity: str,
+        status: str = "open",
+        note: str = "",
+        tuple_id: str = "t1",
+    ) -> None:
+        self.entity = entity
+        self.status = status
+        self.note = note
+        self.tuple_id = tuple_id
+
+    def to_string(self) -> str:
+        note_xml = f"\n    <note>{self.note}</note>" if self.note else ""
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<presence xmlns="urn:ietf:params:xml:ns:pidf"'
+            f' entity="{self.entity}">\n'
+            f'  <tuple id="{self.tuple_id}">\n'
+            f"    <status><basic>{self.status}</basic></status>"
+            f"{note_xml}\n"
+            f"  </tuple>\n"
+            f"</presence>"
+        )
+
+    def to_bytes(self) -> bytes:
+        return self.to_string().encode("utf-8")
+
+    @property
+    def content_type(self) -> str:
+        return self.CONTENT_TYPE
+
+    @classmethod
+    def parse(cls, xml: str | bytes) -> PIFDBody:
+        """Parse a PIDF-XML document.
+
+        Extracts ``entity``, ``<basic>`` status, and optional ``<note>``.
+        Falls back gracefully when elements are absent.
+
+        Args:
+            xml: Raw PIDF-XML string or bytes.
+
+        Returns:
+            :class:`PIFDBody` instance.
+        """
+        if isinstance(xml, bytes):
+            xml = xml.decode("utf-8", errors="replace")
+
+        entity_m = re.search(r'entity=["\']([^"\']+)["\']', xml)
+        entity = entity_m.group(1) if entity_m else ""
+
+        status_m = re.search(r"<basic>\s*(\w+)\s*</basic>", xml, re.IGNORECASE)
+        status = status_m.group(1).lower() if status_m else "closed"
+
+        note_m = re.search(r"<note>\s*(.*?)\s*</note>", xml, re.IGNORECASE | re.DOTALL)
+        note = note_m.group(1) if note_m else ""
+
+        tuple_m = re.search(r'<tuple[^>]+id=["\']([^"\']+)["\']', xml)
+        tuple_id = tuple_m.group(1) if tuple_m else "t1"
+
+        return cls(entity=entity, status=status, note=note, tuple_id=tuple_id)
+
+    def __repr__(self) -> str:
+        return f"<PIFDBody(entity={self.entity!r}, status={self.status!r})>"
+
+
+# ============================================================================
 # Body Parser
 # ============================================================================
 
@@ -1198,6 +1290,12 @@ class BodyParser:
                 _log.error(
                     "Failed to parse SDP body (%d bytes)", len(content), exc_info=True
                 )
+                return RawBody(content, content_type)
+        elif mime_type == "application/pidf+xml":
+            try:
+                return PIFDBody.parse(content)
+            except Exception:
+                _log.error("Failed to parse PIDF body", exc_info=True)
                 return RawBody(content, content_type)
         else:
             return RawBody(content, content_type)

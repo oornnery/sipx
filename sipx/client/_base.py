@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import MutableMapping
 
@@ -148,6 +149,109 @@ def _detect_auth_challenge(response: Response, context: EventContext) -> None:
             context.metadata["needs_auth"] = True
             context.metadata["auth_challenge"] = challenge
             logger.debug(f"Authentication challenge detected: {response.status_code}")
+
+
+_FORK_WINDOW = 0.2  # seconds to wait for additional 200 OKs from forked branches
+
+
+def _extract_tag(header_value: str) -> str:
+    """Extract the tag parameter from a From/To header value."""
+    match = re.search(r";tag=([^;,\s]+)", header_value, re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+class ForkTracker:
+    """Collects multiple 200 OK responses from a forked INVITE (RFC 3261 §19.3).
+
+    When a proxy forks an INVITE, the UAC may receive 200 OK from multiple
+    branches (each with a different To-tag).  This tracker de-duplicates them
+    by To-tag and exposes the first (``best``) plus any extras that must be
+    ACK'd and BYE'd.
+    """
+
+    def __init__(self) -> None:
+        self.responses: list[Response] = []
+
+    def add(self, response: Response) -> bool:
+        """Add a 200 OK.  Returns True if it carries a new To-tag."""
+        to_tag = _extract_tag(response.headers.get("To", ""))
+        seen = {_extract_tag(r.headers.get("To", "")) for r in self.responses}
+        if to_tag not in seen:
+            self.responses.append(response)
+            return True
+        return False
+
+    @property
+    def best(self) -> Response | None:
+        """First (preferred) 200 OK, or None if none collected yet."""
+        return self.responses[0] if self.responses else None
+
+    @property
+    def extra(self) -> list[Response]:
+        """All 200 OKs beyond the first (forked legs to be terminated)."""
+        return self.responses[1:]
+
+
+def _ack_and_bye_forked(transport, response: Response, destination) -> None:
+    """Auto-ACK + fire-and-forget BYE for an extra forked 200 OK (sync transport)."""
+    from ..models._message import Request as SipRequest
+
+    request = response.request
+    if not request:
+        return
+    cseq_num = int((request.headers.get("CSeq") or "1 INVITE").split()[0])
+    base = {
+        "Via": request.headers.get("Via", ""),
+        "From": request.headers.get("From", ""),
+        "To": response.headers.get("To", ""),
+        "Call-ID": request.headers.get("Call-ID", ""),
+        "Max-Forwards": "70",
+        "Content-Length": "0",
+    }
+    ack = SipRequest(
+        method="ACK",
+        uri=request.uri,
+        headers={**base, "CSeq": f"{cseq_num} ACK"},
+    )
+    transport.send(ack.to_bytes(), destination)
+    bye = SipRequest(
+        method="BYE",
+        uri=request.uri,
+        headers={**base, "CSeq": f"{cseq_num + 1} BYE"},
+    )
+    transport.send(bye.to_bytes(), destination)
+    logger.debug("Forked leg terminated (ACK+BYE): %s", response.headers.get("To"))
+
+
+async def _ack_and_bye_forked_async(transport, response: Response, destination) -> None:
+    """Auto-ACK + fire-and-forget BYE for an extra forked 200 OK (async transport)."""
+    from ..models._message import Request as SipRequest
+
+    request = response.request
+    if not request:
+        return
+    cseq_num = int((request.headers.get("CSeq") or "1 INVITE").split()[0])
+    base = {
+        "Via": request.headers.get("Via", ""),
+        "From": request.headers.get("From", ""),
+        "To": response.headers.get("To", ""),
+        "Call-ID": request.headers.get("Call-ID", ""),
+        "Max-Forwards": "70",
+        "Content-Length": "0",
+    }
+    ack = SipRequest(
+        method="ACK",
+        uri=request.uri,
+        headers={**base, "CSeq": f"{cseq_num} ACK"},
+    )
+    await transport.send(ack.to_bytes(), destination)
+    bye = SipRequest(
+        method="BYE",
+        uri=request.uri,
+        headers={**base, "CSeq": f"{cseq_num + 1} BYE"},
+    )
+    await transport.send(bye.to_bytes(), destination)
+    logger.debug("Forked leg terminated (ACK+BYE): %s", response.headers.get("To"))
 
 
 class DialogTracker:

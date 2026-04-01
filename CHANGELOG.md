@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.5] - 2026-04-01
+
+### Added
+
+- **PRACK / 100rel (RFC 3262)** — auto-PRACK in client,
+  `invite(reliable=True)`, server-side RSeq generation
+- **Forking (RFC 3261 Section 19.3)** — `ForkTracker` collects
+  multiple 200 OK, auto-ACK all, BYE extra legs
+- **REFER end-to-end (RFC 3515)** — `refer_and_wait()` with
+  NOTIFY sipfrag tracking, `ReferSubscription`
+- **Presence / PUBLISH (RFC 3903)** — `SIP-If-Match`/`SIP-ETag`
+  refresh, `PIFDBody` model (RFC 3863 PIDF-XML)
+- **B2BUA contrib module** — `B2BUA` + `AsyncB2BUA` bridging
+  A-leg to B-leg, `on_bridge`/`on_terminate` callbacks
+- **Async handler support** — `AsyncSIPServer` supports
+  `async def` handlers
+- **Server-side Timer G** — IST retransmit wired in both
+  sync and async servers
+- **5 new examples** — `prack.py`, `forking.py`,
+  `call_transfer.py`, `presence.py`, `b2bua.py`
+- **75 new tests** — prack (8), forking (13), refer (13),
+  presence (19), b2bua (22)
+
+### Fixed
+
+- **`Request.error()` kwargs** — passed `headers=` instead
+  of `extra_headers=` to `_create_response()`
+
+---
+
 ## [0.0.4] - 2026-03-31
 
 ### Added
@@ -66,6 +96,7 @@ This release represents a complete refactoring of the sipx library, transforming
 ### Added
 
 #### Headers Module (`_header.py`)
+
 - **`HeaderContainer` (ABC)**: Abstract base class for header container implementations
 - **`HeaderParser`**: Dedicated parser for SIP headers
   - `parse()`: Parse raw header data
@@ -74,6 +105,7 @@ This release represents a complete refactoring of the sipx library, transforming
   - `format_header_value()`: Format header values with parameters
 
 #### Message Module (`_message.py`)
+
 - **`SIPMessage` (ABC)**: Abstract base class for all SIP messages
 - **`MessageParser`**: Unified parser orchestrating all component parsers
   - `parse()`: Parse complete SIP messages
@@ -84,6 +116,7 @@ This release represents a complete refactoring of the sipx library, transforming
 - Lazy auth challenge parsing via `AuthParser` when `.auth_challenge` is accessed
 
 #### Body Module (`_body.py`)
+
 - **`MessageBody` (ABC)**: Abstract base class for all message body types
 - **`BodyParser`**: Content-Type based body parser
   - `parse()`: Auto-detect and parse based on Content-Type
@@ -105,6 +138,7 @@ This release represents a complete refactoring of the sipx library, transforming
   - `RawBody`: Unknown/unsupported content types
 
 #### Authentication Module (`_auth.py`)
+
 - **Abstract Base Classes**:
   - `AuthMethod` (ABC): Base for all authentication methods
   - `Challenge` (ABC): Base for authentication challenges
@@ -119,6 +153,7 @@ This release represents a complete refactoring of the sipx library, transforming
 #### Breaking Changes
 
 **DigestAuth API**:
+
 ```python
 # OLD (v0.1.x)
 auth = DigestAuth(credentials=creds)
@@ -128,10 +163,12 @@ header = auth.build_authorization(method, uri, challenge=challenge)
 auth = DigestAuth(credentials=creds, challenge=challenge)
 header = auth.build_authorization(method, uri)
 ```
+
 - Challenge is now required in the `DigestAuth` constructor
 - `build_authorization()` no longer accepts `challenge` parameter
 
 **Module Structure**:
+
 - `_models.py` (2000+ lines) split into `_models/` package:
   - `_models/_header.py`: Headers and HeaderParser
   - `_models/_message.py`: Request, Response, and MessageParser
@@ -139,23 +176,27 @@ header = auth.build_authorization(method, uri)
   - `_models/_auth.py`: Authentication and AuthParser
 
 **Internal Changes**:
+
 - `Request.headers` and `Response.headers` now use internal `_headers` attribute
 - Public `headers` property provides access (no user-facing change)
 
 #### Enhanced
 
 **Headers**:
+
 - Better canonicalization algorithm
 - Support for all SIP compact forms
 - Improved line folding support (RFC 3261 Section 7.3.1)
 
 **Messages**:
+
 - Lazy body parsing (performance improvement)
 - Lazy auth challenge parsing
 - Auto-update Content-Length and Content-Type when body is set
 - Better type hints and documentation
 
 **Authentication**:
+
 - Type-safe credential/challenge matching
 - Support for multiple authentication schemes
 - Easier to extend with new methods
@@ -176,6 +217,7 @@ header = auth.build_authorization(method, uri)
 ### Removed
 
 **Legacy functions and classes**:
+
 - `Parser` class - Use `MessageParser` instead
 - `parse_auth_challenge()` function - Use `AuthParser.parse_from_headers()` instead
 - `make_digest_response()` function - Use `DigestAuth` class instead
@@ -185,6 +227,7 @@ header = auth.build_authorization(method, uri)
 #### Required Changes
 
 1. **Update DigestAuth usage**:
+
 ```python
 # OLD
 auth = DigestAuth(credentials=creds)
@@ -198,6 +241,7 @@ auth.build_authorization(method, uri)
 #### Recommended Improvements
 
 2. **Use parsers** (required):
+
 ```python
 from sipx import MessageParser, AuthParser, HeaderParser
 
@@ -213,6 +257,7 @@ headers = HeaderParser.parse(header_data)
 ```
 
 3. **Use structured body types**:
+
 ```python
 from sipx import SDPBody
 
@@ -232,15 +277,18 @@ if isinstance(response.body, SDPBody):
 ### Technical Details
 
 **Lines of Code**:
+
 - Before: `_models.py` (2000+ lines)
 - After: 4 focused modules (~500 lines each)
 
 **Test Results**:
+
 - 278 tests passing ✅
 - Full coverage of all components
 - RFC 3261 compliance verified
 
 **Performance**:
+
 - Lazy body parsing: ~30% faster for messages without body access
 - Lazy auth parsing: ~20% faster for non-auth responses
 - Header canonicalization: Optimized for common headers
@@ -267,6 +315,7 @@ if isinstance(response.body, SDPBody):
 ## [0.0.1] - Initial Release
 
 ### Added
+
 - Basic SIP message parsing
 - Request and Response classes
 - Headers container with case-insensitive access
@@ -275,6 +324,7 @@ if isinstance(response.body, SDPBody):
 
 ---
 
+[0.0.5]: https://github.com/oornnery/sipx/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/oornnery/sipx/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/oornnery/sipx/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/oornnery/sipx/compare/v0.0.1...v0.0.2

@@ -18,6 +18,7 @@ from ._auth import (
 from ._body import (
     BodyParser,
     MessageBody,
+    PIFDBody,
     RawBody,
     SDPBody,
 )
@@ -57,4 +58,5 @@ __all__ = [
     "RawBody",
     "BodyParser",
     "SDPBody",
+    "PIFDBody",
 ]

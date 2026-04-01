@@ -9,7 +9,7 @@ from .._utils import logger
 from ..models._message import MessageParser, Request, Response
 from ..transports._udp import UDPTransport
 from .._types import TransportConfig, TransactionType, TransactionState
-from ..fsm import StateManager
+from ..fsm import StateManager, TimerManager
 from .._depends import resolve_handler
 from ._base import SIPServerHandlerMixin
 
@@ -58,6 +58,7 @@ class SIPServer(SIPServerHandlerMixin):
         self._handlers: Dict[str, Callable[[Request, tuple], Response]] = {}
         self._state_manager = StateManager()
         self._events: Dict[str, Callable] = events or {}
+        self._rseq_counter: int = 0  # RFC 3262: monotonically increasing RSeq
 
         # Register default handlers
         self._register_default_handlers()
@@ -151,13 +152,21 @@ class SIPServer(SIPServerHandlerMixin):
                 # Create a server transaction for tracking
                 txn = self._create_server_transaction(request)
 
-                # ACK doesn't get a response
+                # ACK doesn't get a response — confirm original INVITE transaction
                 if request.method == "ACK":
                     logger.debug(
                         "<<< RECEIVED ACK from %s:%s", source.host, source.port
                     )
                     logger.debug(request.to_string())
-                    txn.transition_to(TransactionState.CONFIRMED)
+                    # Find the original INVITE IST and confirm it (cancels Timer G/H)
+                    invite_txn = self._state_manager.find_transaction(
+                        call_id=request.headers.get("Call-ID"),
+                        method="INVITE",
+                    )
+                    if invite_txn:
+                        invite_txn.transition_to(TransactionState.CONFIRMED)
+                    else:
+                        txn.transition_to(TransactionState.CONFIRMED)
                     continue
 
                 # Auto 100 Trying for INVITE (RFC 3261 §8.2.6.1)
@@ -179,6 +188,16 @@ class SIPServer(SIPServerHandlerMixin):
                         logger.error("Handler error: %s", handler_err)
                         response = request.error(500)
 
+                    # Add RSeq for reliable provisional responses (RFC 3262)
+                    if (
+                        request.method == "INVITE"
+                        and 100 < response.status_code < 200
+                        and "100rel" in request.headers.get("Require", "")
+                    ):
+                        self._rseq_counter += 1
+                        response.headers["RSeq"] = str(self._rseq_counter)
+                        response.headers["Require"] = "100rel"
+
                     logger.debug(
                         ">>> SENDING %s %s to %s:%s",
                         response.status_code,
@@ -190,6 +209,15 @@ class SIPServer(SIPServerHandlerMixin):
 
                     response_data = response.to_bytes()
                     self._transport.send(response_data, source)
+
+                    # Wire Timer G retransmit for INVITE (IST) on UDP
+                    if request.method == "INVITE" and self.transport == "UDP":
+                        timer_manager = TimerManager()
+                        txn.timer_manager = timer_manager
+                        txn._retransmit_fn = (
+                            lambda d=response_data, s=source: self._transport.send(d, s)
+                        )
+                        txn._on_state_change(txn.state, txn.state)
 
                     # Track response in the transaction
                     self._state_manager.update_transaction(txn.id, response)
