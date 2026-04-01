@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import socket
 
+from .._utils import logger
 from ._models import ResolvedTarget
+
+_log = logger.getChild("dns")
 
 
 class SipResolver:
@@ -30,11 +33,22 @@ class SipResolver:
     def resolve(
         self, domain: str, transport: str | None = None
     ) -> list[ResolvedTarget]:
+        import ipaddress
+
+        _log.debug("Resolving %s (transport=%s)", domain, transport)
+        # Skip SRV for literal IP addresses
+        try:
+            ipaddress.ip_address(domain)
+            return self._resolve_a(domain, transport)
+        except ValueError:
+            pass
         resolver = self._get_resolver()
         if resolver is not None:
             targets = self._resolve_srv(resolver, domain, transport)
             if targets:
+                _log.debug("SRV resolved %s: %d targets", domain, len(targets))
                 return sorted(targets)
+            _log.debug("SRV lookup failed for %s, falling back to A record", domain)
         return self._resolve_a(domain, transport)
 
     def resolve_uri(self, uri: str) -> list[ResolvedTarget]:
@@ -103,6 +117,8 @@ class SipResolver:
         port = 5061 if transport == "TLS" else 5060
         try:
             addr = socket.gethostbyname(domain)
+            _log.debug("A record resolved %s -> %s", domain, addr)
             return [ResolvedTarget(host=addr, port=port, transport=transport)]
-        except socket.gaierror:
+        except socket.gaierror as err:
+            _log.warning("DNS resolution failed for %s: %s", domain, err)
             return [ResolvedTarget(host=domain, port=port, transport=transport)]

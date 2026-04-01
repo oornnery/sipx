@@ -5,7 +5,10 @@ from __future__ import annotations
 import asyncio
 import socket
 
+from .._utils import logger
 from ._models import ResolvedTarget
+
+_log = logger.getChild("dns")
 
 
 class AsyncSipResolver:
@@ -18,13 +21,24 @@ class AsyncSipResolver:
         self, domain: str, transport: str | None = None
     ) -> list[ResolvedTarget]:
         """Resolve domain using asyncio.getaddrinfo (non-blocking A record)."""
+        import ipaddress
+
+        _log.debug("Resolving %s (transport=%s)", domain, transport)
+        # Skip SRV for literal IP addresses
+        try:
+            ipaddress.ip_address(domain)
+            return await self._resolve_a(domain, transport)
+        except ValueError:
+            pass
         # Try SRV via dnspython if available (run in thread — dnspython is sync)
         try:
             targets = await asyncio.to_thread(self._resolve_srv, domain, transport)
             if targets:
+                _log.debug("SRV resolved %s: %d targets", domain, len(targets))
                 return sorted(targets)
+            _log.debug("SRV lookup failed for %s, falling back to A record", domain)
         except Exception:
-            pass
+            _log.debug("SRV lookup failed for %s, falling back to A record", domain)
 
         # Fallback: async A record via stdlib
         return await self._resolve_a(domain, transport)
@@ -101,7 +115,8 @@ class AsyncSipResolver:
             )
             if infos:
                 addr = infos[0][4][0]
+                _log.debug("A record resolved %s -> %s", domain, addr)
                 return [ResolvedTarget(host=addr, port=port, transport=transport)]
-        except socket.gaierror:
-            pass
+        except socket.gaierror as err:
+            _log.warning("DNS resolution failed for %s: %s", domain, err)
         return [ResolvedTarget(host=domain, port=port, transport=transport)]
