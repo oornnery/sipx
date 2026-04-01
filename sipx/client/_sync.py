@@ -518,6 +518,36 @@ class Client:
                 )
                 logger.debug(response.to_string())
 
+                # Auto-PRACK for reliable provisional responses (RFC 3262)
+                if (
+                    method == "INVITE"
+                    and 100 < response.status_code < 200
+                    and "100rel" in response.headers.get("Require", "")
+                ):
+                    rseq = response.headers.get("RSeq", "1")
+                    invite_cseq = request.headers.get("CSeq", "1 INVITE")
+                    invite_cseq_num = int(invite_cseq.split()[0])
+                    prack_headers = {
+                        "Via": request.headers.get("Via", ""),
+                        "From": request.headers.get("From", ""),
+                        "To": response.headers.get(
+                            "To", request.headers.get("To", "")
+                        ),
+                        "Call-ID": request.headers.get("Call-ID", ""),
+                        "CSeq": f"{invite_cseq_num + 1} PRACK",
+                        "RAck": f"{rseq} {invite_cseq}",
+                        "Max-Forwards": "70",
+                        "Content-Length": "0",
+                    }
+                    prack_req = Request(method="PRACK", uri=uri, headers=prack_headers)
+                    self._transport.send(prack_req.to_bytes(), destination)
+                    logger.debug(
+                        ">>> Auto PRACK (RSeq: %s) to %s:%s",
+                        rseq,
+                        destination.host,
+                        destination.port,
+                    )
+
                 # Update transaction (triggers state change, cancels retransmit timers)
                 self._state_manager.update_transaction(transaction.id, response)
 
@@ -574,6 +604,7 @@ class Client:
         to_uri: str,
         from_uri: Optional[str] = None,
         body: Optional[str] = None,
+        reliable: bool = False,
         **kwargs,
     ) -> Response:
         """
@@ -583,6 +614,8 @@ class Client:
             to_uri: Destination URI (e.g., 'sip:bob@example.com')
             from_uri: Source URI (auto-generated if not provided)
             body: SDP body content
+            reliable: If True, add ``Require: 100rel`` for RFC 3262 reliable
+                provisional responses.  The client will auto-send PRACK.
             **kwargs: Additional parameters (host, port, headers, etc.)
 
         Returns:
@@ -602,6 +635,10 @@ class Client:
         headers = kwargs.pop("headers", {})
         headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
         headers["To"] = f"<{to_uri}>"
+
+        if reliable:
+            headers["Require"] = "100rel"
+            headers["Supported"] = "100rel"
 
         if body:
             headers["Content-Type"] = "application/sdp"

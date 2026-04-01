@@ -58,6 +58,7 @@ class SIPServer(SIPServerHandlerMixin):
         self._handlers: Dict[str, Callable[[Request, tuple], Response]] = {}
         self._state_manager = StateManager()
         self._events: Dict[str, Callable] = events or {}
+        self._rseq_counter: int = 0  # RFC 3262: monotonically increasing RSeq
 
         # Register default handlers
         self._register_default_handlers()
@@ -186,6 +187,16 @@ class SIPServer(SIPServerHandlerMixin):
                     except Exception as handler_err:
                         logger.error("Handler error: %s", handler_err)
                         response = request.error(500)
+
+                    # Add RSeq for reliable provisional responses (RFC 3262)
+                    if (
+                        request.method == "INVITE"
+                        and 100 < response.status_code < 200
+                        and "100rel" in request.headers.get("Require", "")
+                    ):
+                        self._rseq_counter += 1
+                        response.headers["RSeq"] = str(self._rseq_counter)
+                        response.headers["Require"] = "100rel"
 
                     logger.debug(
                         ">>> SENDING %s %s to %s:%s",

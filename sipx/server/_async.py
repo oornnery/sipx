@@ -45,6 +45,7 @@ class AsyncSIPServer(SIPServerHandlerMixin):
         self._transport: asyncio.DatagramTransport | None = None
         self._protocol: _SIPServerProtocol | None = None
         self._state_manager = StateManager()
+        self._rseq_counter: int = 0  # RFC 3262: monotonically increasing RSeq
         self._register_default_handlers()
 
     # ------------------------------------------------------------------
@@ -99,6 +100,16 @@ class AsyncSIPServer(SIPServerHandlerMixin):
             except Exception as e:
                 logger.error("Handler error: %s", e)
                 response = message.error(500)
+
+            # Add RSeq for reliable provisional responses (RFC 3262)
+            if (
+                message.method == "INVITE"
+                and 100 < response.status_code < 200
+                and "100rel" in message.headers.get("Require", "")
+            ):
+                self._rseq_counter += 1
+                response.headers["RSeq"] = str(self._rseq_counter)
+                response.headers["Require"] = "100rel"
         else:
             response = message.error(501)
 

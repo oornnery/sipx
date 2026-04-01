@@ -255,6 +255,38 @@ class AsyncClient:
                     self._transport.local_address,
                     response.headers.get("Call-ID", "-"),
                 )
+                logger.debug(response.to_string())
+
+                # Auto-PRACK for reliable provisional responses (RFC 3262)
+                if (
+                    method == "INVITE"
+                    and 100 < response.status_code < 200
+                    and "100rel" in response.headers.get("Require", "")
+                ):
+                    rseq = response.headers.get("RSeq", "1")
+                    invite_cseq = request.headers.get("CSeq", "1 INVITE")
+                    invite_cseq_num = int(invite_cseq.split()[0])
+                    prack_headers = {
+                        "Via": request.headers.get("Via", ""),
+                        "From": request.headers.get("From", ""),
+                        "To": response.headers.get(
+                            "To", request.headers.get("To", "")
+                        ),
+                        "Call-ID": request.headers.get("Call-ID", ""),
+                        "CSeq": f"{invite_cseq_num + 1} PRACK",
+                        "RAck": f"{rseq} {invite_cseq}",
+                        "Max-Forwards": "70",
+                        "Content-Length": "0",
+                    }
+                    prack_req = Request(method="PRACK", uri=uri, headers=prack_headers)
+                    await self._transport.send(prack_req.to_bytes(), destination)
+                    logger.debug(
+                        ">>> Auto PRACK (RSeq: %s) to %s:%s",
+                        rseq,
+                        destination.host,
+                        destination.port,
+                    )
+
                 self._state_manager.update_transaction(transaction.id, response)
                 context.response = response
                 context.source = source
@@ -373,6 +405,7 @@ class AsyncClient:
         to_uri: str,
         from_uri: Optional[str] = None,
         body: Optional[str] = None,
+        reliable: bool = False,
         **kwargs,
     ) -> Optional[Response]:
         if from_uri is None:
@@ -382,6 +415,9 @@ class AsyncClient:
         headers = kwargs.pop("headers", {})
         headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
         headers["To"] = f"<{to_uri}>"
+        if reliable:
+            headers["Require"] = "100rel"
+            headers["Supported"] = "100rel"
         if body:
             headers["Content-Type"] = "application/sdp"
         return await self.request(
