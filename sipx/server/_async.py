@@ -7,7 +7,8 @@ from typing import Callable, Dict
 
 from .._utils import logger
 from ..models._message import MessageParser, Request
-from .._types import TransportAddress
+from .._types import TransportAddress, TransactionType, TransactionState
+from ..fsm import StateManager, AsyncTimerManager
 from .._depends import resolve_handler
 from ._base import SIPServerHandlerMixin
 
@@ -43,6 +44,7 @@ class AsyncSIPServer(SIPServerHandlerMixin):
         self._handlers: Dict[str, Callable] = {}
         self._transport: asyncio.DatagramTransport | None = None
         self._protocol: _SIPServerProtocol | None = None
+        self._state_manager = StateManager()
         self._register_default_handlers()
 
     # ------------------------------------------------------------------
@@ -65,10 +67,24 @@ class AsyncSIPServer(SIPServerHandlerMixin):
 
         source = TransportAddress(host=addr[0], port=addr[1])
 
-        # ACK: no response
+        # ACK: no response — confirm original INVITE transaction (cancels Timer G/H)
         if message.method == "ACK":
             logger.info("Received ACK from %s:%s", addr[0], addr[1])
+            invite_txn = self._state_manager.find_transaction(
+                call_id=message.headers.get("Call-ID"),
+                method="INVITE",
+            )
+            if invite_txn:
+                invite_txn.transition_to(TransactionState.CONFIRMED)
             return
+
+        # Create server transaction for tracking
+        txn_type = (
+            TransactionType.INVITE_SERVER
+            if message.method == "INVITE"
+            else TransactionType.NON_INVITE_SERVER
+        )
+        txn = self._state_manager.create_transaction(message, transaction_type=txn_type)
 
         # Auto 100 Trying for INVITE (RFC 3261 §8.2.6.1)
         if message.method == "INVITE" and transport:
@@ -87,7 +103,21 @@ class AsyncSIPServer(SIPServerHandlerMixin):
             response = message.error(501)
 
         if transport:
-            transport.sendto(response.to_bytes(), addr)
+            response_data = response.to_bytes()
+            transport.sendto(response_data, addr)
+
+            # Wire async Timer G retransmit for INVITE on UDP
+            if message.method == "INVITE":
+                timer_manager = AsyncTimerManager()
+                txn.timer_manager = timer_manager
+                txn._retransmit_fn = (
+                    lambda d=response_data, a=addr: (
+                        transport.sendto(d, a) if transport else None
+                    )
+                )
+                txn._on_state_change(txn.state, txn.state)
+
+            self._state_manager.update_transaction(txn.id, response)
 
     # ------------------------------------------------------------------
     # Lifecycle

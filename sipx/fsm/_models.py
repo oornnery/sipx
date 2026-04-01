@@ -223,6 +223,8 @@ class Transaction:
         """Timer G fired: retransmit last response and double the interval."""
         if self.state != TransactionState.PROCEEDING:
             return
+        if self._retransmit_fn:
+            self._retransmit_fn()
         # Double timer G up to T2 (4s)
         if self.timer_g is not None:
             self.timer_g = min(self.timer_g * 2, 4.0)
