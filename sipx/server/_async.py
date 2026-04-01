@@ -96,7 +96,12 @@ class AsyncSIPServer(SIPServerHandlerMixin):
         handler = self._handlers.get(message.method)
         if handler:
             try:
-                response = resolve_handler(handler, message, source)
+                import asyncio as _asyncio
+
+                if _asyncio.iscoroutinefunction(handler):
+                    response = await handler(message, source)
+                else:
+                    response = resolve_handler(handler, message, source)
             except Exception as e:
                 logger.error("Handler error: %s", e)
                 response = message.error(500)

@@ -442,7 +442,7 @@ class Request(SIPMessage):
 
     def error(self, code: int, headers: dict | None = None) -> Response:
         """Create error response (4xx, 5xx, 6xx)."""
-        return self._create_response(code, headers=headers)
+        return self._create_response(code, extra_headers=headers)
 
     def redirect(self, contact_uri: str) -> Response:
         """Create 302 Moved Temporarily response."""

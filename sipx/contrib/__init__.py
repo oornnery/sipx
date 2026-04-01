@@ -1,5 +1,6 @@
 """sipx.contrib — Public contrib API (re-exports from sipx._contrib)."""
 
+from sipx.contrib._b2bua import AsyncB2BUA, B2BUA
 from sipx.contrib._isup import (
     CallingPartyCategory,
     ISUPMessage,
@@ -28,6 +29,8 @@ from sipx.media._tts import BaseTTS
 from sipx.media._stt import BaseSTT
 
 __all__ = [
+    "B2BUA",
+    "AsyncB2BUA",
     "CallingPartyCategory",
     "ISUPMessage",
     "ISUPMessageType",
