@@ -74,6 +74,7 @@
 - [x] IVR builder: Menu, MenuItem, Prompt models
 - [x] IVR sync + AsyncIVR (native async)
 - [x] FastAPI integration adapter
+- [x] B2BUA sync + AsyncB2BUA (A-leg ↔ B-leg bridge, on_bridge/on_terminate callbacks)
 
 ### Logging
 
@@ -102,10 +103,11 @@
 - [x] Publish Package workflow (PyPI publish on release via trusted publisher)
 - [x] Version management (_version.py single source of truth)
 - [x] v0.0.4 released on GitHub + PyPI
+- [x] PyPI trusted publisher configured (OIDC via release.yml)
 
 ### Testing
 
-- [x] 607 unit tests, ~60% coverage
+- [x] 682 unit tests, ~60% coverage
 - [x] Integration test suite (tests/integration/test_asterisk.py)
 - [x] Asterisk Docker environment (3 auth policies, anonymous OPTIONS)
 
@@ -114,7 +116,7 @@
 - [x] SDD (docs/SDD.md) — full spec, mermaid diagrams, roadmap
 - [x] README.md — quick start, features, RFC table, examples
 - [x] examples/README.md — 22 examples categorized
-- [x] 22 examples covering all major features
+- [x] 27 examples covering all major features
 
 ### Examples
 
@@ -124,6 +126,7 @@
 - [x] sipi.py, sipi_br.py, fastapi_sip.py, asterisk.py
 - [x] response_builders.py, dialog_tracking.py, routing.py
 - [x] dns_resolver.py, session_timers.py
+- [x] prack.py, forking.py, call_transfer.py, presence.py, b2bua.py
 
 ---
 
@@ -136,18 +139,18 @@
 - [ ] SRTP packet encryption (RFC 3711) — AES-128-CM, HMAC-SHA1-80
 - [ ] RTCP sender/receiver reports (RFC 3550 Section 6)
 - [ ] Coverage >80% — current ~60%, need more client/server/media tests
-- [ ] Verify Timer E/A retransmission logs in sngrep (needs live test)
+- [ ] Verify Timer G retransmit in sngrep (live test — INVITE to unreachable IP)
 
 ### Medium Priority
 
 - [ ] Jitter buffer for RTP receive path
-- [ ] Complete PRACK / 100rel flow (RFC 3262)
+- [x] PRACK / 100rel flow (RFC 3262) — auto-PRACK in client, RSeq in server
 - [ ] SIP over WebSocket full compliance (RFC 7118 — keepalive, framing)
 - [ ] IPv6 support (AAAA records in DNS resolver, IPv6 transports)
 - [ ] NAPTR DNS records (RFC 3263 full)
-- [ ] Forking (handle multiple 200 OK from different UAS)
-- [ ] Server-side FSM integration (IST/NIST wired into server handlers)
-- [ ] Configure PyPI trusted publisher for automated publish
+- [x] Forking — ForkTracker, 200ms collection window, auto-ACK+BYE extra legs
+- [x] Server-side FSM Timer G retransmit wired (AsyncSIPServer + SIPServer)
+- [x] Configure PyPI trusted publisher for automated publish
 
 ### Low Priority
 
@@ -155,9 +158,9 @@
 - [ ] Conferencing (audio mixer)
 - [ ] ICE connectivity checks (STUN/TURN)
 - [ ] SRTP-DTLS key exchange
-- [ ] Call transfer (REFER flow end-to-end)
-- [ ] Presence agent (PUBLISH/SUBSCRIBE/NOTIFY full flow)
-- [ ] B2BUA (back-to-back user agent)
+- [x] Call transfer (REFER end-to-end — refer_and_wait, ReferSubscription, sipfrag)
+- [x] Presence agent (PUBLISH RFC 3903 — SIP-ETag/SIP-If-Match, PIFDBody RFC 3863)
+- [x] B2BUA (B2BUA + AsyncB2BUA contrib module)
 - [ ] TUI dashboard (textual — call monitor)
 
 ### Test Coverage Gaps
