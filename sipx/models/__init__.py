@@ -14,6 +14,7 @@ from ._auth import (
     DigestChallenge,
     DigestCredentials,
     SipAuthCredentials,
+    SIPAuthCredentials,
 )
 from ._body import (
     BodyParser,
@@ -51,6 +52,7 @@ __all__ = [
     "DigestCredentials",
     # Authentication - Simplified Credentials
     "SipAuthCredentials",
+    "SIPAuthCredentials",  # uppercase-SIP canonical alias
     # Authentication - Parser
     "AuthParser",
     # Body types

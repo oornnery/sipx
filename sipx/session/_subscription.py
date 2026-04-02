@@ -18,14 +18,14 @@ import asyncio
 import threading
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional, Protocol
 
 from .._utils import logger
 
 _log = logger.getChild("session.sub")
 
 if TYPE_CHECKING:
-    from ..client import AsyncClient, Client
+    from ..client import AsyncSIPClient, SIPClient
     from ..models._message import Response
 
 
@@ -38,6 +38,61 @@ class SubscriptionState(Enum):
     TERMINATED = auto()
 
 
+class _SubscriptionLike(Protocol):
+    """Structural type shared by Subscription and AsyncSubscription."""
+
+    state: SubscriptionState
+
+    def _cancel_refresh(self) -> None: ...
+
+
+# ---------------------------------------------------------------------------
+# Shared pure helpers (used by both Subscription and AsyncSubscription)
+# ---------------------------------------------------------------------------
+
+#: Fraction of ``expires`` at which auto-refresh is scheduled (80%).
+SUBSCRIPTION_REFRESH_MARGIN: float = 0.8
+
+
+def _apply_notify_state(
+    sub: _SubscriptionLike,
+    subscription_state: str,
+) -> None:
+    """Transition *sub*.state based on the Subscription-State header value.
+
+    Mutates ``sub.state`` and cancels the refresh timer when terminated.
+    Works for both :class:`Subscription` and :class:`AsyncSubscription`.
+    """
+    if "terminated" in subscription_state.lower():
+        sub.state = SubscriptionState.TERMINATED
+        _log.info("Subscription terminated by NOTIFY")
+        sub._cancel_refresh()
+    elif "active" in subscription_state.lower():
+        sub.state = SubscriptionState.ACTIVE
+    elif "pending" in subscription_state.lower():
+        sub.state = SubscriptionState.PENDING
+
+
+def _update_subscription_from_response(
+    sub: _SubscriptionLike, r: Response | None
+) -> bool:
+    """Update *sub*.state from a SUBSCRIBE response status code.
+
+    Returns ``True`` when a refresh should be scheduled (200/202),
+    ``False`` when the subscription terminated.
+    """
+    if r and r.status_code in (200, 202):
+        sub.state = (
+            SubscriptionState.ACTIVE
+            if r.status_code == 200
+            else SubscriptionState.PENDING
+        )
+        return True
+    sub.state = SubscriptionState.TERMINATED
+    _log.warning("Subscription failed, status=%s", r.status_code if r else "None")
+    return False
+
+
 @dataclass
 class Subscription:
     """Manages a SIP event subscription.
@@ -46,7 +101,7 @@ class Subscription:
     and tracks NOTIFY state.
     """
 
-    client: Client
+    client: SIPClient
     uri: str
     event: str = "presence"
     expires: int = 3600
@@ -78,17 +133,8 @@ class Subscription:
             expires=self.expires,
         )
 
-        if r and r.status_code == 200:
-            self.state = SubscriptionState.ACTIVE
+        if _update_subscription_from_response(self, r):
             self._schedule_refresh()
-        elif r and r.status_code == 202:
-            self.state = SubscriptionState.PENDING
-            self._schedule_refresh()
-        else:
-            self.state = SubscriptionState.TERMINATED
-            _log.warning(
-                "Subscription failed, status=%s", r.status_code if r else "None"
-            )
 
         return r
 
@@ -131,15 +177,7 @@ class Subscription:
             "NOTIFY received, state=%s body_len=%d", subscription_state, len(body)
         )
         self.last_notify_body = body
-
-        if "terminated" in subscription_state.lower():
-            self.state = SubscriptionState.TERMINATED
-            _log.info("Subscription terminated by NOTIFY")
-            self._cancel_refresh()
-        elif "active" in subscription_state.lower():
-            self.state = SubscriptionState.ACTIVE
-        elif "pending" in subscription_state.lower():
-            self.state = SubscriptionState.PENDING
+        _apply_notify_state(self, subscription_state)
 
         if self.on_notify:
             self.on_notify(body)
@@ -157,7 +195,7 @@ class Subscription:
         self._cancel_refresh()
         if self.expires <= 0:
             return
-        delay = self.expires * 0.8
+        delay = self.expires * SUBSCRIPTION_REFRESH_MARGIN
         _log.debug("Scheduling refresh in %.0fs", delay)
         self._timer = threading.Timer(delay, self._do_refresh)
         self._timer.daemon = True
@@ -184,7 +222,7 @@ class AsyncSubscription:
     and ``asyncio.sleep`` for non-blocking refresh scheduling.
     """
 
-    client: AsyncClient
+    client: AsyncSIPClient
     uri: str
     event: str = "presence"
     expires: int = 3600
@@ -219,17 +257,8 @@ class AsyncSubscription:
             expires=self.expires,
         )
 
-        if r and r.status_code == 200:
-            self.state = SubscriptionState.ACTIVE
+        if _update_subscription_from_response(self, r):
             self._schedule_refresh()
-        elif r and r.status_code == 202:
-            self.state = SubscriptionState.PENDING
-            self._schedule_refresh()
-        else:
-            self.state = SubscriptionState.TERMINATED
-            _log.warning(
-                "Async subscription failed, status=%s", r.status_code if r else "None"
-            )
 
         return r
 
@@ -268,15 +297,11 @@ class AsyncSubscription:
             body: NOTIFY body content (e.g. PIDF XML for presence).
             subscription_state: Subscription-State header value.
         """
+        _log.debug(
+            "NOTIFY received, state=%s body_len=%d", subscription_state, len(body)
+        )
         self.last_notify_body = body
-
-        if "terminated" in subscription_state.lower():
-            self.state = SubscriptionState.TERMINATED
-            self._cancel_refresh()
-        elif "active" in subscription_state.lower():
-            self.state = SubscriptionState.ACTIVE
-        elif "pending" in subscription_state.lower():
-            self.state = SubscriptionState.PENDING
+        _apply_notify_state(self, subscription_state)
 
         if self.on_notify:
             self.on_notify(body)
@@ -300,7 +325,7 @@ class AsyncSubscription:
         """Periodically refresh until terminated."""
         try:
             while self.state != SubscriptionState.TERMINATED:
-                delay = self.expires * 0.8
+                delay = self.expires * SUBSCRIPTION_REFRESH_MARGIN
                 await asyncio.sleep(delay)
                 if self.state == SubscriptionState.TERMINATED:
                     break

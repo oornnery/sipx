@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """sipx — Audio generators demo (no network needed)."""
 
-from sipx._utils import console
+from rich.console import Console
 from sipx.media import (
     ToneGenerator,
     SilenceGenerator,
     NoiseGenerator,
     DTMFToneGenerator,
 )
+
+console = Console()
 
 # Tone generator (440Hz sine wave)
 tone = ToneGenerator(freq=440, sample_rate=8000)

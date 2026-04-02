@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from sipx import Client, SDPBody
+from sipx import SIPClient, SDPBody
 
 if os.getenv("ASTERISK_INTEGRATION") != "1":
     pytestmark = pytest.mark.skip(
@@ -37,7 +37,7 @@ def _aor(user: User) -> str:
     return f"sip:{user.username}@{ASTERISK_HOST}"
 
 
-def _contact(user: User, client: Client) -> dict[str, str]:
+def _contact(user: User, client: SIPClient) -> dict[str, str]:
     return {
         "Contact": (
             f"<sip:{user.username}@{client.local_address.host}:{client.local_address.port}>"
@@ -45,13 +45,13 @@ def _contact(user: User, client: Client) -> dict[str, str]:
     }
 
 
-def _register(client: Client, user: User, expires: int = 60):
+def _register(client: SIPClient, user: User, expires: int = 60):
     response = client.register(_aor(user), expires=expires)
     assert response is not None
     return response
 
 
-def _unregister(client: Client, user: User):
+def _unregister(client: SIPClient, user: User):
     response = client.unregister(_aor(user))
     assert response is not None
     return response
@@ -59,7 +59,7 @@ def _unregister(client: Client, user: User):
 
 def test_register_and_unregister_users():
     for user in ALL_USERS:
-        with Client(
+        with SIPClient(
             local_host=CLIENT_HOST,
             local_port=user.client_port,
             auth=(user.username, user.password),
@@ -72,7 +72,7 @@ def test_register_and_unregister_users():
 
 
 def test_user_2222_accepts_options():
-    with Client(
+    with SIPClient(
         local_host=CLIENT_HOST,
         local_port=5262,
         auth=(USER_2222.username, USER_2222.password),
@@ -83,7 +83,7 @@ def test_user_2222_accepts_options():
 
 
 def test_user_3333_rejects_invalid_credentials():
-    with Client(
+    with SIPClient(
         local_host=CLIENT_HOST,
         local_port=5263,
         auth=(USER_3333.username, "WRONG"),
@@ -93,7 +93,7 @@ def test_user_3333_rejects_invalid_credentials():
 
 
 def test_user_1111_can_complete_echo_call():
-    with Client(
+    with SIPClient(
         local_host=CLIENT_HOST,
         local_port=5261,
         auth=(USER_1111.username, USER_1111.password),

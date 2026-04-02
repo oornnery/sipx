@@ -15,10 +15,8 @@ from __future__ import annotations
 
 import asyncio
 
-from sipx.server import AsyncSIPServer
-from sipx.client import AsyncClient
+from sipx import AsyncSIPServer, AsyncSIPClient, Request, Response
 from sipx.contrib._b2bua import AsyncB2BUA
-from sipx.models._message import Request, Response
 
 
 B2BUA_PORT = 15064
@@ -31,12 +29,12 @@ async def main() -> None:
     # ------------------------------------------------------------------ #
     bob_server = AsyncSIPServer(local_host="127.0.0.1", local_port=BOB_PORT)
 
-    @bob_server.invite
+    @bob_server.invite()
     def bob_on_invite(request: Request) -> Response:
         print(f"  Bob: INVITE from {request.from_header}")
         return request.ok()
 
-    @bob_server.bye
+    @bob_server.bye()
     def bob_on_bye(request: Request) -> Response:
         print("  Bob: BYE received — call ended")
         return request.ok()
@@ -45,7 +43,7 @@ async def main() -> None:
     # B2BUA — bridges Alice → Bob
     # ------------------------------------------------------------------ #
     b2bua_server = AsyncSIPServer(local_host="127.0.0.1", local_port=B2BUA_PORT)
-    b2bua_client = AsyncClient(local_host="127.0.0.1", local_port=0)
+    b2bua_client = AsyncSIPClient(local_host="127.0.0.1", local_port=0)
 
     events: list[str] = []
 
@@ -62,7 +60,7 @@ async def main() -> None:
     # ------------------------------------------------------------------ #
     # Alice's client
     # ------------------------------------------------------------------ #
-    alice = AsyncClient(local_host="127.0.0.1", local_port=0)
+    alice = AsyncSIPClient(local_host="127.0.0.1", local_port=0)
 
     async with bob_server:
         async with b2bua_client:

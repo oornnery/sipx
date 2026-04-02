@@ -2,11 +2,13 @@
 """sipx — Send DTMF digits (all 3 methods)."""
 
 import time
-from sipx import Client
-from sipx._utils import console
+from sipx import SIPClient
+from rich.console import Console
 from sipx.media import CallSession, DTMFToneGenerator
 
-with Client(local_port=5061) as client:
+console = Console()
+
+with SIPClient(local_port=5061) as client:
     client.auth = ("1111", "1111xxx")
 
     sdp = client.create_sdp(port=8000)

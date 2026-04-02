@@ -2,8 +2,10 @@
 """sipx — SIP-I / ISUP interworking (international)."""
 
 from sipx import Request
-from sipx._utils import console
+from rich.console import Console
 from sipx.contrib import SipI
+
+console = Console()
 
 # ISUP -> SIP
 console.print("[bold]ISUP -> SIP[/bold]")

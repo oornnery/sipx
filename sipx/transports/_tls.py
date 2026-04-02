@@ -12,11 +12,11 @@ import socket
 import ssl
 from typing import Optional, Tuple
 
-from ._utils import parse_content_length
+from ._framer import read_sip_message_sync, read_sip_message_async
 from .._types import (
-    ConnectionError,
+    SIPConnectionError,
     ReadError,
-    TimeoutError,
+    SIPTimeoutError,
     TransportAddress,
     TransportConfig,
     TransportError,
@@ -97,7 +97,7 @@ class TLSTransport(BaseTransport):
             destination: Target address
 
         Raises:
-            ConnectionError: If connection fails
+            SIPConnectionError: If connection fails
         """
         if self._connected_to == destination:
             return  # Already connected
@@ -132,12 +132,12 @@ class TLSTransport(BaseTransport):
 
         except ssl.SSLError as e:
             _log.error("TLS handshake failed: %s", e)
-            raise ConnectionError(
+            raise SIPConnectionError(
                 f"TLS handshake failed with {destination.host}:{destination.port}: {e}"
             ) from e
         except OSError as e:
             _log.error("TLS connection error: %s", e)
-            raise ConnectionError(
+            raise SIPConnectionError(
                 f"Failed to connect to {destination.host}:{destination.port}: {e}"
             ) from e
 
@@ -169,8 +169,8 @@ class TLSTransport(BaseTransport):
 
         Raises:
             TransportError: On send/receive failure
-            ConnectionError: If connection fails
-            TimeoutError: If response timeout expires
+            SIPConnectionError: If connection fails
+            SIPTimeoutError: If response timeout expires
         """
         from ..models._message import MessageParser
 
@@ -216,7 +216,7 @@ class TLSTransport(BaseTransport):
 
         Raises:
             WriteError: If send fails
-            ConnectionError: If not connected
+            SIPConnectionError: If not connected
         """
         if self._socket is None or self._closed:
             raise TransportError("Transport is closed")
@@ -254,7 +254,7 @@ class TLSTransport(BaseTransport):
             Tuple of (data, source_address)
 
         Raises:
-            TimeoutError: If timeout expires
+            SIPTimeoutError: If timeout expires
             ReadError: If receive fails
         """
         if self._socket is None or self._closed:
@@ -265,52 +265,12 @@ class TLSTransport(BaseTransport):
             if timeout is not None:
                 self._socket.settimeout(timeout)
 
-            # Read until we have complete SIP message
-            chunks = []
-            total_size = 0
-            content_length: Optional[int] = None
-            headers_end_pos: Optional[int] = None
-
-            while True:
-                chunk = self._socket.recv(4096)
-                if not chunk:
-                    raise ReadError("Connection closed by peer")
-
-                chunks.append(chunk)
-                total_size += len(chunk)
-                data_so_far = b"".join(chunks)
-
-                # Try to find end of headers
-                if headers_end_pos is None:
-                    headers_end_pos = data_so_far.find(b"\r\n\r\n")
-                    if headers_end_pos != -1:
-                        # Parse Content-Length from headers
-                        headers = data_so_far[: headers_end_pos + 4]
-                        content_length = self._parse_content_length(headers)
-
-                # Check if we have complete message
-                if headers_end_pos is not None:
-                    body_start = headers_end_pos + 4
-                    if content_length is not None:
-                        # We know expected size
-                        if total_size >= body_start + content_length:
-                            # Complete message received
-                            complete = data_so_far[: body_start + content_length]
-                            _log.debug("TLS recv %d bytes", len(complete))
-                            return (
-                                complete,
-                                self._connected_to or TransportAddress("", 0, "TLS"),
-                            )
-                    elif total_size > body_start:
-                        # No Content-Length, assume message ends after headers
-                        _log.debug("TLS recv %d bytes", len(data_so_far))
-                        return (
-                            data_so_far,
-                            self._connected_to or TransportAddress("", 0, "TLS"),
-                        )
+            data = read_sip_message_sync(self._socket.recv)
+            _log.debug("TLS recv %d bytes", len(data))
+            return data, self._connected_to or TransportAddress("", 0, "TLS")
 
         except socket.timeout as e:
-            raise TimeoutError("TLS receive timeout") from e
+            raise SIPTimeoutError("TLS receive timeout") from e
         except ssl.SSLError as e:
             _log.error("TLS receive failed: %s", e)
             raise ReadError(f"TLS receive error: {e}") from e
@@ -323,6 +283,8 @@ class TLSTransport(BaseTransport):
 
     @staticmethod
     def _parse_content_length(headers: bytes) -> Optional[int]:
+        from ._utils import parse_content_length
+
         return parse_content_length(headers)
 
     def close(self) -> None:
@@ -345,7 +307,7 @@ class TLSTransport(BaseTransport):
         if self._socket:
             try:
                 return self._socket.getpeercert()
-            except Exception:
+            except (OSError, ssl.SSLError, AttributeError):
                 return None
         return None
 
@@ -422,7 +384,7 @@ class AsyncTLSTransport(AsyncBaseTransport):
             destination: Target address
 
         Raises:
-            ConnectionError: If connection fails
+            SIPConnectionError: If connection fails
         """
         if self._connected_to == destination and self._writer is not None:
             return  # Already connected
@@ -452,17 +414,17 @@ class AsyncTLSTransport(AsyncBaseTransport):
             _log.error(
                 "TLS connection timeout to %s:%d", destination.host, destination.port
             )
-            raise ConnectionError(
+            raise SIPConnectionError(
                 f"TLS connection timeout to {destination.host}:{destination.port}"
             ) from e
         except ssl.SSLError as e:
             _log.error("TLS handshake failed: %s", e)
-            raise ConnectionError(
+            raise SIPConnectionError(
                 f"TLS handshake failed with {destination.host}:{destination.port}: {e}"
             ) from e
         except OSError as e:
             _log.error("TLS connection error: %s", e)
-            raise ConnectionError(
+            raise SIPConnectionError(
                 f"Failed to connect to {destination.host}:{destination.port}: {e}"
             ) from e
 
@@ -472,7 +434,7 @@ class AsyncTLSTransport(AsyncBaseTransport):
             self._writer.close()
             try:
                 await self._writer.wait_closed()
-            except Exception:
+            except (OSError, ConnectionError, asyncio.TimeoutError):
                 pass  # Ignore errors during close
             self._writer = None
             self._reader = None
@@ -495,8 +457,8 @@ class AsyncTLSTransport(AsyncBaseTransport):
 
         Raises:
             TransportError: On send/receive failure
-            ConnectionError: If connection fails
-            TimeoutError: If response timeout expires
+            SIPConnectionError: If connection fails
+            SIPTimeoutError: If response timeout expires
         """
         from ..models._message import MessageParser
 
@@ -516,7 +478,7 @@ class AsyncTLSTransport(AsyncBaseTransport):
                 timeout=self.config.read_timeout,
             )
         except asyncio.TimeoutError as e:
-            raise TimeoutError("Response timeout") from e
+            raise SIPTimeoutError("Response timeout") from e
 
         # Parse response
         parser = MessageParser()
@@ -556,7 +518,7 @@ class AsyncTLSTransport(AsyncBaseTransport):
 
         Raises:
             WriteError: If send fails
-            ConnectionError: If not connected
+            SIPConnectionError: If not connected
         """
         if self._closed:
             raise TransportError("Transport is closed")
@@ -571,7 +533,7 @@ class AsyncTLSTransport(AsyncBaseTransport):
             self._writer.write(data)
             await self._writer.drain()
             _log.debug("TLS send %d bytes", len(data))
-        except Exception as e:
+        except (OSError, ssl.SSLError, ConnectionError, RuntimeError) as e:
             _log.error("TLS send failed: %s", e)
             raise WriteError(f"Failed to send TLS data: {e}") from e
 
@@ -589,63 +551,27 @@ class AsyncTLSTransport(AsyncBaseTransport):
             Tuple of (data, source_address)
 
         Raises:
-            TimeoutError: If timeout expires
+            SIPTimeoutError: If timeout expires
             ReadError: If receive fails
         """
         if self._reader is None or self._closed:
             raise TransportError("Transport is closed or not connected")
 
         try:
-            # Read until we have complete SIP message
-            chunks = []
-            total_size = 0
-            content_length: Optional[int] = None
-            headers_end_pos: Optional[int] = None
+            data = await read_sip_message_async(self._reader)
+            _log.debug("TLS recv %d bytes", len(data))
+            return data, self._connected_to or TransportAddress("", 0, "TLS")
 
-            while True:
-                chunk = await self._reader.read(4096)
-                if not chunk:
-                    raise ReadError("Connection closed by peer")
-
-                chunks.append(chunk)
-                total_size += len(chunk)
-                data_so_far = b"".join(chunks)
-
-                # Try to find end of headers
-                if headers_end_pos is None:
-                    headers_end_pos = data_so_far.find(b"\r\n\r\n")
-                    if headers_end_pos != -1:
-                        # Parse Content-Length from headers
-                        headers = data_so_far[: headers_end_pos + 4]
-                        content_length = self._parse_content_length(headers)
-
-                # Check if we have complete message
-                if headers_end_pos is not None:
-                    body_start = headers_end_pos + 4
-                    if content_length is not None:
-                        # We know expected size
-                        if total_size >= body_start + content_length:
-                            # Complete message received
-                            complete = data_so_far[: body_start + content_length]
-                            _log.debug("TLS recv %d bytes", len(complete))
-                            return (
-                                complete,
-                                self._connected_to or TransportAddress("", 0, "TLS"),
-                            )
-                    elif total_size > body_start:
-                        # No Content-Length, assume message ends after headers
-                        _log.debug("TLS recv %d bytes", len(data_so_far))
-                        return (
-                            data_so_far,
-                            self._connected_to or TransportAddress("", 0, "TLS"),
-                        )
-
-        except Exception as e:
+        except ReadError:
+            raise
+        except (OSError, ssl.SSLError, ConnectionError, RuntimeError) as e:
             _log.error("TLS receive failed: %s", e)
             raise ReadError(f"Failed to receive TLS data: {e}") from e
 
     @staticmethod
     def _parse_content_length(headers: bytes) -> Optional[int]:
+        from ._utils import parse_content_length
+
         return parse_content_length(headers)
 
     async def close(self) -> None:
@@ -671,7 +597,7 @@ class AsyncTLSTransport(AsyncBaseTransport):
                 ssl_object = transport.get_extra_info("ssl_object")
                 if ssl_object:
                     return ssl_object.getpeercert()
-            except Exception:
+            except (OSError, ssl.SSLError, AttributeError):
                 pass
         return None
 

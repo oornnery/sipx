@@ -9,8 +9,10 @@ Usage:
     uv run python examples/events_demo.py
 """
 
-from sipx import Client, Events, on
-from sipx._utils import console
+from sipx import SIPClient, Events, on
+from rich.console import Console
+
+console = Console()
 
 
 class MyEvents(Events):
@@ -70,7 +72,7 @@ def main():
 
     events = MyEvents()
 
-    with Client(local_port=5061) as client:
+    with SIPClient(local_port=5061) as client:
         client.events = events
         client.auth = ("1111", "1111xxx")
 

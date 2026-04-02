@@ -1,22 +1,102 @@
 """Utilities and constants for SIP protocol."""
 
 import logging
+import typing
 
-from rich.console import Console
-from rich.logging import RichHandler
+if typing.TYPE_CHECKING:
+    pass
 
-# Rich Console for pretty printing
-console = Console()
+# Rich Console for pretty printing (lazy init to avoid import overhead)
+console: typing.Any = None
 
-# Configure logging with RichHandler
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(message)s",
-    datefmt="[%X]",
-    handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)],
-)
 
-# Get logger for the package
+def _get_console():
+    """Lazily initialize the Rich console."""
+    global console
+    if console is None:
+        from rich.console import Console
+
+        console = Console()
+    return console
+
+
+def _init_console() -> typing.Any:
+    """Return the module-level console, initializing it if needed.
+
+    Examples import ``console`` directly from this module.  Because the
+    name is bound to ``None`` at parse time, they would get ``None`` unless
+    we initialise it eagerly here or they call ``_get_console()`` first.
+    This function is called once at module import to ensure ``console`` is
+    ready for any importer.
+    """
+    return _get_console()
+
+
+# Eagerly initialise so ``from sipx._utils import console`` works immediately.
+try:
+    console = _init_console()
+except Exception:
+    # rich may not be installed; fall back to a simple print wrapper
+    class _FallbackConsole:  # type: ignore[no-redef]
+        """Minimal console replacement when rich is unavailable."""
+
+        def print(self, *args, **kwargs) -> None:  # noqa: A003
+            import re
+
+            text = " ".join(str(a) for a in args)
+            # Strip rich markup tags like [bold], [green], etc.
+            text = re.sub(r"\[/?[^\]]+\]", "", text)
+            print(text)
+
+    console = _FallbackConsole()
+
+
+def configure_logging(
+    level: int = logging.INFO,
+    *,
+    rich: bool = True,
+    format: str = "%(message)s",
+    datefmt: str = "[%X]",
+) -> None:
+    """Configure sipx logging.
+
+    This must be called explicitly by the user to set up logging.
+    By default sipx does NOT configure logging on import (to avoid
+    overwriting the user's configuration).
+
+    Args:
+        level: Logging level (default: INFO).
+        rich: Use RichHandler for pretty output (default: True).
+        format: Log format string.
+        datefmt: Date format string.
+
+    Example::
+
+        import sipx
+        sipx.configure_logging(level=logging.DEBUG)
+    """
+    if rich:
+        try:
+            from rich.logging import RichHandler
+
+            handler = RichHandler(
+                console=_get_console(), rich_tracebacks=True, show_path=False
+            )
+        except ImportError:
+            handler = logging.StreamHandler()
+    else:
+        handler = logging.StreamHandler()
+
+    handler.setFormatter(logging.Formatter(fmt=format, datefmt=datefmt))
+
+    # Avoid duplicate handlers on repeated calls
+    root = logging.getLogger("sipx")
+    root.handlers.clear()
+    root.setLevel(level)
+    root.addHandler(handler)
+
+
+# Get logger for the package (user configures it via configure_logging())
 logger = logging.getLogger("sipx")
 
 EOL = "\r\n"

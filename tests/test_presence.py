@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from sipx.client import Client
+from sipx.client import SIPClient
 from sipx.models import PIFDBody
 from sipx.models._message import Response
 from sipx._types import TransportAddress
@@ -158,7 +158,7 @@ class TestPublish:
         mock_create.return_value = transport
         transport._queue.append(_make_response(200, "OK", {"SIP-ETag": "etag1"}))
 
-        client = Client()
+        client = SIPClient()
         pidf = PIFDBody(entity="sip:alice@127.0.0.1", status="open")
         client.publish("sip:alice@127.0.0.1", content=pidf.to_string())
 
@@ -171,7 +171,7 @@ class TestPublish:
         mock_create.return_value = transport
         transport._queue.append(_make_response(200, "OK", {"SIP-ETag": "abc123"}))
 
-        client = Client()
+        client = SIPClient()
         client.publish("sip:alice@127.0.0.1", content="<presence/>")
 
         assert client._presence_etag == "abc123"
@@ -182,7 +182,7 @@ class TestPublish:
         mock_create.return_value = transport
         transport._queue.append(_make_response(200, "OK", {"SIP-ETag": "etag2"}))
 
-        client = Client()
+        client = SIPClient()
         client._presence_etag = "etag1"
         client.publish("sip:alice@127.0.0.1", etag="etag1")
 
@@ -195,7 +195,7 @@ class TestPublish:
         mock_create.return_value = transport
         transport._queue.append(_make_response(412, "Conditional Request Failed"))
 
-        client = Client()
+        client = SIPClient()
         client.publish("sip:alice@127.0.0.1", etag="stale")
 
         assert client._presence_etag is None
@@ -206,7 +206,7 @@ class TestPublish:
         mock_create.return_value = transport
         transport._queue.append(_make_response(200, "OK"))
 
-        client = Client()
+        client = SIPClient()
         pidf = PIFDBody(entity="sip:alice@127.0.0.1")
         client.publish("sip:alice@127.0.0.1", content=pidf.to_string())
 

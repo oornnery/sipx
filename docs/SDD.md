@@ -19,8 +19,8 @@
 
 | Goal | Description |
 | --- | --- |
-| **Simplicity** | Clean API inspired by httpx (`client.invite()`) and FastAPI (`@server.invite`, `Annotated` DI) |
-| **Sync + Async** | `Client` / `AsyncClient` and `SIPServer` / `AsyncSIPServer` with the same API |
+| **Simplicity** | Clean API inspired by httpx (`client.invite()`) and FastAPI (`@server.invite()`, `Annotated` DI) |
+| **Sync + Async** | `SIPClient` / `AsyncSIPClient` and `SIPServer` / `AsyncSIPServer` with the same API |
 | **Declarative events** | `@on('INVITE', status=200)` as decorators |
 | **FastAPI-style DI** | `Annotated[str, FromHeader]`, `Annotated[RTPSession, AutoRTP(port=8000)]` extractors |
 | **Response builders** | `request.ok()`, `request.trying()`, `request.ringing()`, `request.error(code)` |
@@ -50,7 +50,7 @@ graph TB
     end
 
     subgraph "sipx Public API"
-        CLIENT[Client / AsyncClient]
+        CLIENT[SIPClient / AsyncSIPClient]
         SERVER[SIPServer / AsyncSIPServer]
         EVENTS[Events + @on decorator]
         DI[DI: Annotated + Extractors]
@@ -132,14 +132,14 @@ sipx/
 ├── _utils.py              # Constants, logging, reason phrases
 │
 ├── client/
-│   ├── __init__.py        # Re-exports: Client, AsyncClient
+│   ├── __init__.py        # Re-exports: SIPClient, AsyncSIPClient
 │   ├── _base.py           # Shared helpers, DialogTracker
-│   ├── _sync.py           # Client (sync, with auto DNS, dialog tracking)
-│   └── _async.py          # AsyncClient (native asyncio, DatagramProtocol)
+│   ├── _sync.py           # SIPClient (sync, with auto DNS, dialog tracking)
+│   └── _async.py          # AsyncSIPClient (native asyncio, DatagramProtocol)
 │
 ├── server/
 │   ├── __init__.py        # Re-exports: SIPServer, AsyncSIPServer
-│   ├── _base.py           # SIPServerHandlerMixin (decorators, DI)
+│   ├── _base.py           # SIPServerBase (decorators, DI)
 │   ├── _sync.py           # SIPServer (threading)
 │   └── _async.py          # AsyncSIPServer (asyncio.DatagramProtocol)
 │
@@ -227,7 +227,7 @@ sipx/
 | **3550** | RTP: Real-time Transport Protocol | `media/_rtp.py`, `media/_async.py` | ✅ Sync + Async |
 | **4733** | DTMF via RTP (telephone-event) | `media/_dtmf.py` | ✅ Send + Collect |
 | **2976** | SIP INFO Method | `client/` | ✅ DTMF via SIP INFO |
-| **3263** | SIP DNS/SRV Resolution | `dns/` | ✅ Sync + Async, auto in Client |
+| **3263** | SIP DNS/SRV Resolution | `dns/` | ✅ Sync + Async, auto in SIPClient |
 | **4028** | Session Timers | `session/_timer.py` | ✅ Sync + Async |
 | **3581** | Symmetric Response (rport) | `client/` (Via header) | ✅ Complete |
 | **3986** | URI Syntax | `_uri.py` | ✅ SipURI parser |
@@ -265,11 +265,11 @@ sipx/
 
 ## 4. Detailed Components
 
-### 4.1 Client (`client/`)
+### 4.1 SIPClient (`client/`)
 
 ```mermaid
 classDiagram
-    class Client {
+    class SIPClient {
         +config: TransportConfig
         +transport_protocol: str
         -_transport: BaseTransport
@@ -293,7 +293,7 @@ classDiagram
         +enable_auto_reregister(aor, interval) None
     }
 
-    class AsyncClient {
+    class AsyncSIPClient {
         -_transport: AsyncUDPTransport
         -_dialog: DialogTracker
         -_resolver: AsyncSipResolver
@@ -313,10 +313,10 @@ classDiagram
         +clear() None
     }
 
-    Client --> DialogTracker
-    AsyncClient --> DialogTracker
-    Client --> BaseTransport
-    AsyncClient --> AsyncBaseTransport
+    SIPClient --> DialogTracker
+    AsyncSIPClient --> DialogTracker
+    SIPClient --> BaseTransport
+    AsyncSIPClient --> AsyncBaseTransport
 ```
 
 **Key features:**
@@ -334,8 +334,8 @@ classDiagram
 response = sipx.options("sip:pbx.example.com")
 response = sipx.register("sip:alice@pbx.com", auth=("alice", "secret"))
 
-# Client with dialog tracking
-with Client(local_port=5061) as client:
+# SIPClient with dialog tracking
+with SIPClient(local_port=5061) as client:
     client.auth = ("alice", "secret")
     sdp = client.create_sdp(port=8000)
     r = client.invite("sip:bob@pbx.com", body=sdp.to_string())
@@ -344,7 +344,7 @@ with Client(local_port=5061) as client:
     client.bye()      # uses tracked dialog
 
 # Native async (no threading wrapper)
-async with AsyncClient() as client:
+async with AsyncSIPClient() as client:
     r = await client.invite("sip:bob@pbx.com", body=sdp.to_string())
     await client.ack()
     await client.bye()
@@ -354,7 +354,7 @@ async with AsyncClient() as client:
 
 ```mermaid
 classDiagram
-    class SIPServerHandlerMixin {
+    class SIPServerBase {
         -_handlers: dict
         +invite(fn) decorator
         +register(fn) decorator
@@ -376,8 +376,8 @@ classDiagram
         +auto 100 Trying for INVITE
     }
 
-    SIPServerHandlerMixin <|-- SIPServer
-    SIPServerHandlerMixin <|-- AsyncSIPServer
+    SIPServerBase <|-- SIPServer
+    SIPServerBase <|-- AsyncSIPServer
 ```
 
 **FastAPI-style handlers with DI:**
@@ -385,7 +385,7 @@ classDiagram
 ```python
 server = SIPServer(local_host="0.0.0.0", local_port=5060)
 
-@server.invite
+@server.invite()
 def on_invite(
     request: Request,
     caller: Annotated[str, FromHeader],
@@ -396,7 +396,7 @@ def on_invite(
         content=SDPBody.audio(ip="10.0.0.1", port=8000).to_string(),
     )
 
-@server.register
+@server.register()
 def on_register(request: Request):
     return request.ok()
 
@@ -517,8 +517,7 @@ classDiagram
 stateDiagram-v2
     state "INVITE Client Transaction" as ICT {
         [*] --> CALLING: Send INVITE
-        CALLING --> TRYING: 1xx received
-        TRYING --> PROCEEDING: 1xx received
+        CALLING --> PROCEEDING: 1xx received
         PROCEEDING --> COMPLETED: 2xx-6xx received
         COMPLETED --> TERMINATED: Timer D
     }
@@ -531,7 +530,7 @@ stateDiagram-v2
 ```
 
 - `TimerManager` (sync) / `AsyncTimerManager` (async) for RFC 3261 Timer A/B/E/F
-- Automatic retransmission wired into Client.request()
+- Automatic retransmission wired into SIPClient.request()
 
 ### 4.9 Media Layer (`media/`)
 
@@ -569,7 +568,7 @@ stateDiagram-v2
 ```mermaid
 sequenceDiagram
     participant App as Application
-    participant C as sipx.Client
+    participant C as sipx.SIPClient
     participant PBX as PBX
 
     App->>C: client.invite("sip:bob@pbx.com", body=sdp)
@@ -671,7 +670,7 @@ sequenceDiagram
 | RF-18 | Auto 100 Trying for INVITE | ✅ |
 | RF-19 | Dialog tracking (implicit ack/bye) | ✅ |
 | RF-20 | Response builders (request.ok/error/trying) | ✅ |
-| RF-21 | Auto DNS in Client | ✅ |
+| RF-21 | Auto DNS in SIPClient | ✅ |
 | RF-22 | FastAPI-style DI with Annotated | ✅ |
 
 ### 6.2 SIP Signaling (Pending)
@@ -763,7 +762,7 @@ pie title Progress by Area
     "Events + DI" : 95
     "FSM/Timers" : 85
     "Server (sync+async)" : 85
-    "Client (sync+async)" : 95
+    "SIPClient (sync+async)" : 95
     "DNS/Routing" : 90
     "RTP/Media" : 85
     "DTMF (3 methods)" : 95
@@ -792,8 +791,8 @@ pie title Progress by Area
 
 ```python
 # Core
-sipx.Client                    # Sync SIP client
-sipx.AsyncClient               # Async SIP client (native asyncio)
+sipx.SIPClient                 # Sync SIP client
+sipx.AsyncSIPClient            # Async SIP client (native asyncio)
 sipx.Request                   # SIP Request (with ok/error/trying/ringing)
 sipx.Response                  # SIP Response
 sipx.SDPBody                   # SDP body builder
@@ -857,9 +856,9 @@ sipx.contrib.ISUPMessage       # Real ISUP binary encoding
 ### Done (Phases 1-3)
 
 - Core SIP signaling (14 methods, all sync + async)
-- Native AsyncClient (not wrapper)
+- Native AsyncSIPClient (not wrapper)
 - FSM timers with automatic retransmission
-- DNS SRV resolution (auto in Client)
+- DNS SRV resolution (auto in SIPClient)
 - SIP URI parser
 - SDP with ICE, SRTP crypto, DTLS, rtcp-fb
 - RTP engine (sync + async)
@@ -902,8 +901,8 @@ sipx.contrib.ISUPMessage       # Real ISUP binary encoding
 | **Builder** | Response | `request.ok()`, `request.error()`, `SDPBody.audio()` |
 | **Template Method** | SIPMessage | `to_bytes()`, `to_string()` |
 | **Lazy Initialization** | Body parsing, DNS | `response.body` parses on demand, DNS resolver lazy-inits |
-| **Context Manager** | Client/Server | `with Client()` / `async with AsyncClient()` |
-| **Decorator** | Events, Server | `@on('INVITE')`, `@server.invite` |
+| **Context Manager** | Client/Server | `with SIPClient()` / `async with AsyncSIPClient()` |
+| **Decorator** | Events, Server | `@on('INVITE')`, `@server.invite()` |
 | **Dependency Injection** | Server handlers | `Annotated[str, FromHeader]` extractors |
 | **Tracker** | Dialog | `DialogTracker` tracks INVITE 200 OK + RouteSet |
 
@@ -954,7 +953,7 @@ sipx.contrib.ISUPMessage       # Real ISUP binary encoding
 
 ## Appendix A -- Implemented SIP Methods
 
-| Method | RFC | `Client` | `AsyncClient` | Description |
+| Method | RFC | `SIPClient` | `AsyncSIPClient` | Description |
 | --- | --- | --- | --- | --- |
 | INVITE | 3261 | ✅ | ✅ | Initiate call |
 | ACK | 3261 | ✅ | ✅ | Confirm INVITE (auto dialog) |

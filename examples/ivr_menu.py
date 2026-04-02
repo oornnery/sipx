@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """sipx — IVR menu builder example (no network needed)."""
 
-from sipx._utils import console
+from rich.console import Console
 from sipx.contrib import Menu, MenuItem, Prompt
+
+console = Console()
 
 # Build a menu
 menu = Menu(

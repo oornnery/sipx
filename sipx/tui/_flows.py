@@ -168,7 +168,7 @@ class StepResult:
 
 
 class FlowRunner:
-    """Executes a parsed Flow against an AsyncClient/AsyncSIPServer.
+    """Executes a parsed Flow against an AsyncSIPClient/AsyncSIPServer.
 
     The runner maps flow actions to sipx client/server method calls.
     It reports progress via callbacks so the TUI can update in real-time.
@@ -200,7 +200,7 @@ class FlowRunner:
         """Execute all steps in the flow.
 
         Args:
-            client: AsyncClient instance (for UAC flows)
+            client: AsyncSIPClient instance (for UAC flows)
             server: AsyncSIPServer instance (for UAS flows)
 
         Returns:

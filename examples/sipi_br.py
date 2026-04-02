@@ -2,11 +2,13 @@
 """sipx — SIP-I BR (Brazilian ANATEL extensions)."""
 
 from sipx import Request
-from sipx._utils import console
+from rich.console import Console
 from sipx.contrib import (
     SipI,
     SipIBR,
 )
+
+console = Console()
 
 # Number normalization
 console.print("[bold]BR Number Normalization[/bold]")

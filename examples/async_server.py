@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""sipx — AsyncSIPServer + AsyncClient (self-contained, no Asterisk)."""
+"""sipx — AsyncSIPServer + AsyncSIPClient (self-contained, no Asterisk)."""
 
 import asyncio
 from typing import Annotated
-from sipx import AsyncClient, Request, FromHeader
-from sipx.server import AsyncSIPServer
-from sipx._utils import console
+from sipx import AsyncSIPClient, AsyncSIPServer, Request, FromHeader
+from rich.console import Console
+
+console = Console()
 
 HOST = "127.0.0.1"
 PORT = 15090
@@ -13,13 +14,13 @@ PORT = 15090
 server = AsyncSIPServer(local_host=HOST, local_port=PORT)
 
 
-@server.register
+@server.register()
 def on_register(request: Request, caller: Annotated[str, FromHeader]):
     console.print(f"  server: REGISTER from {caller}")
     return request.ok()
 
 
-@server.message
+@server.message()
 def on_message(request: Request, caller: Annotated[str, FromHeader]):
     body = request.content.decode() if request.content else ""
     console.print(f"  server: MESSAGE from {caller}: {body}")
@@ -33,7 +34,7 @@ async def main():
     await asyncio.sleep(0.5)
 
     try:
-        async with AsyncClient(local_host=HOST, local_port=PORT + 1) as client:
+        async with AsyncSIPClient(local_host=HOST, local_port=PORT + 1) as client:
             # Register
             r = await client.request(
                 "REGISTER", f"sip:test@{HOST}", host=HOST, port=PORT

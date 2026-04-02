@@ -249,8 +249,6 @@ class Transaction:
         if response.is_provisional:
             if self.transaction_type == TransactionType.INVITE:
                 if self.state == TransactionState.CALLING:
-                    self.transition_to(TransactionState.TRYING)
-                elif self.state == TransactionState.TRYING:
                     self.transition_to(TransactionState.PROCEEDING)
         elif response.is_final:
             self.transition_to(TransactionState.COMPLETED)

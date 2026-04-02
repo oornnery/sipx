@@ -16,7 +16,11 @@ Test:
     curl -X POST http://localhost:8000/call -d '{"uri":"sip:100@127.0.0.1","username":"1111","password":"1111xxx"}'
 """
 
-from sipx._utils import console
+from rich.console import Console
+
+from sipx import SIPClient
+
+console = Console()
 
 try:
     from fastapi import FastAPI
@@ -26,8 +30,6 @@ except ImportError:
         "[red]This example requires: pip install fastapi uvicorn pydantic[/red]"
     )
     raise SystemExit(1)
-
-from sipx import Client
 
 # ---------------------------------------------------------------------------
 # Pydantic models for API
@@ -74,7 +76,7 @@ def health():
 @app.post("/register", response_model=SipResponse)
 def register(req: RegisterRequest):
     """Register with a SIP server."""
-    with Client(local_port=0) as client:
+    with SIPClient(local_port=0) as client:
         client.auth = (req.username, req.password)
         r = client.register(req.aor)
         return SipResponse(status_code=r.status_code, reason=r.reason_phrase)
@@ -83,7 +85,7 @@ def register(req: RegisterRequest):
 @app.post("/options", response_model=SipResponse)
 def options(uri: str):
     """Send OPTIONS to a SIP server."""
-    with Client(local_port=0) as client:
+    with SIPClient(local_port=0) as client:
         r = client.options(uri)
         return SipResponse(status_code=r.status_code, reason=r.reason_phrase)
 
@@ -93,7 +95,7 @@ def call(req: CallRequest):
     """Make a SIP call."""
     import time
 
-    with Client(local_port=0) as client:
+    with SIPClient(local_port=0) as client:
         client.auth = (req.username, req.password)
         sdp = client.create_sdp()
         r = client.invite(to_uri=req.uri, body=sdp.to_string())
@@ -109,7 +111,7 @@ def call(req: CallRequest):
 @app.post("/message", response_model=SipResponse)
 def message(req: MessageRequest):
     """Send a SIP MESSAGE."""
-    with Client(local_port=0) as client:
+    with SIPClient(local_port=0) as client:
         if req.username:
             client.auth = (req.username, req.password)
         r = client.message(to_uri=req.uri, content=req.content)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from sipx.client import Client
+from sipx.client import SIPClient
 from sipx.models._message import Response
 from sipx._types import TransportAddress
 from sipx.transports._base import BaseTransport
@@ -69,7 +69,7 @@ class TestInviteReliable:
         # Queue a final 200 OK so request() terminates
         transport._queue.append(_make_response(200, "OK"))
 
-        client = Client()
+        client = SIPClient()
         client.invite("sip:bob@127.0.0.1", reliable=True)
 
         # First sent message is the INVITE
@@ -84,7 +84,7 @@ class TestInviteReliable:
         mock_create.return_value = transport
         transport._queue.append(_make_response(200, "OK"))
 
-        client = Client()
+        client = SIPClient()
         client.invite("sip:bob@127.0.0.1", reliable=False)
 
         invite_bytes, _ = transport.sent[0]
@@ -113,7 +113,7 @@ class TestAutoPrack:
         )
         transport._queue.append(_make_response(200, "OK"))
 
-        client = Client()
+        client = SIPClient()
         client.invite("sip:bob@127.0.0.1", reliable=True)
 
         sent_methods = []
@@ -137,7 +137,7 @@ class TestAutoPrack:
         )
         transport._queue.append(_make_response(200, "OK"))
 
-        client = Client()
+        client = SIPClient()
         client.invite("sip:bob@127.0.0.1", reliable=True)
 
         prack_bytes = None
@@ -161,7 +161,7 @@ class TestAutoPrack:
         transport._queue.append(_make_response(180, "Ringing"))
         transport._queue.append(_make_response(200, "OK"))
 
-        client = Client()
+        client = SIPClient()
         client.invite("sip:bob@127.0.0.1")
 
         sent_methods = [

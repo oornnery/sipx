@@ -15,9 +15,7 @@ from __future__ import annotations
 
 import asyncio
 
-from sipx.server import AsyncSIPServer
-from sipx.client import AsyncClient
-from sipx.models._message import Request
+from sipx import AsyncSIPServer, AsyncSIPClient, Request
 
 
 SERVER_PORT = 15062
@@ -26,12 +24,12 @@ SERVER_PORT = 15062
 async def main() -> None:
     server = AsyncSIPServer(local_host="127.0.0.1", local_port=SERVER_PORT)
 
-    @server.invite
+    @server.invite()
     def on_invite(request: Request):
         """Return 180 Ringing — server will add RSeq/Require: 100rel automatically."""
         return request.ringing()
 
-    @server.prack
+    @server.prack()
     def on_prack(request: Request):
         """Acknowledge the PRACK."""
         return request.ok()
@@ -39,7 +37,7 @@ async def main() -> None:
     async with server:
         print(f"Server listening on 127.0.0.1:{SERVER_PORT}")
 
-        async with AsyncClient(local_host="127.0.0.1", local_port=0) as client:
+        async with AsyncSIPClient(local_host="127.0.0.1", local_port=0) as client:
             print("Client: sending INVITE with Require: 100rel")
             response = await client.invite(
                 f"sip:bob@127.0.0.1:{SERVER_PORT}",

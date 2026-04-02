@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from sipx.client import Client
+from sipx.client import SIPClient
 from sipx.client._base import ForkTracker, _extract_tag
 from sipx.models._message import Response
 from sipx._types import TransportAddress
@@ -136,7 +136,7 @@ class TestNoForking:
         mock_create.return_value = transport
         transport._queue.append(_make_200("tag1"))
 
-        client = Client()
+        client = SIPClient()
         resp = client.invite("sip:bob@127.0.0.1")
         assert resp is not None
         assert resp.status_code == 200
@@ -147,7 +147,7 @@ class TestNoForking:
         mock_create.return_value = transport
         transport._queue.append(_make_200("tag1"))
 
-        client = Client()
+        client = SIPClient()
         client.invite("sip:bob@127.0.0.1")
 
         methods = [d.split(b"\r\n")[0].split()[0] for d, _ in transport.sent]
@@ -168,7 +168,7 @@ class TestForkingClient:
         transport._queue.append(_make_200("tagA"))
         transport._queue.append(_make_200("tagB"))
 
-        client = Client(fork_policy="first")
+        client = SIPClient(fork_policy="first")
         resp = client.invite("sip:bob@127.0.0.1")
 
         assert resp is not None
@@ -182,7 +182,7 @@ class TestForkingClient:
         transport._queue.append(_make_200("tagA"))
         transport._queue.append(_make_200("tagB"))
 
-        client = Client(fork_policy="first")
+        client = SIPClient(fork_policy="first")
         client.invite("sip:bob@127.0.0.1")
 
         methods = [d.split(b"\r\n")[0].split()[0] for d, _ in transport.sent]

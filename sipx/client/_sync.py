@@ -2,49 +2,38 @@
 
 from __future__ import annotations
 
+import re
+import socket
 import threading
-import uuid
 from typing import Optional, Union, Callable
 
 from .._utils import logger
+from .._types import SIPTimeoutError
 from ..models._auth import SipAuthCredentials
-from .._events import Events, EventContext
+from .._events import Events
 from ..fsm import StateManager, TimerManager
 from ..models._message import Request, Response, MessageParser
-from ..transports import TransportAddress, TransportConfig
+from ..transports import TransportConfig
 from ._base import (
-    DialogTracker,
+    SIPClientBase,
     ForkTracker,
-    _FORK_WINDOW,
     _ack_and_bye_forked,
     _create_sync_transport,
-    _extract_host_port,
-    _build_auth_header,
-    _get_default_from_uri,
     _ensure_required_headers,
-    _detect_auth_challenge,
 )
 
 
-class Client:
+class SIPClient(SIPClientBase):
     """
     Synchronous SIP client with simplified API.
 
-    This client provides a clean, intuitive interface for SIP communication:
-    - Set event handlers with `client.events = MyEvents()`
-    - Set authentication with `client.auth = Auth.Digest('user', 'pass')`
-    - Simple method signatures: `invite(to_uri, from_uri, body=sdp)`
+    Inherits shared business logic (properties, header building,
+    SIP method helpers) from :class:`SIPClientBase`.
 
     Example:
-        >>> class MyEvents(Events):
-        ...     @event_handler('INVITE', status=200)
-        ...     def on_invite_ok(self, request, response, context):
-        ...         print("Call accepted!")
-        ...
-        >>> with Client() as client:
-        ...     client.events = MyEvents()
-        ...     client.auth = Auth.Digest('alice', 'secret')
-        ...     response = client.invite('sip:bob@example.com', 'sip:alice@local')
+        >>> with SIPClient() as client:
+        ...     client.auth = ("alice", "secret")
+        ...     response = client.invite('sip:bob@example.com')
     """
 
     def __init__(
@@ -58,56 +47,24 @@ class Client:
         auto_dns: bool = True,
         fork_policy: str = "first",
     ) -> None:
-        """
-        Initialize SIP client.
+        config = TransportConfig(local_host=local_host, local_port=local_port)
+        transport_protocol = transport.upper()
+        _transport = _create_sync_transport(transport_protocol, config)
 
-        Args:
-            local_host: Local IP address to bind (default: 0.0.0.0)
-            local_port: Local port to bind (default: 5060)
-            transport: Transport protocol - UDP, TCP, or TLS (default: UDP)
-            events: Optional Events instance for handling SIP messages
-            auth: Optional authentication credentials (from Auth.Digest() or tuple)
-            auto_auth: Automatically retry on 401/407 if auth is set (default: True)
-            auto_dns: Automatically resolve SIP URIs via DNS SRV (default: True)
-            fork_policy: How to handle forked INVITE responses.
-                ``"first"`` (default) — return the first 200, auto-ACK+BYE extras.
-        """
-        # Transport configuration
-        self.config = TransportConfig(
-            local_host=local_host,
-            local_port=local_port,
+        super().__init__(
+            config=config,
+            transport_protocol=transport_protocol,
+            transport=_transport,
+            events=events,
+            auth=auth,
+            auto_auth=auto_auth,
+            auto_dns=auto_dns,
+            fork_policy=fork_policy,
         )
-        self.transport_protocol = transport.upper()
 
-        # Initialize transport
-        self._transport = _create_sync_transport(self.transport_protocol, self.config)
-
-        # State management (internal)
         self._state_manager = StateManager()
 
-        # Events and Auth
-        self._events = events
-        self._auto_auth = auto_auth
-
-        # Convert tuple auth to SipAuthCredentials
-        if isinstance(auth, tuple) and len(auth) == 2:
-            self._auth: Optional[SipAuthCredentials] = SipAuthCredentials(
-                username=str(auth[0]), password=str(auth[1])
-            )
-        elif isinstance(auth, SipAuthCredentials):
-            self._auth = auth
-        else:
-            self._auth = None
-
-        # Client state
-        self._closed = False
-        self._dialog = DialogTracker()
-        self._auto_dns = auto_dns
-        self._fork_policy = fork_policy
-        self._resolver = None
-        self._presence_etag: Optional[str] = None  # RFC 3903 SIP-ETag
-
-        # Re-registration support
+        # Re-registration support (sync: threading.Timer)
         self._reregister_timer: Optional[threading.Timer] = None
         self._reregister_interval: Optional[int] = None
         self._reregister_aor: Optional[str] = None
@@ -116,20 +73,6 @@ class Client:
     # ------------------------------------------------------------------
     # Thin wrappers around standalone helpers (backward compat)
     # ------------------------------------------------------------------
-
-    def _extract_host_port(self, uri: str) -> tuple[str, int]:
-        """Extract host and port from SIP URI."""
-        return _extract_host_port(uri)
-
-    def _build_auth_header(
-        self, challenge, credentials: SipAuthCredentials, method: str, uri: str
-    ) -> str:
-        """Build Authorization header from challenge and credentials."""
-        return _build_auth_header(challenge, credentials, method, uri)
-
-    def _get_default_from_uri(self) -> str:
-        """Get default FROM URI, using auth username if available."""
-        return _get_default_from_uri(self._auth, self._transport.local_address.host)
 
     def _ensure_required_headers(
         self, request: Request, host: str, port: int
@@ -143,55 +86,7 @@ class Client:
             transport_protocol=self.transport_protocol,
             auth=self._auth,
         )
-        # Content-Length
-        content_length = len(request.content) if request.content else 0
-        request.headers["Content-Length"] = str(content_length)
         return request
-
-    @property
-    def events(self) -> Optional[Events]:
-        """Get the current Events instance."""
-        return self._events
-
-    @events.setter
-    def events(self, events_instance: Optional[Events]) -> None:
-        """
-        Set the Events instance for handling SIP messages.
-
-        Example:
-            >>> class MyEvents(Events):
-            ...     @event_handler('INVITE', status=200)
-            ...     def on_invite_ok(self, request, response, context):
-            ...         print("Call accepted!")
-            ...
-            >>> client.events = MyEvents()
-        """
-        self._events = events_instance
-
-    @property
-    def auth(self) -> Optional[SipAuthCredentials]:
-        """Get the current authentication credentials."""
-        return self._auth
-
-    @auth.setter
-    def auth(self, credentials: Optional[Union[SipAuthCredentials, tuple]]) -> None:
-        """
-        Set authentication credentials.
-
-        Accepts a SipAuthCredentials instance or a (username, password) tuple.
-
-        Example:
-            >>> client.auth = Auth.Digest('alice', 'secret')
-            >>> client.auth = ('alice', 'secret')  # tuple shorthand
-        """
-        if isinstance(credentials, tuple) and len(credentials) == 2:
-            self._auth = SipAuthCredentials(
-                username=str(credentials[0]), password=str(credentials[1])
-            )
-        elif isinstance(credentials, SipAuthCredentials):
-            self._auth = credentials
-        else:
-            self._auth = None
 
     def retry_with_auth(
         self, response: Response, auth: Optional[SipAuthCredentials] = None
@@ -201,111 +96,23 @@ class Client:
 
         This method allows the user to manually handle authentication challenges.
         Unlike automatic retry, this gives full control over when and how to retry.
-
-        Args:
-            response: The 401/407 response that triggered authentication
-            auth: Optional credentials to use (overrides client.auth if provided)
-
-        Returns:
-            Final response after authentication, or None if auth failed
-
-        Example:
-            >>> # Using client.auth
-            >>> response = client.invite('sip:bob@example.com')
-            >>> if response.status_code == 401:
-            ...     response = client.retry_with_auth(response)
-            ...     if response.status_code == 200:
-            ...         client.ack(response=response)
-
-        Example:
-            >>> # Using custom auth
-            >>> response = client.invite('sip:bob@example.com')
-            >>> if response.status_code == 401:
-            ...     custom_auth = Auth.Digest('alice', 'secret')
-            ...     response = client.retry_with_auth(response, auth=custom_auth)
         """
-        # Use provided auth or fall back to client auth
-        credentials = auth or self._auth
-
-        if not credentials:
-            logger.warning("No credentials available for retry_with_auth")
+        request, destination = self._build_auth_retry_request(response, auth=auth)
+        if request is None or destination is None:
             return None
-
-        if response.status_code not in (401, 407):
-            logger.warning(
-                f"retry_with_auth called on {response.status_code} (expected 401/407)"
-            )
-            return None
-
-        # Get original request
-        request = response.request
-        if not request:
-            logger.error("No request attached to response")
-            return None
-
-        # Parse challenge
-        from ..models._auth import AuthParser
-
-        parser = AuthParser()
-        challenge = parser.parse_from_headers(response.headers)
-
-        if not challenge:
-            logger.error("No authentication challenge found in response")
-            return None
-
-        # Extract host/port from original request
-        host, port = _extract_host_port(request.uri)
 
         try:
-            # Build authorization header
-            auth_header = _build_auth_header(
-                challenge, credentials, request.method, request.uri
-            )
-
-            # Determine header name
-            auth_header_name = (
-                "Proxy-Authorization"
-                if response.status_code == 407
-                else "Authorization"
-            )
-
-            # Update request with authorization
-            request.headers[auth_header_name] = auth_header
-
-            # Increment CSeq
-            if "CSeq" in request.headers:
-                cseq_parts = request.headers["CSeq"].split()
-                if len(cseq_parts) == 2:
-                    cseq_num = int(cseq_parts[0]) + 1
-                    request.headers["CSeq"] = f"{cseq_num} {cseq_parts[1]}"
-
-            # Generate new Via branch (new transaction)
-            if "Via" in request.headers:
-                old_via = request.headers["Via"]
-                new_branch = f"z9hG4bK{uuid.uuid4().hex[:16]}"
-                import re as _re
-
-                request.headers["Via"] = _re.sub(
-                    r"branch=z9hG4bK[^;,\s]+", f"branch={new_branch}", old_via
-                )
-
-            # Log retry
             logger.debug(
                 ">>> AUTH RETRY %s (%s -> %s:%s)",
                 request.method,
                 self._transport.local_address,
-                host,
-                port,
+                destination.host,
+                destination.port,
             )
             logger.debug(request.to_string())
 
-            # Send authenticated request
-            destination = TransportAddress(
-                host=host, port=port, protocol=self.transport_protocol
-            )
             self._transport.send(request.to_bytes(), destination)
 
-            # Receive response
             parser = MessageParser()
             final_response = None
 
@@ -313,52 +120,20 @@ class Client:
                 response_data, source = self._transport.receive(
                     timeout=self._transport.config.read_timeout
                 )
-
-                auth_response = parser.parse(response_data)
-
-                # Skip incoming requests (e.g. re-INVITE from server)
-                if not isinstance(auth_response, Response):
-                    continue
-
-                auth_response.raw = response_data
-                auth_response.request = request
-                auth_response.transport_info = {
-                    "protocol": self.transport_protocol,
-                    "local": str(self._transport.local_address),
-                    "remote": str(source),
-                }
-
-                logger.debug(
-                    "<<< RECEIVED %s %s (%s -> %s)",
-                    auth_response.status_code,
-                    auth_response.reason_phrase,
-                    source,
-                    self._transport.local_address,
+                final_response, done = self._handle_auth_retry_message(
+                    request=request,
+                    response_data=response_data,
+                    source=source,
+                    parser=parser,
+                    final_response=final_response,
                 )
-                logger.debug(auth_response.to_string())
-
-                # Call events on response
-                if self._events:
-                    context = EventContext(
-                        request=request,
-                        response=auth_response,
-                        source=source,
-                    )
-                    auth_response = self._events._call_response_handlers(
-                        auth_response, context
-                    )
-
-                if auth_response.status_code >= 200:
-                    final_response = auth_response
+                if done:
                     break
-
-                if final_response is None:
-                    final_response = auth_response
 
             return final_response
 
-        except Exception as e:
-            logger.error(f"Auth retry failed: {e}")
+        except (OSError, SIPTimeoutError, ValueError, re.error) as e:
+            logger.error("Auth retry failed: %s", e, exc_info=True)
             return None
 
     def request(
@@ -386,56 +161,17 @@ class Client:
         Returns:
             SIP response, or None if request timed out.
         """
-        # Auto-extract host/port from URI if not provided
-        if host is None:
-            host, extracted_port = _extract_host_port(uri)
-            port = port if port is not None else extracted_port
-        elif host.startswith(("sip:", "sips:")):
-            # Caller passed a full SIP URI as host (e.g. "sip:127.0.0.1:5060")
-            host, extracted_port = _extract_host_port(host)
-            port = port if port is not None else extracted_port
-        else:
-            port = port if port is not None else 5060
-
-        # Auto DNS resolution for non-IP hostnames
-        if self._auto_dns and not self._is_ip(host):
-            resolved = self._resolve_dns(host)
-            if resolved:
-                host = resolved.host
-                port = resolved.port
-
-        # Build request
-        request = Request(
+        request, destination, context, transaction = self._prepare_request_message(
             method=method,
             uri=uri,
-            headers=headers or {},
+            host=host,
+            port=port,
+            headers=headers,
             content=content,
             **kwargs,
         )
-
-        # Ensure required headers
-        _ensure_required_headers(
-            method=request.method,
-            uri=request.uri,
-            headers=request.headers,
-            local_addr=self._transport.local_address,
-            transport_protocol=self.transport_protocol,
-            auth=self._auth,
-        )
-
-        # Content-Length (depends on request.content which is set above)
-        content_length = len(request.content) if request.content else 0
-        request.headers["Content-Length"] = str(content_length)
-
-        # Create destination
-        destination = TransportAddress(
-            host=host,
-            port=port,
-            protocol=self.transport_protocol,
-        )
-
-        # Create transaction
-        transaction = self._state_manager.create_transaction(request)
+        host = destination.host
+        port = destination.port
 
         # Wire up timer manager for automatic retransmissions
         timer_manager = TimerManager()
@@ -448,29 +184,7 @@ class Client:
         # Trigger initial state timers (Timer A/E for retransmission)
         transaction._on_state_change(transaction.state, transaction.state)
 
-        # Create event context
-        context = EventContext(
-            request=request,
-            destination=destination,
-            transaction_id=transaction.id,
-            transaction=transaction,
-        )
-
-        # Call events on_request
-        if self._events:
-            request = self._events._call_request_handlers(request, context)
-
-        # Log request
-        logger.debug(
-            ">>> %s %s | %s -> %s:%s | Call-ID: %s",
-            method,
-            uri,
-            self._transport.local_address,
-            host,
-            port,
-            request.headers.get("Call-ID", "-"),
-        )
-        logger.debug(request.to_string())
+        self._log_outgoing_request(method, uri, host, port, request)
 
         try:
             import time as _time
@@ -493,116 +207,59 @@ class Client:
                     response_data, source = self._transport.receive(
                         timeout=poll_interval
                     )
-                except Exception:
-                    # Timeout on this poll -- loop again (timers retransmit in background)
-                    if transaction.is_terminated():
-                        logger.debug("Transaction terminated by timer")
+                except (socket.timeout, SIPTimeoutError, OSError):
+                    if not self._should_continue_waiting(
+                        transaction=transaction,
+                        fork_deadline=fork_deadline,
+                        now=_time.monotonic(),
+                    ):
                         break
-                    if fork_deadline is not None and _time.monotonic() >= fork_deadline:
-                        break  # Fork collection window expired
                     continue
 
-                response = parser.parse(response_data)
-
-                # Skip incoming requests (e.g. re-INVITE from server)
-                if not isinstance(response, Response):
-                    logger.debug(
-                        "Skipped incoming %s, waiting for Response",
-                        type(response).__name__,
-                    )
-                    continue
-
-                response.raw = response_data
-                response.request = request
-                response.transport_info = {
-                    "protocol": self.transport_protocol,
-                    "local": str(self._transport.local_address),
-                    "remote": str(source),
-                }
-
-                logger.debug(
-                    "<<< %s %s | %s -> %s | Call-ID: %s",
-                    response.status_code,
-                    response.reason_phrase,
-                    source,
-                    self._transport.local_address,
-                    response.headers.get("Call-ID", "-"),
+                response, prack_req = self._process_received_response(
+                    request=request,
+                    response_data=response_data,
+                    source=source,
+                    parser=parser,
+                    context=context,
+                    uri=uri,
                 )
-                logger.debug(response.to_string())
+                if response is None:
+                    continue
 
-                # Auto-PRACK for reliable provisional responses (RFC 3262)
-                if (
-                    method == "INVITE"
-                    and 100 < response.status_code < 200
-                    and "100rel" in response.headers.get("Require", "")
-                ):
-                    rseq = response.headers.get("RSeq", "1")
-                    invite_cseq = request.headers.get("CSeq", "1 INVITE")
-                    invite_cseq_num = int(invite_cseq.split()[0])
-                    prack_headers = {
-                        "Via": request.headers.get("Via", ""),
-                        "From": request.headers.get("From", ""),
-                        "To": response.headers.get("To", request.headers.get("To", "")),
-                        "Call-ID": request.headers.get("Call-ID", ""),
-                        "CSeq": f"{invite_cseq_num + 1} PRACK",
-                        "RAck": f"{rseq} {invite_cseq}",
-                        "Max-Forwards": "70",
-                        "Content-Length": "0",
-                    }
-                    prack_req = Request(method="PRACK", uri=uri, headers=prack_headers)
+                if prack_req is not None:
                     self._transport.send(prack_req.to_bytes(), destination)
                     logger.debug(
-                        ">>> Auto PRACK (RSeq: %s) to %s:%s",
-                        rseq,
+                        ">>> Auto PRACK to %s:%s",
                         destination.host,
                         destination.port,
                     )
 
-                # Update transaction (triggers state change, cancels retransmit timers)
                 self._state_manager.update_transaction(transaction.id, response)
 
-                # Update context
-                context.response = response
-                context.source = source
-
-                # Detect auth challenges
-                _detect_auth_challenge(response, context)
-
-                # Call events on_response
-                if self._events:
-                    response = self._events._call_response_handlers(response, context)
-
-                # Check for final response
-                if response.status_code >= 200:
-                    if fork_tracker is not None and response.status_code == 200:
-                        # INVITE 200: collect forks for a short window
-                        fork_tracker.add(response)
-                        if fork_deadline is None:
-                            fork_deadline = _time.monotonic() + _FORK_WINDOW
-                        if _time.monotonic() >= fork_deadline:
-                            break
-                        continue
-                    elif fork_deadline is not None:
-                        # Non-200 final arrived during fork collection: stop
-                        break
-                    else:
-                        final_response = response
-                        break
-
-                # Store provisional response
-                if final_response is None:
-                    final_response = response
-
-            # Resolve final response from fork tracker (INVITE)
-            if fork_tracker is not None and fork_tracker.best is not None:
-                final_response = fork_tracker.best
-                if self._fork_policy == "first" and fork_tracker.extra:
-                    logger.debug(
-                        "Forking: %d extra legs detected — auto-ACK+BYE",
-                        len(fork_tracker.extra),
+                final_response, fork_deadline, should_break = (
+                    self._collect_response_result(
+                        method=method,
+                        response=response,
+                        final_response=final_response,
+                        fork_tracker=fork_tracker,
+                        fork_deadline=fork_deadline,
+                        now=_time.monotonic(),
                     )
-                    for extra in fork_tracker.extra:
-                        _ack_and_bye_forked(self._transport, extra, destination)
+                )
+                if should_break:
+                    break
+
+            final_response, extra_forks = self._resolve_fork_final_response(
+                final_response, fork_tracker
+            )
+            if self._fork_policy == "first" and extra_forks:
+                logger.debug(
+                    "Forking: %d extra legs detected — auto-ACK+BYE",
+                    len(extra_forks),
+                )
+                for extra in extra_forks:
+                    _ack_and_bye_forked(self._transport, extra, destination)
 
             if final_response is None:
                 logger.warning(
@@ -611,140 +268,16 @@ class Client:
                 )
                 return None
 
-            # Auto-retry on 401/407 if auth is set
-            if (
-                self._auto_auth
-                and self._auth
-                and final_response.status_code in (401, 407)
-            ):
+            if self._should_auto_retry_auth(final_response):
                 retry_result = self.retry_with_auth(final_response)
                 if retry_result:
                     final_response = retry_result
 
-            # Track dialog state for implicit ack/bye
-            self._dialog.track(final_response)
+            return self._finalize_response(final_response)
 
-            return final_response
-
-        except Exception:
-            raise
         finally:
             # Clean up all timers for this transaction
             timer_manager.cancel_all()
-
-    def invite(
-        self,
-        to_uri: str,
-        from_uri: Optional[str] = None,
-        body: Optional[str] = None,
-        reliable: bool = False,
-        **kwargs,
-    ) -> Response:
-        """
-        Send INVITE request to establish a call.
-
-        Args:
-            to_uri: Destination URI (e.g., 'sip:bob@example.com')
-            from_uri: Source URI (auto-generated if not provided)
-            body: SDP body content
-            reliable: If True, add ``Require: 100rel`` for RFC 3262 reliable
-                provisional responses.  The client will auto-send PRACK.
-            **kwargs: Additional parameters (host, port, headers, etc.)
-
-        Returns:
-            SIP response
-
-        Example:
-            >>> sdp = SDPBody.offer(local_ip='192.168.1.100', local_port=8000, audio=True)
-            >>> response = client.invite('sip:bob@example.com', body=sdp.to_string())
-        """
-        # Auto-generate from_uri if not provided
-        if from_uri is None:
-            from_uri = _get_default_from_uri(
-                self._auth, self._transport.local_address.host
-            )
-
-        # Build headers
-        headers = kwargs.pop("headers", {})
-        headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
-        headers["To"] = f"<{to_uri}>"
-
-        if reliable:
-            headers["Require"] = "100rel"
-            headers["Supported"] = "100rel"
-
-        if body:
-            headers["Content-Type"] = "application/sdp"
-
-        return self.request(
-            method="INVITE",
-            uri=to_uri,
-            headers=headers,
-            content=body,
-            **kwargs,
-        )
-
-    def register(
-        self,
-        aor: str,
-        registrar: Optional[str] = None,
-        expires: int = 3600,
-        **kwargs,
-    ) -> Response:
-        """
-        Send REGISTER request.
-
-        Args:
-            aor: Address of Record (e.g., 'sip:alice@example.com')
-            registrar: Registrar host (auto-extracted from aor if not provided)
-            expires: Registration expiry in seconds (default: 3600)
-            **kwargs: Additional parameters
-
-        Returns:
-            SIP response
-
-        Example:
-            >>> response = client.register('sip:alice@example.com')
-        """
-        # Extract registrar from aor if not provided
-        if registrar is None:
-            registrar, _ = _extract_host_port(aor)
-
-        # Build headers
-        headers = kwargs.pop("headers", {})
-        headers["From"] = f"<{aor}>;tag={uuid.uuid4().hex[:8]}"
-        headers["To"] = f"<{aor}>"
-        headers["Contact"] = (
-            f"<sip:{self._transport.local_address.host}:{self._transport.local_address.port}>;expires={expires}"
-        )
-
-        return self.request(
-            method="REGISTER",
-            uri=aor,
-            host=registrar,
-            headers=headers,
-            **kwargs,
-        )
-
-    def options(
-        self,
-        uri: str,
-        **kwargs,
-    ) -> Response:
-        """
-        Send OPTIONS request.
-
-        Args:
-            uri: Target URI
-            **kwargs: Additional parameters
-
-        Returns:
-            SIP response
-
-        Example:
-            >>> response = client.options('sip:example.com')
-        """
-        return self.request(method="OPTIONS", uri=uri, **kwargs)
 
     def ack(
         self,
@@ -758,45 +291,13 @@ class Client:
             response: The INVITE response to acknowledge (uses tracked dialog if omitted)
             **kwargs: Additional parameters
         """
-        if response is None:
-            response = self._dialog.active
-        if response is None:
-            raise ValueError("No response provided and no active dialog")
-        request = response.request
-        if request is None:
-            raise ValueError("Response has no associated request")
-        host = kwargs.pop("host", None)
-        port = kwargs.pop("port", 5060)
-
-        if host is None:
-            host, port = _extract_host_port(request.uri)
-
-        # Build ACK request
-        headers = kwargs.pop("headers", {})
-        headers["From"] = request.headers.get("From")
-        headers["To"] = response.headers.get("To")
-        headers["Call-ID"] = request.headers.get("Call-ID")
-        headers["CSeq"] = f"{(request.headers.get('CSeq') or '1').split()[0]} ACK"
-        headers["Via"] = request.headers.get("Via")
-
-        ack_request = Request(
-            method="ACK",
-            uri=request.uri,
-            headers=headers,
-        )
-
-        # Apply route set if present in dialog
-        if self._dialog.route_set:
-            self._dialog.route_set.apply(ack_request)
-
-        # Send ACK (no response expected)
-        destination = TransportAddress(
-            host=host, port=port, protocol=self.transport_protocol
-        )
+        ack_request, destination = self._build_ack(response, **kwargs)
         self._transport.send(ack_request.to_bytes(), destination)
-
         logger.debug(
-            ">>> SENDING ACK (%s -> %s:%s)", self._transport.local_address, host, port
+            ">>> SENDING ACK (%s -> %s:%s)",
+            self._transport.local_address,
+            destination.host,
+            destination.port,
         )
         logger.debug(ack_request.to_string())
 
@@ -805,7 +306,7 @@ class Client:
         response: Optional[Response] = None,
         dialog_id: Optional[str] = None,
         **kwargs,
-    ) -> Response:
+    ) -> Optional[Response]:
         """
         Send BYE request to terminate a call.
 
@@ -821,158 +322,10 @@ class Client:
             >>> invite_response = client.invite('sip:bob@example.com', body=sdp)
             >>> bye_response = client.bye(response=invite_response)
         """
-        if response is None and dialog_id is None:
-            response = self._dialog.active
-        if response is None:
-            raise ValueError("No response provided and no active dialog")
-
-        # Extract dialog info from response
-        request = response.request
-        if request is None:
-            raise ValueError("Response has no associated request")
-        headers = kwargs.pop("headers", {})
-        headers["From"] = request.headers.get("From")
-        headers["To"] = response.headers.get("To")
-        headers["Call-ID"] = request.headers.get("Call-ID")
-
-        # Increment CSeq
-        cseq_num = int((request.headers.get("CSeq") or "1").split()[0]) + 1
-        headers["CSeq"] = f"{cseq_num} BYE"
-
-        # Apply route set if present
-        if self._dialog.route_set and not self._dialog.route_set.is_empty:
-            route_value = ", ".join(f"<{r}>" for r in self._dialog.route_set.routes)
-            headers["Route"] = route_value
-
-        result = self.request(
-            method="BYE",
-            uri=request.uri,
-            headers=headers,
-            **kwargs,
-        )
-
-        # Clear dialog after BYE
+        uri, headers = self._build_bye_headers(response, dialog_id=dialog_id, **kwargs)
+        result = self.request(method="BYE", uri=uri, headers=headers, **kwargs)
         self._dialog.clear()
-
         return result
-
-    def cancel(
-        self,
-        response: Response,
-        **kwargs,
-    ) -> Response:
-        """
-        Send CANCEL to cancel a pending INVITE.
-
-        Args:
-            response: Provisional response to the INVITE
-            **kwargs: Additional parameters
-
-        Returns:
-            SIP response
-        """
-        request = response.request
-        if request is None:
-            raise ValueError("Response has no associated request")
-        headers = kwargs.pop("headers", {})
-        headers["From"] = request.headers.get("From")
-        headers["To"] = request.headers.get("To")
-        headers["Call-ID"] = request.headers.get("Call-ID")
-        headers["CSeq"] = f"{(request.headers.get('CSeq') or '1').split()[0]} CANCEL"
-        headers["Via"] = request.headers.get("Via")
-
-        return self.request(
-            method="CANCEL",
-            uri=request.uri,
-            headers=headers,
-            **kwargs,
-        )
-
-    def message(
-        self,
-        to_uri: str,
-        from_uri: Optional[str] = None,
-        content: str = "",
-        content_type: str = "text/plain",
-        **kwargs,
-    ) -> Response:
-        """
-        Send MESSAGE (instant message).
-
-        Args:
-            to_uri: Destination URI
-            from_uri: Source URI (auto-generated if not provided)
-            content: Message content
-            content_type: Content type (default: text/plain)
-            **kwargs: Additional parameters
-
-        Returns:
-            SIP response
-
-        Example:
-            >>> response = client.message('sip:bob@example.com', content='Hello!')
-        """
-        if from_uri is None:
-            from_uri = _get_default_from_uri(
-                self._auth, self._transport.local_address.host
-            )
-
-        headers = kwargs.pop("headers", {})
-        headers["From"] = f"<{from_uri}>;tag={uuid.uuid4().hex[:8]}"
-        headers["To"] = f"<{to_uri}>"
-        headers["Content-Type"] = content_type
-
-        return self.request(
-            method="MESSAGE",
-            uri=to_uri,
-            headers=headers,
-            content=content,
-            **kwargs,
-        )
-
-    def subscribe(
-        self,
-        uri: str,
-        event: str = "presence",
-        expires: int = 3600,
-        **kwargs,
-    ) -> Response:
-        """Send SUBSCRIBE request."""
-        headers = kwargs.pop("headers", {})
-        headers["Event"] = event
-        headers["Expires"] = str(expires)
-
-        return self.request(method="SUBSCRIBE", uri=uri, headers=headers, **kwargs)
-
-    def notify(
-        self,
-        uri: str,
-        event: str = "presence",
-        content: Optional[str] = None,
-        **kwargs,
-    ) -> Response:
-        """Send NOTIFY request."""
-        headers = kwargs.pop("headers", {})
-        headers["Event"] = event
-
-        if content:
-            headers["Content-Type"] = "application/pidf+xml"
-
-        return self.request(
-            method="NOTIFY", uri=uri, headers=headers, content=content, **kwargs
-        )
-
-    def refer(
-        self,
-        uri: str,
-        refer_to: str,
-        **kwargs,
-    ) -> Response:
-        """Send REFER request."""
-        headers = kwargs.pop("headers", {})
-        headers["Refer-To"] = f"<{refer_to}>"
-
-        return self.request(method="REFER", uri=uri, headers=headers, **kwargs)
 
     def refer_and_wait(
         self,
@@ -980,7 +333,7 @@ class Client:
         refer_to: str,
         timeout: float = 30.0,
         **kwargs,
-    ) -> Optional[Request]:
+    ) -> Request | Response | None:
         """Send REFER and wait for the transfer result via NOTIFY (RFC 3515).
 
         Sends REFER, then polls for ``NOTIFY Event: refer`` messages until
@@ -1011,23 +364,22 @@ class Client:
 
         r = self.refer(uri, refer_to, **kwargs)
         if r is None or r.status_code not in (200, 202):
-            return r  # type: ignore[return-value]
+            return r
 
         from ..session import ReferSubscription
         from ..models._message import MessageParser as _MP
 
         sub = ReferSubscription(refer_to=refer_to)
-        parser = _MP()
         deadline = _time.monotonic() + timeout
         last_notify: Optional[Request] = None
 
         while _time.monotonic() < deadline:
             try:
                 data, src = self._transport.receive(timeout=1.0)
-            except Exception:
+            except (socket.timeout, SIPTimeoutError, OSError):
                 continue
 
-            msg = parser.parse(data)
+            msg = _MP.parse(data)
             if not isinstance(msg, Request) or msg.method != "NOTIFY":
                 continue
             if "refer" not in msg.headers.get("Event", "").lower():
@@ -1049,110 +401,6 @@ class Client:
 
         return last_notify
 
-    def info(
-        self,
-        uri: str,
-        content: Optional[str] = None,
-        content_type: str = "application/dtmf-relay",
-        **kwargs,
-    ) -> Response:
-        """Send INFO request."""
-        headers = kwargs.pop("headers", {})
-
-        if content:
-            headers["Content-Type"] = content_type
-
-        return self.request(
-            method="INFO", uri=uri, headers=headers, content=content, **kwargs
-        )
-
-    def update(
-        self,
-        uri: str,
-        sdp_content: Optional[str] = None,
-        **kwargs,
-    ) -> Response:
-        """Send UPDATE request."""
-        headers = kwargs.pop("headers", {})
-
-        if sdp_content:
-            headers["Content-Type"] = "application/sdp"
-
-        return self.request(
-            method="UPDATE", uri=uri, headers=headers, content=sdp_content, **kwargs
-        )
-
-    def prack(
-        self,
-        response: Response,
-        **kwargs,
-    ) -> Response:
-        """Send PRACK (Provisional Response Acknowledgement)."""
-        request = response.request
-        if request is None:
-            raise ValueError("Response has no associated request")
-        headers = kwargs.pop("headers", {})
-        headers["From"] = request.headers.get("From")
-        headers["To"] = response.headers.get("To")
-        headers["Call-ID"] = request.headers.get("Call-ID")
-
-        # RAck header
-        rseq = response.headers.get("RSeq", "1")
-        cseq = request.headers.get("CSeq", "1 INVITE")
-        headers["RAck"] = f"{rseq} {cseq}"
-
-        return self.request(
-            method="PRACK",
-            uri=request.uri,
-            headers=headers,
-            **kwargs,
-        )
-
-    def publish(
-        self,
-        uri: str,
-        event: str = "presence",
-        content: Optional[str] = None,
-        expires: int = 3600,
-        etag: Optional[str] = None,
-        **kwargs,
-    ) -> Response:
-        """Send PUBLISH request (RFC 3903).
-
-        Args:
-            uri: Presentity URI or ESC address.
-            event: Event package name (default: ``"presence"``).
-            content: Body content (e.g. PIDF-XML string).  When omitted the
-                PUBLISH refreshes an existing state using ``etag``.
-            expires: Publication expiry in seconds.
-            etag: ``SIP-If-Match`` value from a previous 200 OK, used to
-                refresh or modify an existing event state.  When omitted a
-                new publication is created.
-            **kwargs: Extra parameters forwarded to :meth:`request`.
-
-        Returns:
-            SIP response.  On 200 OK the ``SIP-ETag`` header is stored on
-            the client as ``_presence_etag`` for use in subsequent refreshes.
-        """
-        headers = kwargs.pop("headers", {})
-        headers["Event"] = event
-        headers["Expires"] = str(expires)
-
-        if etag:
-            headers["SIP-If-Match"] = etag
-
-        if content:
-            headers["Content-Type"] = "application/pidf+xml"
-
-        r = self.request(
-            method="PUBLISH", uri=uri, headers=headers, content=content, **kwargs
-        )
-        if r and r.status_code == 200:
-            new_etag = r.headers.get("SIP-ETag")
-            if new_etag:
-                self._presence_etag = new_etag
-        return r
-
     def close(self) -> None:
         """Close the transport."""
         if not self._closed:
@@ -1166,42 +414,6 @@ class Client:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
         self.close()
-
-    @property
-    def transport(self):
-        """Get the transport instance."""
-        return self._transport
-
-    @property
-    def local_address(self):
-        """Get the local transport address."""
-        return self._transport.local_address
-
-    @property
-    def is_closed(self):
-        """Check if client is closed."""
-        return self._closed
-
-    def create_sdp(self, port: int = 0, **kwargs):
-        """Create SDP using client's local address.
-
-        Returns:
-            SDPBody configured with the client's local IP.
-        """
-        from ..models._body import SDPBody
-
-        return SDPBody.audio(ip=self._transport.local_address.host, port=port, **kwargs)
-
-    @staticmethod
-    def _is_ip(host: str) -> bool:
-        """Check if host is an IP address (not a hostname)."""
-        import ipaddress
-
-        try:
-            ipaddress.ip_address(host)
-            return True
-        except ValueError:
-            return False
 
     def _resolve_dns(self, host: str):
         """Resolve hostname via SIP DNS SRV (lazy init)."""
@@ -1290,15 +502,16 @@ class Client:
             if self._reregister_callback and response:
                 try:
                     self._reregister_callback(response)
-                except Exception as e:
-                    logger.error(f"Re-register callback error: {e}")
+                except (ValueError, TypeError, RuntimeError, OSError) as e:
+                    logger.warning("Re-register callback error: %s", e, exc_info=True)
 
             # Schedule next re-registration
             if response and response.status_code == 200:
                 self._schedule_reregister()
             else:
                 logger.warning(
-                    f"Re-registration failed: {response.status_code if response else 'No response'}"
+                    "Re-registration failed: %s",
+                    response.status_code if response else "No response",
                 )
                 # Retry after shorter interval on failure
                 if self._reregister_interval:
@@ -1306,37 +519,13 @@ class Client:
                     retry_timer.daemon = True
                     retry_timer.start()
 
-        except Exception as e:
-            logger.error(f"Re-registration error: {e}")
+        except (OSError, SIPTimeoutError) as e:
+            logger.error("Re-registration error: %s", e, exc_info=True)
             # Retry after shorter interval on error
             if self._reregister_interval:
                 retry_timer = threading.Timer(30, self._do_reregister)
                 retry_timer.daemon = True
                 retry_timer.start()
 
-    def unregister(self, aor: str, **kwargs) -> Response:
-        """
-        Unregister (send REGISTER with Expires: 0).
-
-        Args:
-            aor: Address of Record to unregister
-            **kwargs: Additional arguments passed to register()
-
-        Returns:
-            Response object
-
-        Example:
-            >>> response = client.unregister(aor="sip:alice@domain.com")
-            >>> if response.status_code == 200:
-            ...     print("Unregistered successfully")
-        """
-        # Disable auto re-registration if it was set for this AOR
-        if self._reregister_aor == aor:
-            self.disable_auto_reregister()
-
-        return self.register(aor=aor, expires=0, **kwargs)
-
     def __repr__(self):
-        return (
-            f"Client(local={self.local_address}, transport={self.transport_protocol})"
-        )
+        return f"SIPClient(local={self.local_address}, transport={self.transport_protocol})"

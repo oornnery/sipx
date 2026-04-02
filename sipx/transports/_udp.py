@@ -12,7 +12,7 @@ from typing import Optional, Tuple
 
 from .._types import (
     ReadError,
-    TimeoutError,
+    SIPTimeoutError,
     TransportAddress,
     TransportConfig,
     TransportError,
@@ -85,7 +85,7 @@ class UDPTransport(BaseTransport):
 
         Raises:
             TransportError: On send/receive failure
-            TimeoutError: If response timeout expires
+            SIPTimeoutError: If response timeout expires
         """
         from ..models._message import MessageParser
 
@@ -172,7 +172,7 @@ class UDPTransport(BaseTransport):
             Tuple of (data, source_address)
 
         Raises:
-            TimeoutError: If timeout expires
+            SIPTimeoutError: If timeout expires
             ReadError: If receive fails
         """
         if self._socket is None or self._closed:
@@ -196,7 +196,7 @@ class UDPTransport(BaseTransport):
             return data, source
 
         except socket.timeout as e:
-            raise TimeoutError("UDP receive timeout") from e
+            raise SIPTimeoutError("UDP receive timeout") from e
         except OSError as e:
             raise ReadError(f"Failed to receive UDP datagram: {e}") from e
         finally:
@@ -278,7 +278,7 @@ class AsyncUDPTransport(AsyncBaseTransport):
 
         Raises:
             TransportError: On send/receive failure
-            TimeoutError: If response timeout expires
+            SIPTimeoutError: If response timeout expires
         """
         from ..models._message import MessageParser
 
@@ -297,7 +297,7 @@ class AsyncUDPTransport(AsyncBaseTransport):
                 timeout=self.config.read_timeout,
             )
         except asyncio.TimeoutError as e:
-            raise TimeoutError("Response timeout") from e
+            raise SIPTimeoutError("Response timeout") from e
 
         # Parse response
         parser = MessageParser()
@@ -341,7 +341,7 @@ class AsyncUDPTransport(AsyncBaseTransport):
                 destination.host,
                 destination.port,
             )
-        except Exception as e:
+        except OSError as e:
             _log.error("UDP send failed: %s", e)
             raise WriteError(f"Failed to send UDP datagram: {e}") from e
 
@@ -359,7 +359,7 @@ class AsyncUDPTransport(AsyncBaseTransport):
             Tuple of (data, source_address)
 
         Raises:
-            TimeoutError: If timeout expires
+            SIPTimeoutError: If timeout expires
             ReadError: If receive fails
         """
         await self._ensure_initialized()
@@ -387,8 +387,8 @@ class AsyncUDPTransport(AsyncBaseTransport):
             return data, source
 
         except asyncio.TimeoutError as e:
-            raise TimeoutError("UDP receive timeout") from e
-        except Exception as e:
+            raise SIPTimeoutError("UDP receive timeout") from e
+        except (OSError, RuntimeError) as e:
             raise ReadError(f"Failed to receive UDP datagram: {e}") from e
 
     async def close(self) -> None:

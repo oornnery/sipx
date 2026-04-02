@@ -125,18 +125,24 @@ class TransportAddress:
 
 
 # =============================================================================
-# Transport Exceptions
+# Exceptions
 # =============================================================================
 
 
-class TransportError(Exception):
-    """Base exception for transport errors."""
+class SIPError(Exception):
+    """Base exception for all sipx errors."""
 
     pass
 
 
-class ConnectionError(TransportError):
-    """Raised when connection fails (TCP/TLS only)."""
+class TransportError(SIPError):
+    """Base exception for transport-level errors (network, socket, etc.)."""
+
+    pass
+
+
+class SIPConnectionError(TransportError):
+    """Raised when a transport connection fails (TCP/TLS only)."""
 
     pass
 
@@ -153,8 +159,20 @@ class ReadError(TransportError):
     pass
 
 
-class TimeoutError(TransportError):
-    """Raised when operation times out."""
+class SIPTimeoutError(TransportError):
+    """Raised when a SIP operation times out (Timer B/F expiry, etc.)."""
+
+    pass
+
+
+class SIPParseError(SIPError):
+    """Raised when a SIP message cannot be parsed (malformed syntax)."""
+
+    pass
+
+
+class SIPAuthError(SIPError):
+    """Raised when SIP authentication fails (invalid credentials, missing challenge)."""
 
     pass
 
@@ -247,11 +265,14 @@ __all__ = [
     "TransportConfig",
     "TransportAddress",
     # Exceptions
+    "SIPError",
     "TransportError",
-    "ConnectionError",
+    "SIPConnectionError",
     "WriteError",
     "ReadError",
-    "TimeoutError",
+    "SIPTimeoutError",
+    "SIPParseError",
+    "SIPAuthError",
     # FSM enums
     "TransactionState",
     "DialogState",

@@ -155,7 +155,7 @@ class WSTransport(BaseTransport):
         if self._ws is not None:
             try:
                 self._ws.close()
-            except Exception:
+            except (OSError, RuntimeError, ConnectionError):
                 pass
             self._ws = None
         _log.info("WS closed")
@@ -271,7 +271,7 @@ class AsyncWSTransport(AsyncBaseTransport):
         if self._ws is not None:
             try:
                 await self._ws.close()
-            except Exception:
+            except (OSError, RuntimeError, ConnectionError):
                 pass
             self._ws = None
         _log.info("WS closed")

@@ -20,9 +20,7 @@ from __future__ import annotations
 
 import asyncio
 
-from sipx.server import AsyncSIPServer
-from sipx.client import AsyncClient
-from sipx.models._message import Request
+from sipx import AsyncSIPServer, AsyncSIPClient, Request
 
 
 SERVER_PORT = 15063
@@ -32,11 +30,11 @@ async def main() -> None:
     server = AsyncSIPServer(local_host="127.0.0.1", local_port=SERVER_PORT)
     client_addr: dict = {}
 
-    @server.invite
+    @server.invite()
     def on_invite(request: Request):
         return request.ok()
 
-    @server.refer
+    @server.refer()
     def on_refer(request: Request):
         """Accept transfer and schedule NOTIFY sequence."""
         refer_to = request.headers.get("Refer-To", "")
@@ -93,7 +91,7 @@ async def main() -> None:
     async with server:
         print(f"Server on 127.0.0.1:{SERVER_PORT}")
 
-        async with AsyncClient(local_host="127.0.0.1", local_port=0) as client:
+        async with AsyncSIPClient(local_host="127.0.0.1", local_port=0) as client:
             local_port = client.local_address.port
             client_addr["addr"] = ("127.0.0.1", local_port)
 

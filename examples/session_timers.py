@@ -8,8 +8,10 @@ These are used for keeping calls alive and monitoring presence.
 No network required — exercises config models in-memory.
 """
 
-from sipx._utils import console
-from sipx.session import SessionTimerConfig
+from rich.console import Console
+from sipx import SessionTimerConfig
+
+console = Console()
 
 
 def demo_session_timer():

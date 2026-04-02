@@ -36,7 +36,9 @@ class TestRequestCreation:
 
     def test_auto_content_length(self):
         req = Request("OPTIONS", "sip:bob@biloxi.com")
-        assert req.headers["Content-Length"] == "0"
+        # Content-Length is computed dynamically in to_bytes()
+        raw = req.to_bytes()
+        assert b"Content-Length: 0" in raw
 
     def test_auto_max_forwards(self):
         req = Request("REGISTER", "sip:registrar.example.com")
@@ -53,7 +55,9 @@ class TestRequestCreation:
     def test_content_as_string(self):
         req = Request("MESSAGE", "sip:bob@biloxi.com", content="Hello")
         assert req.content == b"Hello"
-        assert req.headers["Content-Length"] == "5"
+        # Content-Length is computed dynamically in to_bytes()
+        raw = req.to_bytes()
+        assert b"Content-Length: 5" in raw
 
     def test_content_as_bytes(self):
         req = Request("MESSAGE", "sip:bob@biloxi.com", content=b"Hello")
@@ -70,7 +74,9 @@ class TestRequestCreation:
         sdp.add_media("audio", 8000, "RTP/AVP", ["0"])
         req = Request("INVITE", "sip:bob@biloxi.com", content=sdp)
         assert req.headers["Content-Type"] == "application/sdp"
-        assert int(req.headers["Content-Length"]) > 0
+        # Content-Length is computed dynamically in to_bytes()
+        raw = req.to_bytes()
+        assert int(raw.split(b"Content-Length: ")[1].split(b"\r\n")[0]) > 0
 
     def test_repr(self):
         req = Request("INVITE", "sip:bob@biloxi.com")
@@ -248,7 +254,9 @@ class TestRequestBodySetter:
         req.body = sdp
         assert req.body is sdp
         assert req.headers["Content-Type"] == "application/sdp"
-        assert int(req.headers["Content-Length"]) > 0
+        # Content-Length is computed dynamically in to_bytes()
+        raw = req.to_bytes()
+        assert int(raw.split(b"Content-Length: ")[1].split(b"\r\n")[0]) > 0
 
     def test_set_body_none(self):
         sdp = SDPBody(
@@ -261,13 +269,17 @@ class TestRequestBodySetter:
         req.body = None
         assert req.body is None
         assert req.content == b""
-        assert req.headers["Content-Length"] == "0"
+        # Content-Length is computed dynamically in to_bytes()
+        raw = req.to_bytes()
+        assert b"Content-Length: 0" in raw
 
     def test_set_content_string(self):
         req = Request("MESSAGE", "sip:bob@biloxi.com")
         req.content = "Hello"
         assert req.content == b"Hello"
-        assert req.headers["Content-Length"] == "5"
+        # Content-Length is computed dynamically in to_bytes()
+        raw = req.to_bytes()
+        assert b"Content-Length: 5" in raw
 
     def test_set_content_bytes(self):
         req = Request("MESSAGE", "sip:bob@biloxi.com")
@@ -311,7 +323,9 @@ class TestResponseCreation:
 
     def test_auto_content_length(self):
         resp = Response(200)
-        assert resp.headers["Content-Length"] == "0"
+        # Content-Length is computed dynamically in to_bytes()
+        raw = resp.to_bytes()
+        assert b"Content-Length: 0" in raw
 
     def test_content_string(self):
         resp = Response(200, content="OK body")
@@ -468,7 +482,9 @@ class TestResponseBodySetter:
         resp = Response(200)
         resp.content = "body text"
         assert resp.content == b"body text"
-        assert resp.headers["Content-Length"] == "9"
+        # Content-Length is computed dynamically in to_bytes()
+        raw = resp.to_bytes()
+        assert b"Content-Length: 9" in raw
 
 
 # ============================================================================

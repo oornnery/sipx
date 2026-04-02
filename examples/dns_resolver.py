@@ -3,7 +3,7 @@
 sipx — DNS SRV Resolution (RFC 3263)
 
 Shows how sipx resolves SIP URIs to IP:port via DNS SRV records,
-with fallback to A records. The Client uses this automatically
+with fallback to A records. The SIPClient uses this automatically
 when auto_dns=True (default).
 
 No Asterisk required for offline demo. SRV queries need dnspython.
@@ -11,12 +11,14 @@ No Asterisk required for offline demo. SRV queries need dnspython.
 
 import asyncio
 
-from sipx._utils import console
+from rich.console import Console
+
+console = Console()
 
 
 def demo_sync():
     """Synchronous DNS resolution."""
-    from sipx.dns import SipResolver
+    from sipx import SipResolver
 
     resolver = SipResolver()
 
@@ -64,7 +66,7 @@ def demo_sync():
 
 async def demo_async():
     """Asynchronous DNS resolution."""
-    from sipx.dns import AsyncSipResolver
+    from sipx import AsyncSipResolver
 
     resolver = AsyncSipResolver()
 
@@ -85,12 +87,12 @@ async def demo_async():
 
 
 def demo_auto_dns():
-    """Show how Client uses DNS automatically."""
-    console.print("\n[bold]3. Auto DNS in Client[/bold]\n")
-    console.print("  Client(auto_dns=True)  # default")
+    """Show how SIPClient uses DNS automatically."""
+    console.print("\n[bold]3. Auto DNS in SIPClient[/bold]\n")
+    console.print("  SIPClient(auto_dns=True)  # default")
     console.print("  client.invite('sip:bob@company.com')  # auto-resolves via SRV")
     console.print("  client.invite('sip:bob@10.0.0.1')     # IP detected, skips DNS")
-    console.print("  Client(auto_dns=False) # disable auto DNS")
+    console.print("  SIPClient(auto_dns=False) # disable auto DNS")
 
 
 def main():

@@ -5,6 +5,78 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.7] - 2026-04-02
+
+### Added
+
+- **Public API expansion** — `PIFDBody`, `AsyncSipResolver`, `ForkTracker`,
+  `EOL`, `SCHEME`, `VERSION`, `BRANCH`, `HEADERS`, `HEADERS_COMPACT`,
+  `REASON_PHRASES` now exported from top-level `sipx`
+- **`Headers.get()` overloads** — proper `@overload` typing: returns `str`
+  when a `str` default is provided, `str | None` otherwise (eliminates 15+
+  type checker false positives)
+- **`MessageParser` static methods** — `parse()`, `parse_request()`,
+  `parse_response()`, `parse_uri()` are now `@staticmethod`; no need to
+  instantiate `MessageParser()` anymore
+- **`Auth.digest`** — snake_case alias for `Auth.Digest` factory method
+- **`SIPAuthCredentials`** — uppercase-SIP canonical alias for
+  `SipAuthCredentials` in `sipx`, `sipx.models`, and `sipx.models._auth`
+- **`MessageParser.parse_uri()` deprecation** — emits `DeprecationWarning`
+  pointing to `SipURI.parse(uri)`
+- **Subscription helpers** — `_apply_notify_state()`,
+  `_update_subscription_from_response()`, `SUBSCRIPTION_REFRESH_MARGIN`
+  extracted as shared pure helpers in `session/_subscription.py`
+- **RTP helpers** — `_resolve_codec()`, `RTP_PACKETS_PER_SECOND`,
+  `RTP_PACKET_DURATION` extracted in `media/_rtp.py`, shared with
+  `media/_async.py`
+- **`SIPMessageFramer`** — shared TCP/TLS framing logic extracted to
+  `transports/_framer.py` (sync + async)
+- **WebSocket transport** — `WSTransport` and `AsyncWSTransport` now
+  exported from `sipx.transports`
+
+### Fixed
+
+- **`AsyncWSTransport.handle_request`** — `MessageParser.parse(...)` was
+  called as unbound method (missing instantiation); now works correctly
+  as `@staticmethod`
+- **`AsyncSubscription.handle_notify`** — missing `_log.debug()` that the
+  sync version had
+- **`_build_register_headers` return type** — was `tuple[str, dict]`,
+  actually returns `dict`
+- **`refer_and_wait` return type** — was `Optional[Request]`, now
+  `Request | Response | None` (honest about rejection path)
+- **`examples/b2bua.py`** — decorators `@bob_server.invite` and
+  `@bob_server.bye` missing parentheses (decorator factories)
+- **31 `ty check` diagnostics** — all resolved (was 31, now 0)
+
+### Changed
+
+- **Examples modernized** — all 27 examples now import exclusively from
+  the `sipx` top-level public API:
+  - `from sipx._utils import console` → `from rich.console import Console`
+  - `from sipx.models._message import ...` → `from sipx import ...`
+  - `from sipx.server import ...` → `from sipx import ...`
+  - `from sipx._types import ...` → `from sipx import ...`
+  - `from sipx._routing import ...` → `from sipx import ...`
+  - `from sipx.fsm import ...` → `from sipx import ...`
+  - `from sipx.session import ...` → `from sipx import ...`
+  - `from sipx.dns import ...` → `from sipx import ...`
+- **`sipx/__init__.py` cleanup** — all imports at top of file (no E402),
+  all imported symbols in `__all__` (no F401)
+- **`main.py`** — consolidated 3 inline `Auth` imports into single import
+- **`asterisk.py`** — uses `Auth.digest()` snake_case alias
+
+---
+
+## [0.0.6] - 2026-04-02
+
+### Added
+
+- **TUI** — interactive SIP workbench with sngrep-style UI (`uv run sipx tui`)
+- **Textual dependency** — added for TUI support
+
+---
+
 ## [0.0.5] - 2026-04-01
 
 ### Added
@@ -324,6 +396,8 @@ if isinstance(response.body, SDPBody):
 
 ---
 
+[0.0.7]: https://github.com/oornnery/sipx/compare/v0.0.6...v0.0.7
+[0.0.6]: https://github.com/oornnery/sipx/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/oornnery/sipx/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/oornnery/sipx/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/oornnery/sipx/compare/v0.0.2...v0.0.3

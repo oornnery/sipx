@@ -23,7 +23,7 @@ from .._utils import logger
 _log = logger.getChild("media.session")
 
 if TYPE_CHECKING:
-    from sipx.client import Client
+    from sipx.client import SIPClient
     from sipx.models._message import Response
 
     from ._rtp import RTPSession
@@ -95,12 +95,12 @@ class CallSession:
     DTMF interaction.
 
     Args:
-        client: The ``Client`` that initiated the call.
+        client: The ``SIPClient`` that initiated the call.
         response: The SIP response (typically 200 OK with SDP).
         rtp_port: Local UDP port for RTP media.
     """
 
-    def __init__(self, client: Client, response: Response, rtp_port: int) -> None:
+    def __init__(self, client: SIPClient, response: Response, rtp_port: int) -> None:
         self._client = client
         self._response = response
         self._rtp_port = rtp_port

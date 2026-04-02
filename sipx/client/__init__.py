@@ -1,4 +1,5 @@
-from ._sync import Client
-from ._async import AsyncClient
+from ._base import SIPClientBase
+from ._sync import SIPClient
+from ._async import AsyncSIPClient
 
-__all__ = ["Client", "AsyncClient"]
+__all__ = ["SIPClientBase", "SIPClient", "AsyncSIPClient"]

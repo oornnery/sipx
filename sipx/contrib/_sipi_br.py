@@ -194,7 +194,7 @@ class ATI:
 class AsyncATI:
     """Async ATI for Brazilian number portability.
 
-    Uses AsyncClient.invite() natively — no threading.
+    Uses AsyncSIPClient.invite() natively — no threading.
     """
 
     def __init__(self, client, ati_server: str):
