@@ -226,6 +226,41 @@ def _get_app():
         except KeyboardInterrupt:
             console.print("\n[bold red]Stopped.[/bold red]")
 
+    # ------------------------------------------------------------------
+    # tui
+    # ------------------------------------------------------------------
+    @app.command()
+    def tui(
+        host: str = typer.Option("0.0.0.0", "--host", "-h", help="Listen address"),
+        port: int = typer.Option(5060, "--port", "-p", help="Listen port"),
+        listen: bool = typer.Option(
+            False, "--listen", "-l", help="Start passive listener on launch"
+        ),
+    ):
+        """Launch interactive SIP workbench (TUI)."""
+        try:
+            from .tui import SipxApp
+        except ImportError:
+            console.print(
+                "[red]TUI requires textual. Install with:[/red]\n"
+                "  pip install sipx[tui]"
+            )
+            raise typer.Exit(1)
+
+        tui_app = SipxApp()
+        if listen:
+            # Schedule listener start after mount
+
+            original_on_mount = tui_app.on_mount
+
+            def _patched_on_mount() -> None:
+                original_on_mount()
+                tui_app.start_listener(host=host, port=port)
+
+            tui_app.on_mount = _patched_on_mount  # type: ignore[method-assign]
+
+        tui_app.run()
+
     return app
 
 

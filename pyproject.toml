@@ -27,6 +27,9 @@ dependencies = [
     "typer>=0.17.4",
 ]
 
+[project.optional-dependencies]
+tui = ["textual[syntax]>=8.0"]
+
 [project.urls]
 Homepage = "https://github.com/oornnery/sipx"
 Repository = "https://github.com/oornnery/sipx"
