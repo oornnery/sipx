@@ -206,6 +206,35 @@ class TestStatusMatching:
 
 
 class TestCallRequestHandlers:
+    def test_dynamic_phase_response_handler_skipped_in_request_pipeline(self):
+        called = []
+        ev = Events()
+
+        @ev.add_handler(method="INVITE", phase="response")
+        def on_invite(req, resp, ctx):
+            called.append("response-only")
+
+        req = Request(method="INVITE", uri="sip:bob@example.com")
+        ctx = EventContext(request=req)
+        result = ev._call_request_handlers(req, ctx)
+        assert isinstance(result, Request)
+        assert called == []
+
+    def test_dynamic_phase_both_handler_runs_in_request_pipeline(self):
+        called = []
+        ev = Events()
+
+        @ev.add_handler(method="INVITE", phase="both")
+        def on_invite(req, resp, ctx):
+            called.append("both")
+            return req
+
+        req = Request(method="INVITE", uri="sip:bob@example.com")
+        ctx = EventContext(request=req)
+        result = ev._call_request_handlers(req, ctx)
+        assert isinstance(result, Request)
+        assert called == ["both"]
+
     def test_calls_on_request(self):
         called = []
 
@@ -282,6 +311,37 @@ class TestCallRequestHandlers:
 
 
 class TestCallResponseHandlers:
+    def test_dynamic_phase_request_handler_skipped_in_response_pipeline(self):
+        called = []
+        ev = Events()
+
+        @ev.add_handler(method="INVITE", status=200, phase="request")
+        def on_invite(req, resp, ctx):
+            called.append("request-only")
+
+        req = Request(method="INVITE", uri="sip:bob@example.com")
+        resp = Response(status_code=200)
+        ctx = EventContext(request=req, response=resp)
+        result = ev._call_response_handlers(resp, ctx)
+        assert isinstance(result, Response)
+        assert called == []
+
+    def test_dynamic_phase_both_handler_runs_in_response_pipeline(self):
+        called = []
+        ev = Events()
+
+        @ev.add_handler(method="INVITE", status=200, phase="both")
+        def on_invite(response, context):
+            called.append((response.status_code, context.request.method))
+            return response
+
+        req = Request(method="INVITE", uri="sip:bob@example.com")
+        resp = Response(status_code=200)
+        ctx = EventContext(request=req, response=resp)
+        result = ev._call_response_handlers(resp, ctx)
+        assert isinstance(result, Response)
+        assert called == [(200, "INVITE")]
+
     def test_calls_on_response(self):
         called = []
 

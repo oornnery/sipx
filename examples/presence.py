@@ -16,7 +16,7 @@ Run:
 
 from __future__ import annotations
 
-from sipx.models import PIFDBody
+from sipx import PIFDBody
 
 
 def demo_pidf() -> None:

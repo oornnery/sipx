@@ -35,9 +35,9 @@ sipx.register("sip:alice@pbx.com", auth=("alice", "secret"))
 sipx.send("sip:bob@pbx.com", "Hello!", auth=("alice", "secret"))
 
 # Full call with dialog tracking
-from sipx import Client
+from sipx import SIPClient
 
-with Client(local_port=5061) as client:
+with SIPClient(local_port=5061) as client:
     client.auth = ("alice", "secret")
 
     client.register("sip:alice@pbx.com")
@@ -80,12 +80,12 @@ from sipx import SIPServer, Request, FromHeader, Header
 
 server = SIPServer(local_host="127.0.0.1", local_port=5060)
 
-@server.register
+@server.register()
 def on_register(request: Request, caller: Annotated[str, FromHeader]):
     print(f"REGISTER from {caller}")
     return request.ok()
 
-@server.message
+@server.message()
 def on_message(request: Request, caller: Annotated[str, FromHeader]):
     body = request.content.decode() if request.content else ""
     print(f"MESSAGE from {caller}: {body}")
@@ -94,14 +94,14 @@ def on_message(request: Request, caller: Annotated[str, FromHeader]):
 server.start()
 ```
 
-### Async Client
+### Async SIPClient
 
 ```python
 import asyncio
-from sipx import AsyncClient
+from sipx import AsyncSIPClient
 
 async def main():
-    async with AsyncClient(local_port=5061) as client:
+    async with AsyncSIPClient(local_port=5061) as client:
         client.auth = ("alice", "secret")
 
         r = await client.register("sip:alice@pbx.com")
@@ -184,6 +184,22 @@ class CallEvents(Events):
         print("Auth challenge received")
 ```
 
+### Client Decorators
+
+```python
+from sipx import SIPClient
+
+with SIPClient() as client:
+    @client.invite(status=200)
+    def on_invite_ok(response, context):
+        print("INVITE accepted:", response.status_code)
+
+    @client.message(phase="request")
+    def stamp_message(request, context):
+        request.headers["X-Debug"] = "1"
+        return request
+```
+
 ### Authentication
 
 ```python
@@ -229,7 +245,7 @@ if r.status_code == 401:
 | 3264 | Offer/Answer Model with SDP       | Complete                                   |
 | 3550 | RTP: Real-time Transport Protocol | Complete (sync + async)                    |
 | 4733 | DTMF via RTP (telephone-event)    | Complete                                   |
-| 3263 | DNS SRV Resolution                | Complete (auto in Client)                  |
+| 3263 | DNS SRV Resolution                | Complete (auto in SIPClient)               |
 | 4028 | Session Timers                    | Complete                                   |
 
 ## Documentation

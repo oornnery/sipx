@@ -68,11 +68,11 @@ class Auth:
     Simplified authentication interface for SIP clients.
 
     This class provides static factory methods for creating authentication
-    credentials that can be easily assigned to a Client instance.
+    credentials that can be easily assigned to a SIPClient instance.
 
     Example:
-        >>> from sipx import Client, Auth
-        >>> with Client() as client:
+        >>> from sipx import SIPClient, Auth
+        >>> with SIPClient() as client:
         ...     client.auth = Auth.Digest('alice', 'secret')
         ...     response = client.register('sip:alice@example.com')
     """
@@ -138,6 +138,13 @@ class Auth:
             return response.headers.get("Proxy-Authenticate", "")
         else:  # 401 or other
             return response.headers.get("WWW-Authenticate", "")
+
+    #: Snake-case alias for :meth:`Digest` (Pythonic style).
+    digest = Digest
+
+
+# Canonical uppercase-SIP naming alias (mirrors SIPClient, SIPServer, etc.)
+SIPAuthCredentials = SipAuthCredentials
 
 
 # ============================================================================
@@ -798,6 +805,10 @@ def _parse_auth_params(params_string: str) -> dict[str, str]:
 
 
 __all__ = [
+    # Simplified auth API
+    "Auth",
+    "SipAuthCredentials",
+    "SIPAuthCredentials",  # uppercase-SIP canonical alias
     # Base classes
     "AuthMethod",
     "Challenge",

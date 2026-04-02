@@ -10,7 +10,7 @@ Example::
     from typing import Annotated
     from sipx._depends import FromHeader, SDP, AutoRTP
 
-    @server.invite
+    @server.invite()
     def on_invite(
         request: Request,
         caller: Annotated[str, FromHeader()],
@@ -200,6 +200,27 @@ def resolve_handler(handler: Any, request: Request, source: TransportAddress) ->
     return Extractor.resolve_handler(handler, request, source)
 
 
+async def async_resolve_handler(
+    handler: Any, request: Request, source: TransportAddress
+) -> Any:
+    """Resolve dependencies for an async handler.
+
+    Inspects handler type hints, injects ``Annotated`` dependencies, then
+    ``await``s the handler if it is a coroutine function.
+    """
+    import asyncio
+
+    result = Extractor.resolve_handler(handler, request, source)
+
+    # If the handler is a coroutine function, resolve_handler would have
+    # called it and returned a coroutine.  Await it here.
+    if asyncio.iscoroutine(result):
+        return await result
+
+    # If resolve_handler called the handler directly (sync), return the result.
+    return result
+
+
 # ============================================================================
 # Exports
 # ============================================================================
@@ -216,4 +237,5 @@ __all__ = [
     "Header",
     "AutoRTP",
     "resolve_handler",
+    "async_resolve_handler",
 ]

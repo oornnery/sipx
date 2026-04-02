@@ -9,7 +9,12 @@ Usage:
 """
 
 import sipx
-from sipx._utils import console
+from rich.console import Console
+
+console = Console()
+
+# Optional: enable debug logging for SIP traffic
+# sipx.configure_logging(level="DEBUG")
 
 
 def example_register():
@@ -40,10 +45,10 @@ def example_call():
 
 
 def example_client():
-    """Use Client for multiple operations."""
-    from sipx import Client
+    """Use SIPClient for multiple operations."""
+    from sipx import SIPClient
 
-    with Client(local_port=5061) as client:
+    with SIPClient(local_port=5061) as client:
         client.auth = ("1111", "1111xxx")
 
         # Register

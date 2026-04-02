@@ -2,7 +2,9 @@
 """sipx — SDP creation and analysis."""
 
 from sipx import SDPBody
-from sipx._utils import console
+from rich.console import Console
+
+console = Console()
 
 # Simple audio SDP (1 line)
 sdp = SDPBody.audio(ip="192.168.1.100", port=8000)

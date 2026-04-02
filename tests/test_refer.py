@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from sipx.client import Client
+from sipx.client import SIPClient
 from sipx.models._message import Request, Response
 from sipx._types import TransportAddress
 from sipx.transports._base import BaseTransport
@@ -135,7 +135,7 @@ class TestReferMethod:
         mock_create.return_value = transport
         transport._queue.append(_make_response(202, "Accepted"))
 
-        client = Client()
+        client = SIPClient()
         client.refer("sip:bob@127.0.0.1", refer_to="sip:carol@127.0.0.1")
 
         refer_bytes = transport.sent[0][0]
@@ -148,7 +148,7 @@ class TestReferMethod:
         mock_create.return_value = transport
         transport._queue.append(_make_response(202, "Accepted"))
 
-        client = Client()
+        client = SIPClient()
         r = client.refer("sip:bob@127.0.0.1", refer_to="sip:carol@127.0.0.1")
         assert r is not None
         assert r.status_code == 202
@@ -167,7 +167,7 @@ class TestReferAndWait:
         transport._queue.append(_make_response(202, "Accepted"))
         transport._queue.append(_make_notify("SIP/2.0 200 OK\r\n", "terminated"))
 
-        client = Client()
+        client = SIPClient()
         result = client.refer_and_wait(
             "sip:bob@127.0.0.1",
             refer_to="sip:carol@127.0.0.1",
@@ -184,7 +184,7 @@ class TestReferAndWait:
         transport._queue.append(_make_response(202, "Accepted"))
         transport._queue.append(_make_notify("SIP/2.0 200 OK\r\n", "terminated"))
 
-        client = Client()
+        client = SIPClient()
         client.refer_and_wait("sip:bob@127.0.0.1", refer_to="sip:carol@127.0.0.1")
 
         # Last sent message should be 200 OK to NOTIFY
@@ -199,7 +199,7 @@ class TestReferAndWait:
         transport._queue.append(_make_notify("SIP/2.0 180 Ringing\r\n", "active"))
         transport._queue.append(_make_notify("SIP/2.0 200 OK\r\n", "terminated"))
 
-        client = Client()
+        client = SIPClient()
         result = client.refer_and_wait(
             "sip:bob@127.0.0.1",
             refer_to="sip:carol@127.0.0.1",
@@ -214,7 +214,7 @@ class TestReferAndWait:
         mock_create.return_value = transport
         transport._queue.append(_make_response(403, "Forbidden"))
 
-        client = Client()
+        client = SIPClient()
         # refer() returns 403, refer_and_wait returns it directly (not None)
         result = client.refer_and_wait(
             "sip:bob@127.0.0.1",
@@ -222,6 +222,7 @@ class TestReferAndWait:
         )
 
         assert result is not None
+        assert isinstance(result, Response)
         assert result.status_code == 403
 
     @patch("sipx.client._sync._create_sync_transport")
@@ -231,7 +232,7 @@ class TestReferAndWait:
         transport._queue.append(_make_response(202, "Accepted"))
         # No NOTIFY queued → receive() always raises TimeoutError
 
-        client = Client()
+        client = SIPClient()
         result = client.refer_and_wait(
             "sip:bob@127.0.0.1",
             refer_to="sip:carol@127.0.0.1",

@@ -2,19 +2,33 @@
 
 from __future__ import annotations
 
+import socket
 import threading
 from typing import Callable, Dict, Optional
 
+from .._types import SIPTimeoutError
 from .._utils import logger
 from ..models._message import MessageParser, Request, Response
 from ..transports._udp import UDPTransport
-from .._types import TransportConfig, TransactionType, TransactionState
+from ..transports._tcp import TCPTransport
+from ..transports._tls import TLSTransport
+from .._types import TransportConfig
 from ..fsm import StateManager, TimerManager
-from .._depends import resolve_handler
-from ._base import SIPServerHandlerMixin
+from ._base import SIPServerBase
 
 
-class SIPServer(SIPServerHandlerMixin):
+def _create_server_transport(protocol: str, config: TransportConfig):
+    """Create a sync transport for the server based on protocol name."""
+    if protocol == "UDP":
+        return UDPTransport(config)
+    elif protocol == "TCP":
+        return TCPTransport(config)
+    elif protocol == "TLS":
+        return TLSTransport(config)
+    raise ValueError(f"Unsupported server transport: {protocol}")
+
+
+class SIPServer(SIPServerBase):
     """
     Simple SIP server that listens for incoming requests.
 
@@ -51,7 +65,7 @@ class SIPServer(SIPServerHandlerMixin):
         )
 
         self.transport = transport.upper()
-        self._transport = UDPTransport(self.config)
+        self._transport = _create_server_transport(self.transport, self.config)
         self._stop_event = threading.Event()
         self._stop_event.set()  # Start in stopped state
         self._thread: Optional[threading.Thread] = None
@@ -79,8 +93,10 @@ class SIPServer(SIPServerHandlerMixin):
         if callback is not None:
             try:
                 callback(*args)
-            except Exception:
-                logger.debug(f"Event handler error for '{event}'")
+            except (ValueError, TypeError, RuntimeError, OSError) as e:
+                logger.warning(
+                    "Event handler error for '%s': %s", event, e, exc_info=True
+                )
 
     def start(self) -> None:
         """Start the server in a background thread."""
@@ -109,67 +125,33 @@ class SIPServer(SIPServerHandlerMixin):
         self._transport.close()
         logger.info("SIP Server stopped")
 
-    def _create_server_transaction(self, request: Request) -> None:
-        """
-        Create a server-side transaction for an incoming request.
-
-        Uses INVITE_SERVER for INVITE requests, NON_INVITE_SERVER for others.
-
-        Args:
-            request: The incoming SIP request
-        """
-        if request.method == "INVITE":
-            txn_type = TransactionType.INVITE_SERVER
-        else:
-            txn_type = TransactionType.NON_INVITE_SERVER
-
-        txn = self._state_manager.create_transaction(request, transaction_type=txn_type)
-        txn.transport = self.transport
-        self._emit("transaction_created", txn)
-        return txn
-
     def _run(self) -> None:
         """Main server loop - runs in background thread."""
         parser = MessageParser()
 
         while not self._stop_event.is_set():
             try:
-                # Receive incoming message with timeout
                 data, source = self._transport.receive(timeout=1.0)
 
                 if not data:
                     continue
 
-                # Parse message
                 message = parser.parse(data)
 
-                # Only handle requests (not responses)
                 if not isinstance(message, Request):
                     continue
 
                 request = message
+                self._log_request(request, source)
 
-                # Create a server transaction for tracking
-                txn = self._create_server_transaction(request)
+                txn = self._create_server_transaction(request, self.transport)
+                self._emit("transaction_created", txn)
 
-                # ACK doesn't get a response — confirm original INVITE transaction
                 if request.method == "ACK":
-                    logger.debug(
-                        "<<< RECEIVED ACK from %s:%s", source.host, source.port
-                    )
-                    logger.debug(request.to_string())
-                    # Find the original INVITE IST and confirm it (cancels Timer G/H)
-                    invite_txn = self._state_manager.find_transaction(
-                        call_id=request.headers.get("Call-ID"),
-                        method="INVITE",
-                    )
-                    if invite_txn:
-                        invite_txn.transition_to(TransactionState.CONFIRMED)
-                    else:
-                        txn.transition_to(TransactionState.CONFIRMED)
+                    self._handle_ack(request, source)
                     continue
 
-                # Auto 100 Trying for INVITE (RFC 3261 §8.2.6.1)
+                # Auto 100 Trying for INVITE (RFC 3261 Section 8.2.6.1)
                 if request.method == "INVITE":
                     trying = request.trying()
                     self._transport.send(trying.to_bytes(), source)
@@ -177,79 +159,31 @@ class SIPServer(SIPServerHandlerMixin):
                         ">>> AUTO 100 Trying to %s:%s", source.host, source.port
                     )
 
-                # Find handler for this method
-                handler = self._handlers.get(request.method)
+                response = self._resolve_response_sync(request, source)
 
-                if handler:
-                    # Call handler with DI resolution
-                    try:
-                        response = resolve_handler(handler, request, source)
-                    except Exception as handler_err:
-                        logger.error("Handler error: %s", handler_err)
-                        response = request.error(500)
+                self._log_response(response, source)
+                response_data = response.to_bytes()
+                self._transport.send(response_data, source)
 
-                    # Add RSeq for reliable provisional responses (RFC 3262)
-                    if (
-                        request.method == "INVITE"
-                        and 100 < response.status_code < 200
-                        and "100rel" in request.headers.get("Require", "")
-                    ):
-                        self._rseq_counter += 1
-                        response.headers["RSeq"] = str(self._rseq_counter)
-                        response.headers["Require"] = "100rel"
-
-                    logger.debug(
-                        ">>> SENDING %s %s to %s:%s",
-                        response.status_code,
-                        response.reason_phrase,
-                        source.host,
-                        source.port,
+                # Wire Timer G retransmit for INVITE (IST) on UDP
+                if request.method == "INVITE" and self.transport == "UDP":
+                    timer_manager = TimerManager()
+                    txn.timer_manager = timer_manager
+                    txn._retransmit_fn = (
+                        lambda d=response_data, s=source: self._transport.send(d, s)
                     )
-                    logger.debug(response.to_string())
+                    txn._on_state_change(txn.state, txn.state)
 
-                    response_data = response.to_bytes()
-                    self._transport.send(response_data, source)
+                self._state_manager.update_transaction(txn.id, response)
+                self._emit("response_sent", txn, response)
 
-                    # Wire Timer G retransmit for INVITE (IST) on UDP
-                    if request.method == "INVITE" and self.transport == "UDP":
-                        timer_manager = TimerManager()
-                        txn.timer_manager = timer_manager
-                        txn._retransmit_fn = (
-                            lambda d=response_data, s=source: self._transport.send(d, s)
-                        )
-                        txn._on_state_change(txn.state, txn.state)
-
-                    # Track response in the transaction
-                    self._state_manager.update_transaction(txn.id, response)
-                    self._emit("response_sent", txn, response)
-                else:
-                    # No handler - send 501 Not Implemented
-                    logger.warning(
-                        "<<< RECEIVED %s from %s:%s (no handler)",
-                        request.method,
-                        source.host,
-                        source.port,
-                    )
-                    logger.debug(request.to_string())
-
-                    response = request.error(501)
-
-                    logger.debug(
-                        ">>> SENDING 501 Not Implemented to %s:%s",
-                        source.host,
-                        source.port,
-                    )
-                    logger.debug(response.to_string())
-
-                    response_data = response.to_bytes()
-                    self._transport.send(response_data, source)
-
-                    self._state_manager.update_transaction(txn.id, response)
-
+            except (socket.timeout, SIPTimeoutError):
+                pass
+            except OSError as e:
+                if not self._stop_event.is_set():
+                    logger.debug("Server loop OS error: %s", e)
             except Exception as e:
-                # Timeout or other errors - continue
-                if not self._stop_event.is_set() and "timeout" not in str(e).lower():
-                    logger.debug(f"Server loop error: {e}")
+                logger.warning("Unexpected server loop error: %s", e, exc_info=True)
 
     def __enter__(self):
         """Context manager entry."""

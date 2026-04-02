@@ -13,8 +13,13 @@ Requires:
 
 import time
 from dataclasses import dataclass
+
+from rich import box
+from rich.console import Console
+from rich.table import Table
 from sipx import (
-    Client,
+    SIPClient,
+    SIPServer,
     Events,
     EventContext,
     on,
@@ -31,10 +36,6 @@ from sipx import (
     StateManager,
     DialogState,
     TransportAddress,
-)
-from sipx.server import SIPServer
-from sipx._utils import console
-from sipx._utils import (
     EOL,
     SCHEME,
     VERSION,
@@ -44,8 +45,7 @@ from sipx._utils import (
     REASON_PHRASES,
 )
 
-from rich.table import Table
-from rich import box
+console = Console()
 
 # ---------------------------------------------------------------------------
 # Config
@@ -129,11 +129,11 @@ class FullEvents(Events):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def make_sdp(client: Client, username: str, port: int = 8000) -> SDPBody:
+def make_sdp(client: SIPClient, username: str, port: int = 8000) -> SDPBody:
     return client.create_sdp(port=port)
 
 
-def contact(username: str, client: Client) -> dict:
+def contact(username: str, client: SIPClient) -> dict:
     addr = client.local_address
     return {"Contact": f"<sip:{username}@{addr.host}:{addr.port}>"}
 
@@ -219,7 +219,7 @@ def demo_server() -> dict:
     results = {}
     server = SIPServer(local_host="127.0.0.1", local_port=15060)
 
-    @server.message
+    @server.message()
     def on_msg(request, source):
         return request.ok()
 
@@ -227,7 +227,7 @@ def demo_server() -> dict:
     time.sleep(0.5)
 
     try:
-        with Client(local_host="127.0.0.1", local_port=15061) as c:
+        with SIPClient(local_host="127.0.0.1", local_port=15061) as c:
             r = c.options("sip:127.0.0.1:15060", host="127.0.0.1", port=15060)
             results["server_options"] = r.status_code == 200
 
@@ -250,7 +250,7 @@ def demo_server() -> dict:
 def test_options_no_auth() -> dict:
     results = {}
     console.print("\n[bold]N.1 OPTIONS (no auth)[/bold]")
-    with Client(local_host="127.0.0.1", local_port=5070) as client:
+    with SIPClient(local_host="127.0.0.1", local_port=5070) as client:
         # No client.auth — tests anonymous endpoint in pjsip.conf
         r = client.options(f"sip:{HOST}")
         results["options_no_auth"] = r is not None and r.status_code == 200
@@ -265,7 +265,7 @@ def test_user(user: User, test_id: int) -> dict:
     results = {}
     u = user.username
 
-    with Client(local_port=user.client_port) as client:
+    with SIPClient(local_port=user.client_port) as client:
         events = FullEvents()
         client.events = events
         client.auth = (u, user.password)  # tuple auth
@@ -345,7 +345,7 @@ def test_advanced(user: User) -> dict:
 
     # Invalid credentials
     console.print("\n[bold]A.1 Invalid creds[/bold]")
-    with Client(local_port=user.client_port, auto_auth=True) as c:
+    with SIPClient(local_port=user.client_port, auto_auth=True) as c:
         c.auth = (u, "WRONG")
         r = c.register(f"sip:{u}@{HOST}", expires=60)
         results["invalid_creds"] = r and r.status_code in (401, 403)
@@ -355,10 +355,10 @@ def test_advanced(user: User) -> dict:
 
     # Per-request auth
     console.print("\n[bold]A.2 Per-request auth[/bold]")
-    with Client(local_port=user.client_port, auto_auth=False) as c:
+    with SIPClient(local_port=user.client_port, auto_auth=False) as c:
         r = c.register(f"sip:{u}@{HOST}", expires=60)
         if r.status_code == 401:
-            override = Auth.Digest(u, user.password)
+            override = Auth.digest(u, user.password)  # snake_case alias
             r = c.retry_with_auth(r, auth=override)
         results["per_request"] = r and r.status_code == 200
         console.print(f"  -> {r.status_code}")
@@ -367,7 +367,7 @@ def test_advanced(user: User) -> dict:
 
     # Auto re-registration
     console.print("\n[bold]A.3 Auto re-reg[/bold]")
-    with Client(local_port=user.client_port) as c:
+    with SIPClient(local_port=user.client_port) as c:
         c.auth = (u, user.password)
         r = c.register(f"sip:{u}@{HOST}", expires=120)
         if not (r and r.status_code == 200):
@@ -397,7 +397,7 @@ def test_late_offer(user: User) -> dict:
     results = {}
     u = user.username
 
-    with Client(local_port=user.client_port) as client:
+    with SIPClient(local_port=user.client_port) as client:
         events = FullEvents()
         client.events = events
         client.auth = (u, user.password)

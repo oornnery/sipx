@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """sipx — TTS and STT adapters (text-to-speech / speech-to-text)."""
 
-from sipx._utils import console
+from rich.console import Console
 from sipx.media import BaseTTS, BaseSTT, FileTTS, DummySTT, ToneGenerator
+
+console = Console()
 
 # ---------------------------------------------------------------------------
 # Built-in adapters

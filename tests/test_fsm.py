@@ -40,20 +40,23 @@ class TestTransaction:
         assert txn.updated_at >= old_updated
 
     def test_add_response_provisional_invite(self):
-        """1xx response on INVITE in CALLING -> TRYING."""
+        """1xx response on INVITE in CALLING -> PROCEEDING (RFC 3261 17.1.1)."""
         txn = Transaction(transaction_type=TransactionType.INVITE)
         resp = Response(status_code=100)
         txn.add_response(resp)
         assert len(txn.responses) == 1
-        assert txn.state == TransactionState.TRYING
-
-    def test_add_response_provisional_invite_trying_to_proceeding(self):
-        """Second 1xx response on INVITE in TRYING -> PROCEEDING."""
-        txn = Transaction(transaction_type=TransactionType.INVITE)
-        txn.transition_to(TransactionState.TRYING)
-        resp = Response(status_code=180)
-        txn.add_response(resp)
         assert txn.state == TransactionState.PROCEEDING
+
+    def test_add_response_multiple_provisionals_stay_proceeding(self):
+        """Multiple 1xx responses on INVITE stay in PROCEEDING (RFC 3261 17.1.1)."""
+        txn = Transaction(transaction_type=TransactionType.INVITE)
+        resp1 = Response(status_code=100)
+        txn.add_response(resp1)
+        assert txn.state == TransactionState.PROCEEDING
+        resp2 = Response(status_code=180)
+        txn.add_response(resp2)
+        assert txn.state == TransactionState.PROCEEDING
+        assert len(txn.responses) == 2
 
     def test_add_response_final_completes(self):
         """2xx+ response -> COMPLETED."""

@@ -8,9 +8,10 @@ and applied to subsequent requests (ACK, BYE).
 No network required — exercises routing logic in-memory.
 """
 
-from sipx import Request, Response
-from sipx._routing import RouteSet
-from sipx._utils import console
+from sipx import Request, Response, RouteSet
+from rich.console import Console
+
+console = Console()
 
 
 def main():

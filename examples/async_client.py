@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """
-sipx — AsyncClient example: register, call, message.
+sipx — AsyncSIPClient example: register, call, message.
 
 Requires: cd docker/asterisk && docker-compose up -d
 """
 
 import asyncio
 
-from sipx import AsyncClient
-from sipx._utils import console
+from sipx import AsyncSIPClient
+from rich.console import Console
+
+console = Console()
 
 
 async def main():
-    console.print("[bold]sipx — AsyncClient[/bold]")
+    console.print("[bold]sipx — AsyncSIPClient[/bold]")
     console.print("Requires Asterisk: cd docker/asterisk && docker-compose up -d\n")
 
-    async with AsyncClient(local_port=5061) as client:
+    async with AsyncSIPClient(local_port=5061) as client:
         client.auth = ("1111", "1111xxx")
 
         # Register

@@ -2,10 +2,12 @@
 """sipx — Complete call flow: REGISTER → INVITE → ACK → BYE."""
 
 import time
-from sipx import Client
-from sipx._utils import console
+from sipx import SIPClient
+from rich.console import Console
 
-with Client(local_port=5061) as client:
+console = Console()
+
+with SIPClient(local_port=5061) as client:
     client.auth = ("1111", "1111xxx")
 
     # Register

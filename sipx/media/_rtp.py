@@ -111,6 +111,24 @@ _CODEC_REGISTRY: dict[int, type[Codec]] = {
     8: PCMA,
 }
 
+#: Number of RTP packets per second (20 ms per packet → 50 pps).
+RTP_PACKETS_PER_SECOND: int = 50
+
+#: Duration of one RTP packet in seconds.
+RTP_PACKET_DURATION: float = 1.0 / RTP_PACKETS_PER_SECOND
+
+
+def _resolve_codec(payload_type: int, codec: Optional[Codec] = None) -> Codec:
+    """Return the appropriate :class:`Codec` for *payload_type*.
+
+    If *codec* is provided it is returned as-is.  Otherwise the payload type
+    is looked up in :data:`_CODEC_REGISTRY`.  Falls back to :class:`PCMU`.
+    """
+    if codec is not None:
+        return codec
+    cls = _CODEC_REGISTRY.get(payload_type)
+    return cls() if cls is not None else PCMU()
+
 
 class RTPSession:
     """
@@ -138,12 +156,7 @@ class RTPSession:
         self.clock_rate = clock_rate
 
         # Resolve codec
-        if codec is not None:
-            self.codec = codec
-        elif payload_type in _CODEC_REGISTRY:
-            self.codec = _CODEC_REGISTRY[payload_type]()
-        else:
-            self.codec = PCMU()  # default fallback
+        self.codec = _resolve_codec(payload_type, codec)
 
         # RTP state
         self._ssrc = random.randint(0, 0xFFFFFFFF)
@@ -151,7 +164,7 @@ class RTPSession:
         self._timestamp = random.randint(0, 0xFFFFFFFF)
 
         # Packetization: 20ms at clock_rate
-        self._samples_per_packet = clock_rate // 50  # 160 for 8 kHz
+        self._samples_per_packet = clock_rate // RTP_PACKETS_PER_SECOND
 
         # Socket
         self._socket: Optional[socket.socket] = None
@@ -274,8 +287,8 @@ class RTPSession:
             self._timestamp += self._samples_per_packet
             offset += bytes_per_packet
 
-            # Pace at ~20 ms
-            time.sleep(0.020)
+            # Pace at 20 ms per packet
+            time.sleep(RTP_PACKET_DURATION)
 
     # ------------------------------------------------------------------
     # Receiving

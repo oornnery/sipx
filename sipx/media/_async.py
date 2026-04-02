@@ -2,7 +2,7 @@
 Async wrappers for RTP, DTMF, and CallSession.
 
 Thin async layer that delegates blocking I/O to ``asyncio.to_thread``,
-matching the ``AsyncClient`` pattern used elsewhere in sipx.
+matching the ``AsyncSIPClient`` pattern used elsewhere in sipx.
 """
 
 from __future__ import annotations
@@ -11,12 +11,12 @@ import asyncio
 from typing import TYPE_CHECKING, Optional
 
 from .._utils import logger
-from ._rtp import RTPPacket
+from ._rtp import RTPPacket, RTP_PACKETS_PER_SECOND, RTP_PACKET_DURATION, _resolve_codec
 
 _log = logger.getChild("rtp")
 
 if TYPE_CHECKING:
-    from sipx.client import Client
+    from sipx.client import SIPClient
     from sipx.models._body import SDPBody
     from sipx.models._message import Response
     from sipx.media._codecs import Codec
@@ -185,16 +185,8 @@ class AsyncRTPSession:
         self.payload_type = payload_type
         self.clock_rate = clock_rate
 
-        # Resolve codec
-        from ._codecs import PCMA, PCMU
-
-        _registry: dict[int, type] = {0: PCMU, 8: PCMA}
-        if codec is not None:
-            self.codec = codec
-        elif payload_type in _registry:
-            self.codec = _registry[payload_type]()
-        else:
-            self.codec = PCMU()
+        # Resolve codec (shared helper from _rtp)
+        self.codec = _resolve_codec(payload_type, codec)
 
         # RTP state
         import random
@@ -202,7 +194,7 @@ class AsyncRTPSession:
         self._ssrc = random.randint(0, 0xFFFFFFFF)
         self._sequence_number = random.randint(0, 0xFFFF)
         self._timestamp = random.randint(0, 0xFFFFFFFF)
-        self._samples_per_packet = clock_rate // 50  # 20ms
+        self._samples_per_packet = clock_rate // RTP_PACKETS_PER_SECOND
 
         # asyncio transport
         self._transport: asyncio.DatagramTransport | None = None
@@ -267,7 +259,7 @@ class AsyncRTPSession:
             self._sequence_number += 1
             self._timestamp += self._samples_per_packet
             offset += bytes_per_packet
-            await asyncio.sleep(0.020)
+            await asyncio.sleep(RTP_PACKET_DURATION)
 
     async def recv_audio(self, timeout: float = 1.0) -> Optional[bytes]:
         packet = await self.recv_packet(timeout)
@@ -318,7 +310,7 @@ class AsyncRTPSession:
 class AsyncCallSession:
     """Async call session wrapping RTP + DTMF via ``asyncio.to_thread``."""
 
-    def __init__(self, client: Client, response: Response, rtp_port: int) -> None:
+    def __init__(self, client: SIPClient, response: Response, rtp_port: int) -> None:
         from ._session import CallSession
 
         self._sync = CallSession(client, response, rtp_port)

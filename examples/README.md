@@ -27,8 +27,8 @@ uv run python examples/routing.py
 | Example | Features | Description |
 | --- | --- | --- |
 | `quickstart.py` | register, options, send, call | One-liner functions |
-| `call.py` | Client, create_sdp, dialog tracking | Complete call: REGISTER -> INVITE -> ACK -> BYE |
-| `async_client.py` | AsyncClient, create_sdp | Full async client flow |
+| `call.py` | SIPClient, create_sdp, dialog tracking | Complete call: REGISTER -> INVITE -> ACK -> BYE |
+| `async_client.py` | AsyncSIPClient, create_sdp | Full async client flow |
 | `events.py` | Events, @on, EventContext | All event handler patterns |
 | `dtmf.py` | RFC 4733, SIP INFO, inband | 3 DTMF sending methods |
 | `dns_resolver.py` | SipResolver, AsyncSipResolver | DNS SRV resolution with fallback |
@@ -49,8 +49,8 @@ uv run python examples/session_timers.py
 
 | Example | Features | Description |
 | --- | --- | --- |
-| `server.py` | SIPServer, @server.invite, DI, Annotated | Sync server with decorators + extractors |
-| `async_server.py` | AsyncSIPServer, AsyncClient | Async server + client loopback |
+| `server.py` | SIPServer, @server.invite(), DI, Annotated | Sync server with decorators + extractors |
+| `async_server.py` | AsyncSIPServer, AsyncSIPClient | Async server + client loopback |
 | `ivr.py` | AsyncIVR, AsyncRTPSession, DTMF | Full IVR with real RTP + DTMF collection |
 
 ```bash
@@ -76,7 +76,7 @@ uv run python examples/ivr.py
 
 | Example | Features | Description |
 | --- | --- | --- |
-| `fastapi_sip.py` | FastAPI, Client, REST+SIP | HTTP API wrapping SIP operations |
+| `fastapi_sip.py` | FastAPI, SIPClient, REST+SIP | HTTP API wrapping SIP operations |
 
 ## Test Suite
 

@@ -163,8 +163,8 @@ class Events:
         ...         request.headers['Authorization'] = 'Digest ...'
         ...         return request
 
-    Usage with Client:
-        >>> with Client() as client:
+    Usage with SIPClient:
+        >>> with SIPClient() as client:
         ...     client.events = MyEvents()
         ...     client.auth = Auth.Digest('alice', 'secret')
         ...     response = client.invite('sip:bob@example.com', 'sip:alice@local')
@@ -198,6 +198,50 @@ class Events:
         logger.debug(
             f"Discovered {len(self._handlers)} event handlers in {self.__class__.__name__}"
         )
+
+    def add_handler(
+        self,
+        handler: Optional[Callable] = None,
+        method: Optional[Union[str, tuple[str, ...]]] = None,
+        *,
+        status: Optional[Union[int, tuple[int, ...], range]] = None,
+        **options: Any,
+    ) -> Callable:
+        """Register a handler dynamically on an Events instance.
+
+        Supports both direct registration::
+
+            events.add_handler(fn, "INVITE", status=200)
+
+        and decorator style::
+
+            @events.add_handler(method="INVITE", status=200)
+            def fn(...):
+                ...
+
+        This enables runtime registration via APIs such as ``@client.invite()``
+        while reusing the same matching/execution pipeline as declarative
+        ``Events`` subclasses.
+        """
+
+        def _register(fn: Callable) -> Callable:
+            decorated = event_handler(method, status=status)(fn)
+            methods = getattr(decorated, "_event_handler_method", None)
+            statuses = getattr(decorated, "_event_handler_status", None)
+            phase = options.pop("phase", None)
+            if phase not in (None, "request", "response", "both"):
+                raise ValueError("phase must be one of: request, response, both")
+            setattr(
+                decorated,
+                "_event_handler_options",
+                {"phase": phase, **dict(options)},
+            )
+            self._handlers.append((decorated, methods, statuses))
+            return decorated
+
+        if handler is None:
+            return _register
+        return _register(handler)
 
     def _matches_method(
         self, request_method: str, filter_methods: Optional[tuple]
@@ -274,6 +318,10 @@ class Events:
 
         # Then call matching decorated handlers (request-only: skip status-filtered handlers)
         for handler, methods, statuses in self._handlers:
+            options = getattr(handler, "_event_handler_options", {})
+            phase = options.get("phase")
+            if phase == "response":
+                continue
             # Skip handlers that filter on status — they are response-only
             if statuses is not None:
                 continue
@@ -311,6 +359,10 @@ class Events:
         request = context.request
 
         for handler, methods, statuses in self._handlers:
+            options = getattr(handler, "_event_handler_options", {})
+            phase = options.get("phase")
+            if phase == "request":
+                continue
             # Response handlers match on both method and status
             request_method = request.method if request else None
 
@@ -318,8 +370,21 @@ class Events:
                 response.status_code, statuses
             ):
                 try:
-                    # Call handler with request, response, context
-                    result = handler(request, response, context)
+                    sig = inspect.signature(handler)
+                    params = list(sig.parameters.keys())
+
+                    if len(params) >= 3:
+                        result = handler(request, response, context)
+                    elif len(params) == 2:
+                        result = handler(response, context)
+                    elif len(params) == 1:
+                        name = params[0]
+                        if name in ("context", "ctx"):
+                            result = handler(context)
+                        else:
+                            result = handler(response)
+                    else:
+                        result = handler()
 
                     # Handler can return:
                     # - None: no action

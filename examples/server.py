@@ -25,9 +25,11 @@ from sipx import (
     Header,
     Source,
     Extractor,
+    TransportAddress,
 )
-from sipx._utils import console
-from sipx._types import TransportAddress
+from rich.console import Console
+
+console = Console()
 
 
 # ---------------------------------------------------------------------------
@@ -47,14 +49,14 @@ class UserAgent(Extractor):
 server = SIPServer(local_host="127.0.0.1", local_port=15090)
 
 
-@server.options
+@server.options()
 def on_options(request: Request):
     """Simple handler — just request, no DI."""
     console.print("  [green]OPTIONS received[/green]")
     return request.ok({"Allow": "INVITE,ACK,BYE,CANCEL,OPTIONS,MESSAGE,REGISTER"})
 
 
-@server.register
+@server.register()
 def on_register(
     request: Request,
     caller: Annotated[str, FromHeader],
@@ -67,7 +69,7 @@ def on_register(
     return request.ok()
 
 
-@server.message
+@server.message()
 def on_message(
     request: Request,
     caller: Annotated[str, FromHeader],

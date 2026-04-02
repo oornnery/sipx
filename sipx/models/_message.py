@@ -176,12 +176,8 @@ class Request(SIPMessage):
         """Add mandatory RFC 3261 headers if not already present.
 
         User-provided headers always take precedence over defaults.
+        Content-Length is computed dynamically in to_bytes().
         """
-        # Content-Length is mandatory (RFC 3261 Section 20.14)
-        # Only set if user didn't provide it
-        if "Content-Length" not in self._headers:
-            self._headers["Content-Length"] = str(len(self._content))
-
         # Max-Forwards recommended default (RFC 3261 Section 20.22)
         if "Max-Forwards" not in self._headers:
             self._headers["Max-Forwards"] = "70"
@@ -198,14 +194,10 @@ class Request(SIPMessage):
 
     @content.setter
     def content(self, value: str | bytes | MessageBody) -> None:
-        """Set message content and auto-update Content-Length header.
-
-        Note: This will override any manually set Content-Length.
-        """
+        """Set message content. Content-Length is computed in to_bytes()."""
         if isinstance(value, MessageBody):
             self._body = value
             self._content = value.to_bytes()
-            # Auto-set Content-Type
             if "Content-Type" not in self._headers:
                 self._headers["Content-Type"] = value.content_type
         elif isinstance(value, str):
@@ -214,8 +206,6 @@ class Request(SIPMessage):
         else:
             self._body = None
             self._content = value
-        # Always update Content-Length to match actual content
-        self._headers["Content-Length"] = str(len(self._content))
 
     @property
     def body(self) -> MessageBody | None:
@@ -230,7 +220,6 @@ class Request(SIPMessage):
                     self._content, self._headers["Content-Type"]
                 )
             except Exception:
-                # If parsing fails, return None
                 pass
         return self._body
 
@@ -240,14 +229,12 @@ class Request(SIPMessage):
         if value is None:
             self._body = None
             self._content = b""
-            self._headers["Content-Length"] = "0"
             if "Content-Type" in self._headers:
                 del self._headers["Content-Type"]
         else:
             self._body = value
             self._content = value.to_bytes()
             self._headers["Content-Type"] = value.content_type
-            self._headers["Content-Length"] = str(len(self._content))
 
     @property
     def max_forwards(self) -> int | None:
@@ -319,13 +306,19 @@ class Request(SIPMessage):
         return branch_value.startswith(BRANCH)
 
     def to_bytes(self) -> bytes:
-        """Serialize request to bytes (wire format)."""
+        """Serialize request to bytes (wire format).
+
+        Content-Length is computed dynamically from self._content.
+        """
         lines = []
         encoding = "utf-8"
 
         # Request line: METHOD URI VERSION
         request_line = f"{self.method} {self.uri} {self.version}"
         lines.append(request_line.encode(encoding))
+
+        # Ensure Content-Length matches actual content (RFC 3261 Section 20.14)
+        self._headers["Content-Length"] = str(len(self._content))
 
         # Headers
         header_bytes = self._headers.raw().rstrip(EOL.encode(encoding))
@@ -527,8 +520,7 @@ class Response(SIPMessage):
             self._content = b""
 
         # Add mandatory headers (only if not already present)
-        if "Content-Length" not in self._headers:
-            self._headers["Content-Length"] = str(len(self._content))
+        # Content-Length is computed dynamically in to_bytes()
 
     @property
     def headers(self) -> Headers:
@@ -542,9 +534,9 @@ class Response(SIPMessage):
 
     @content.setter
     def content(self, value: str | bytes | MessageBody) -> None:
-        """Set message content and auto-update Content-Length header.
+        """Set message content.
 
-        Note: This will override any manually set Content-Length.
+        Content-Length is computed dynamically in to_bytes().
         """
         if isinstance(value, MessageBody):
             self._body = value
@@ -558,8 +550,6 @@ class Response(SIPMessage):
         else:
             self._body = None
             self._content = value
-        # Always update Content-Length to match actual content
-        self._headers["Content-Length"] = str(len(self._content))
 
     @property
     def body(self) -> MessageBody | None:
@@ -584,14 +574,12 @@ class Response(SIPMessage):
         if value is None:
             self._body = None
             self._content = b""
-            self._headers["Content-Length"] = "0"
             if "Content-Type" in self._headers:
                 del self._headers["Content-Type"]
         else:
             self._body = value
             self._content = value.to_bytes()
             self._headers["Content-Type"] = value.content_type
-            self._headers["Content-Length"] = str(len(self._content))
 
     @property
     def raw(self) -> bytes | None:
@@ -748,13 +736,19 @@ class Response(SIPMessage):
         return self.status_code >= 200
 
     def to_bytes(self) -> bytes:
-        """Serialize response to bytes (wire format)."""
+        """Serialize response to bytes (wire format).
+
+        Content-Length is computed dynamically from self._content.
+        """
         lines = []
         encoding = "utf-8"
 
         # Status line: VERSION STATUS_CODE REASON_PHRASE
         status_line = f"{self.version} {self.status_code} {self.reason_phrase}"
         lines.append(status_line.encode(encoding))
+
+        # Ensure Content-Length matches actual content (RFC 3261 Section 20.14)
+        self._headers["Content-Length"] = str(len(self._content))
 
         # Headers
         header_bytes = self._headers.raw().rstrip(EOL.encode(encoding))
@@ -814,8 +808,9 @@ class MessageParser:
             ValueError: If message is invalid
 
         Example:
+            >>> parser = MessageParser()
             >>> data = b"INVITE sip:bob@biloxi.com SIP/2.0\\r\\nVia: ...\\r\\n\\r\\n"
-            >>> msg = MessageParser.parse(data)
+            >>> msg = parser.parse(data)
             >>> isinstance(msg, Request)
             True
         """
@@ -929,6 +924,11 @@ class MessageParser:
         """
         Parse SIP URI into components.
 
+        .. deprecated::
+            Use :func:`sipx.SipURI.parse` instead, which returns a full
+            :class:`SipURI` object.  This method will be removed in a future
+            version.
+
         Supports full RFC 3261 Section 19.1 format:
             sip:user:password@host:port;param=value?header=value
 
@@ -937,13 +937,15 @@ class MessageParser:
 
         Returns:
             Dict with keys: scheme, user, password, host, port, params
-
-        Example:
-            >>> MessageParser.parse_uri("sip:alice@atlanta.com:5060;transport=tcp")
-            {'scheme': 'sip', 'user': 'alice', 'password': '', 'host': 'atlanta.com', 'port': '5060', 'params': 'transport=tcp'}
-
-        For the full SipURI object, use ``sipx.SipURI.parse(uri)`` instead.
         """
+        import warnings
+
+        warnings.warn(
+            "MessageParser.parse_uri() is deprecated. "
+            "Use SipURI.parse(uri) or SipURI.parse(uri).to_dict() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         from .._uri import SipURI
 
         return SipURI.parse(uri).to_dict()

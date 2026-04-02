@@ -16,7 +16,8 @@ from typing import Annotated
 from rich import box
 from rich.table import Table
 from sipx import (
-    AsyncClient,
+    AsyncSIPClient,
+    AsyncSIPServer,
     Request,
     SDPBody,
     FromHeader,
@@ -25,14 +26,15 @@ from sipx import (
     on,
     Events,
 )
-from sipx.server import AsyncSIPServer
-from sipx._utils import console
+from rich.console import Console
 from sipx.media import (
     RTPSession,
     AsyncRTPSession,
     ToneGenerator,
     DTMFToneGenerator,
 )
+
+console = Console()
 
 # ---------------------------------------------------------------------------
 # Config
@@ -65,7 +67,7 @@ _loop: asyncio.AbstractEventLoop | None = None
 # ---------------------------------------------------------------------------
 
 
-@server.invite
+@server.invite()
 def on_invite(
     request: Request,
     caller: Annotated[str, FromHeader],
@@ -172,7 +174,7 @@ async def main():
         dtmf_gen = DTMFToneGenerator()
         sdp = SDPBody.audio(ip=HOST, port=RTP_CLIENT)
 
-        async with AsyncClient(local_host=HOST, local_port=CLIENT_PORT) as client:
+        async with AsyncSIPClient(local_host=HOST, local_port=CLIENT_PORT) as client:
             client.events = events
 
             # INVITE

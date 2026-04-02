@@ -30,8 +30,46 @@ from .._utils import logger
 _log = logger.getChild("session.timer")
 
 if TYPE_CHECKING:
-    from ..client import AsyncClient, Client
+    from ..client import AsyncSIPClient, SIPClient
     from ..models._message import Response
+
+
+# ---------------------------------------------------------------------------
+# Shared helper (used by both sync and async timer)
+# ---------------------------------------------------------------------------
+
+
+def _parse_session_expires(response, config: SessionTimerConfig) -> None:
+    """Update *config* in-place with Session-Expires / Min-SE from *response*."""
+    se = response.headers.get("Session-Expires")
+    if se:
+        parts = se.split(";")
+        try:
+            config.interval = int(parts[0].strip())
+        except ValueError:
+            pass
+        for part in parts[1:]:
+            kv = part.strip().split("=", 1)
+            if len(kv) == 2 and kv[0].strip().lower() == "refresher":
+                config.refresher = kv[1].strip().lower()
+
+    min_se = response.headers.get("Min-SE")
+    if min_se:
+        try:
+            config.min_se = int(min_se.strip().split(";")[0])
+        except ValueError:
+            pass
+
+    if config.interval < config.min_se:
+        config.interval = config.min_se
+
+
+def _build_refresh_headers(config: SessionTimerConfig) -> dict:
+    """Return headers dict for a session refresh request."""
+    return {
+        "Session-Expires": f"{config.interval};refresher={config.refresher}",
+        "Supported": "timer",
+    }
 
 
 @dataclass
@@ -68,7 +106,7 @@ class SessionTimer:
 
     def __init__(
         self,
-        client: Client,
+        client: SIPClient,
         response: Response,
         config: SessionTimerConfig | None = None,
         on_refresh: Optional[Callable[[Response], None]] = None,
@@ -87,28 +125,7 @@ class SessionTimer:
 
     def _parse_response_timer(self):
         """Parse Session-Expires and Min-SE from the response."""
-        se = self.response.headers.get("Session-Expires")
-        if se:
-            parts = se.split(";")
-            try:
-                self.config.interval = int(parts[0].strip())
-            except ValueError:
-                pass
-            for part in parts[1:]:
-                kv = part.strip().split("=", 1)
-                if len(kv) == 2 and kv[0].strip().lower() == "refresher":
-                    self.config.refresher = kv[1].strip().lower()
-
-        min_se = self.response.headers.get("Min-SE")
-        if min_se:
-            try:
-                self.config.min_se = int(min_se.strip().split(";")[0])
-            except ValueError:
-                pass
-
-        # Enforce minimum
-        if self.config.interval < self.config.min_se:
-            self.config.interval = self.config.min_se
+        _parse_session_expires(self.response, self.config)
 
     @property
     def refresh_count(self) -> int:
@@ -163,10 +180,7 @@ class SessionTimer:
                 return
 
             # Build refresh headers
-            headers = {
-                "Session-Expires": f"{self.config.interval};refresher={self.config.refresher}",
-                "Supported": "timer",
-            }
+            headers = _build_refresh_headers(self.config)
 
             if self.config.method == "UPDATE":
                 refresh_response = self.client.update(
@@ -236,7 +250,7 @@ class AsyncSessionTimer:
 
     def __init__(
         self,
-        client: AsyncClient,
+        client: AsyncSIPClient,
         response: Response,
         config: SessionTimerConfig | None = None,
         on_refresh: Optional[Callable[[Response], None]] = None,
@@ -255,28 +269,7 @@ class AsyncSessionTimer:
 
     def _parse_response_timer(self) -> None:
         """Parse Session-Expires and Min-SE from the response."""
-        se = self.response.headers.get("Session-Expires")
-        if se:
-            parts = se.split(";")
-            try:
-                self.config.interval = int(parts[0].strip())
-            except ValueError:
-                pass
-            for part in parts[1:]:
-                kv = part.strip().split("=", 1)
-                if len(kv) == 2 and kv[0].strip().lower() == "refresher":
-                    self.config.refresher = kv[1].strip().lower()
-
-        min_se = self.response.headers.get("Min-SE")
-        if min_se:
-            try:
-                self.config.min_se = int(min_se.strip().split(";")[0])
-            except ValueError:
-                pass
-
-        # Enforce minimum
-        if self.config.interval < self.config.min_se:
-            self.config.interval = self.config.min_se
+        _parse_session_expires(self.response, self.config)
 
     @property
     def refresh_count(self) -> int:
@@ -322,10 +315,7 @@ class AsyncSessionTimer:
                 if not request:
                     continue
 
-                headers = {
-                    "Session-Expires": f"{self.config.interval};refresher={self.config.refresher}",
-                    "Supported": "timer",
-                }
+                headers = _build_refresh_headers(self.config)
 
                 if self.config.method == "UPDATE":
                     refresh_response = await self.client.update(

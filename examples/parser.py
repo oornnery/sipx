@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """sipx — Parse raw SIP messages and headers."""
 
-from sipx import MessageParser, Headers
-from sipx.models._message import Request, Response
-from sipx._utils import console
+from sipx import MessageParser, Headers, SipURI, Request, Response
+from rich.console import Console
+
+console = Console()
 
 # --- Parse a raw SIP request ---
 raw = (
@@ -53,5 +54,5 @@ console.print(
 console.print(f"Compact: h['f']=={h['f']}, h['i']=={h['i']}")
 
 # --- URI parsing ---
-uri = MessageParser.parse_uri("sip:alice@atlanta.com:5060;transport=tcp")
+uri = SipURI.parse("sip:alice@atlanta.com:5060;transport=tcp").to_dict()
 console.print(f"\nURI: {uri}")

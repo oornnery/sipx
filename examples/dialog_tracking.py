@@ -10,10 +10,10 @@ Shows how the state machine tracks transactions and dialogs:
 No network required — exercises the FSM in-memory.
 """
 
-from sipx import Request, Response
-from sipx.fsm import StateManager
-from sipx._types import DialogState
-from sipx._utils import console
+from sipx import Request, Response, StateManager, DialogState
+from rich.console import Console
+
+console = Console()
 
 
 def main():

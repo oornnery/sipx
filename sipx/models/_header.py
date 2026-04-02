@@ -80,11 +80,19 @@ class Headers(HeaderContainer):
     - Preservation of original header name casing
     - Insertion order preservation
     - Support for compact header forms
+    - Multi-value headers (Via, Record-Route, etc.)
+
+    For single-value access (backward compatible), use ``headers["Via"]`` which
+    returns the first value. For multi-value access, use ``headers.getall("Via")``.
+    To add a value without replacing existing ones, use ``headers.add("Via", val)``.
 
     Examples:
         >>> h = Headers({"Via": "SIP/2.0/UDP server.com", "from": "alice@example.com"})
         >>> h["FROM"]  # Case-insensitive access
         'alice@example.com'
+        >>> h.add("Via", "SIP/2.0/UDP proxy.com")
+        >>> h.getall("Via")
+        ['SIP/2.0/UDP server.com', 'SIP/2.0/UDP proxy.com']
         >>> h["Content-Type"] = "application/sdp"
         >>> list(h.keys())  # Preserves canonical casing
         ['Via', 'From', 'Content-Type']
@@ -152,14 +160,14 @@ class Headers(HeaderContainer):
             headers: Initial headers as Headers instance or Mapping
             encoding: Character encoding for serialization (default: utf-8)
         """
-        # _store maps canonical_name -> (display_name, value)
-        self._store: dict[str, tuple[str, str]] = {}
+        # _store maps canonical_name -> list of (display_name, value) tuples
+        self._store: dict[str, list[tuple[str, str]]] = {}
         # _order tracks insertion order of canonical names
         self._order: list[str] = []
         self._encoding = encoding
 
         if isinstance(headers, Headers):
-            self._store = headers._store.copy()
+            self._store = {k: list(v) for k, v in headers._store.items()}
             self._order = headers._order.copy()
             self._encoding = headers._encoding
         elif isinstance(headers, Mapping):
@@ -169,11 +177,11 @@ class Headers(HeaderContainer):
             raise TypeError("headers must be Headers or Mapping")
 
     def __getitem__(self, key: str) -> str:
-        """Get header value for the given key (case-insensitive)."""
+        """Get first header value for the given key (case-insensitive)."""
         canonical = self._canonical(key)
         if canonical not in self._store:
             raise KeyError(key)
-        return self._store[canonical][1]
+        return self._store[canonical][0][1]
 
     def __setitem__(self, key: str, value: str) -> None:
         """
@@ -186,11 +194,11 @@ class Headers(HeaderContainer):
         if canonical not in self._store:
             self._order.append(canonical)
 
-        # Store with canonical name as display name
-        self._store[canonical] = (canonical, str(value))
+        # Store with canonical name as display name (replaces all values)
+        self._store[canonical] = [(canonical, str(value))]
 
     def __delitem__(self, key: str) -> None:
-        """Delete header with the given key (case-insensitive)."""
+        """Delete all values for header with the given key (case-insensitive)."""
         canonical = self._canonical(key)
         if canonical not in self._store:
             raise KeyError(key)
@@ -198,12 +206,12 @@ class Headers(HeaderContainer):
         self._order.remove(canonical)
 
     def __iter__(self) -> typing.Iterator[str]:
-        """Iterate over header names (in canonical casing, insertion order)."""
+        """Iterate over header names (canonical casing, insertion order)."""
         for canonical in self._order:
-            yield self._store[canonical][0]
+            yield self._store[canonical][0][0]
 
     def __len__(self) -> int:
-        """Return the number of headers."""
+        """Return the number of unique header names."""
         return len(self._order)
 
     def __contains__(self, key: object) -> bool:
@@ -223,17 +231,50 @@ class Headers(HeaderContainer):
         items = ", ".join(f"{k!r}: {v!r}" for k, v in self.items())
         return f"Headers({{{items}}})"
 
+    def add(self, key: str, value: str) -> None:
+        """Add a header value without replacing existing values.
+
+        For headers like Via, Record-Route that can appear multiple times.
+        """
+        canonical = self._canonical(key)
+
+        if canonical not in self._store:
+            self._order.append(canonical)
+            self._store[canonical] = [(canonical, str(value))]
+        else:
+            self._store[canonical].append((canonical, str(value)))
+
+    @typing.overload
+    def get(self, key: str) -> str | None: ...
+
+    @typing.overload
+    def get(self, key: str, default: str) -> str: ...
+
+    @typing.overload
+    def get(self, key: str, default: str | None) -> str | None: ...
+
     def get(self, key: str, default: str | None = None) -> str | None:
-        """Get a header value with a default fallback."""
+        """Get the first header value with a default fallback."""
         try:
             return self[key]
         except KeyError:
             return default
 
+    def getall(self, key: str) -> list[str]:
+        """Get all values for a header name as a list.
+
+        Returns:
+            List of all values for the given header. Empty list if not found.
+        """
+        canonical = self._canonical(key)
+        if canonical not in self._store:
+            return []
+        return [entry[1] for entry in self._store[canonical]]
+
     def items(self) -> typing.Iterator[tuple[str, str]]:  # type: ignore[override]
-        """Iterate over all header name-value pairs."""
+        """Iterate over all header name-value pairs (first value per name)."""
         for canonical in self._order:
-            original, value = self._store[canonical]
+            original, value = self._store[canonical][0]
             yield original, value
 
     def keys(self) -> typing.Iterator[str]:  # type: ignore[override]
@@ -241,9 +282,9 @@ class Headers(HeaderContainer):
         return iter(self)
 
     def values(self) -> typing.Iterator[str]:  # type: ignore[override]
-        """Iterate over header values."""
+        """Iterate over first header values."""
         for canonical in self._order:
-            yield self._store[canonical][1]
+            yield self._store[canonical][0][1]
 
     def update(  # type: ignore[override]
         self,
@@ -275,11 +316,16 @@ class Headers(HeaderContainer):
         if not self._order:
             raise KeyError("Headers is empty")
         canonical = self._order.pop()
-        original, value = self._store.pop(canonical)
+        entries = self._store.pop(canonical)
+        original, value = entries[0]
         return original, value
 
     def to_lines(self) -> list[str]:
-        """Convert headers to list of 'Name: Value' strings in RFC 3261 order."""
+        """Convert headers to list of 'Name: Value' strings in RFC 3261 order.
+
+        Multi-value headers (Via, Record-Route, etc.) are emitted as
+        separate lines, one per value.
+        """
         # RFC 3261 recommended order (Section 20)
         priority_order = [
             "via",
@@ -302,38 +348,40 @@ class Headers(HeaderContainer):
             "supported",
         ]
 
-        # Collect headers in priority order first
-        ordered_headers = []
-        seen = set()
+        # Bucket sort: single pass through headers
+        priority_headers: dict[str, list[tuple[str, str]]] = {}
+        content_type: list[tuple[str, str]] = []
+        content_length: list[tuple[str, str]] = []
+        other_headers: list[tuple[str, str]] = []
+        priority_names_lower = set(priority_order)
 
-        # Add priority headers in order
+        for canonical in self._order:
+            for original, value in self._store[canonical]:
+                name_lower = original.lower()
+                if name_lower == "content-type":
+                    content_type.append((original, value))
+                elif name_lower == "content-length":
+                    content_length.append((original, value))
+                elif name_lower in priority_names_lower:
+                    if name_lower not in priority_headers:
+                        priority_headers[name_lower] = []
+                    priority_headers[name_lower].append((original, value))
+                else:
+                    other_headers.append((original, value))
+
+        ordered_headers: list[tuple[str, str]] = []
+
+        # Add priority headers in RFC order
         for priority_name in priority_order:
-            for name, value in self.items():
-                if name.lower() == priority_name:
-                    ordered_headers.append((name, value))
-                    seen.add(name.lower())
-                    break
+            if priority_name in priority_headers:
+                ordered_headers.extend(priority_headers[priority_name])
 
-        # Add remaining headers (except Content-Type and Content-Length which go last)
-        for name, value in self.items():
-            if name.lower() not in seen and name.lower() not in (
-                "content-type",
-                "content-length",
-            ):
-                ordered_headers.append((name, value))
-                seen.add(name.lower())
+        # Add remaining headers
+        ordered_headers.extend(other_headers)
 
-        # Add Content-Type before Content-Length if present
-        for name, value in self.items():
-            if name.lower() == "content-type":
-                ordered_headers.append((name, value))
-                break
-
-        # Add Content-Length last if present
-        for name, value in self.items():
-            if name.lower() == "content-length":
-                ordered_headers.append((name, value))
-                break
+        # Add Content-Type before Content-Length
+        ordered_headers.extend(content_type)
+        ordered_headers.extend(content_length)
 
         return [f"{name}: {value}" for name, value in ordered_headers]
 
@@ -445,7 +493,7 @@ class HeaderParser:
             else:
                 # Save previous header if exists
                 if current_name is not None:
-                    headers[current_name] = current_value
+                    headers.add(current_name, current_value)
 
                 # Parse new header
                 if b":" not in line:
@@ -457,7 +505,7 @@ class HeaderParser:
 
         # Save last header
         if current_name is not None:
-            headers[current_name] = current_value
+            headers.add(current_name, current_value)
 
         return headers
 

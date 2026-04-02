@@ -6,6 +6,7 @@ from ._subscription import (
     Subscription,
     AsyncSubscription,
     ReferSubscription,
+    SUBSCRIPTION_REFRESH_MARGIN,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "Subscription",
     "AsyncSubscription",
     "ReferSubscription",
+    "SUBSCRIPTION_REFRESH_MARGIN",
 ]

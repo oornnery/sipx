@@ -11,7 +11,9 @@ No network required — builds and inspects SIP messages offline.
 """
 
 from sipx import Request
-from sipx._utils import console
+from rich.console import Console
+
+console = Console()
 
 # ---------------------------------------------------------------------------
 # 1. Response builders on Request

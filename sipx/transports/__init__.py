@@ -5,14 +5,16 @@ This package provides transport implementations for SIP protocol:
 - UDP: Connectionless, unreliable transport
 - TCP: Connection-oriented, reliable transport
 - TLS: Secure, connection-oriented transport
+- WebSocket: WebSocket-based SIP transport (RFC 7118)
 
 Both synchronous and asynchronous versions are provided for each transport.
 """
 
+from ._framer import read_sip_message_sync, read_sip_message_async
 from .._types import (
-    ConnectionError,
+    SIPConnectionError,
     ReadError,
-    TimeoutError,
+    SIPTimeoutError,
     TransportAddress,
     TransportConfig,
     TransportError,
@@ -28,10 +30,22 @@ __all__ = [
     "TransportAddress",
     # Exceptions
     "TransportError",
-    "ConnectionError",
+    "SIPConnectionError",
     "ReadError",
     "WriteError",
-    "TimeoutError",
+    "SIPTimeoutError",
+    # Framing utilities
+    "read_sip_message_sync",
+    "read_sip_message_async",
+    # Transport implementations (lazy-loaded)
+    "UDPTransport",
+    "AsyncUDPTransport",
+    "TCPTransport",
+    "AsyncTCPTransport",
+    "TLSTransport",
+    "AsyncTLSTransport",
+    "WSTransport",
+    "AsyncWSTransport",
 ]
 
 
@@ -62,5 +76,13 @@ def __getattr__(name: str):
         from ._tls import AsyncTLSTransport
 
         return AsyncTLSTransport
+    elif name == "WSTransport":
+        from ._ws import WSTransport
+
+        return WSTransport
+    elif name == "AsyncWSTransport":
+        from ._ws import AsyncWSTransport
+
+        return AsyncWSTransport
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

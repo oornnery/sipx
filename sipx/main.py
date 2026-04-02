@@ -34,7 +34,8 @@ def _get_app():
     typer = _import_typer()
     from rich.console import Console
 
-    from .client import Client
+    from .client import SIPClient
+    from .models._auth import Auth
     from .server import SIPServer
 
     console = Console()
@@ -63,11 +64,9 @@ def _get_app():
         """Register with a SIP server."""
         auth = None
         if user and password:
-            from .models._auth import Auth
-
             auth = Auth.Digest(username=user, password=password)
 
-        with Client(
+        with SIPClient(
             local_host="0.0.0.0", local_port=0, transport=transport, auth=auth
         ) as client:
             console.print(
@@ -96,7 +95,9 @@ def _get_app():
         ),
     ):
         """Send OPTIONS to query server capabilities."""
-        with Client(local_host="0.0.0.0", local_port=0, transport=transport) as client:
+        with SIPClient(
+            local_host="0.0.0.0", local_port=0, transport=transport
+        ) as client:
             console.print(
                 f"[bold]OPTIONS [cyan]{uri}[/cyan] via {host}:{port}...[/bold]"
             )
@@ -130,11 +131,9 @@ def _get_app():
         """Make a call: INVITE + ACK, hold, BYE."""
         auth = None
         if user and password:
-            from .models._auth import Auth
-
             auth = Auth.Digest(username=user, password=password)
 
-        with Client(
+        with SIPClient(
             local_host="0.0.0.0", local_port=0, transport=transport, auth=auth
         ) as client:
             console.print(f"[bold]INVITE [cyan]{uri}[/cyan]...[/bold]")
@@ -185,11 +184,9 @@ def _get_app():
         """Send a SIP MESSAGE."""
         auth = None
         if user and password:
-            from .models._auth import Auth
-
             auth = Auth.Digest(username=user, password=password)
 
-        with Client(
+        with SIPClient(
             local_host="0.0.0.0", local_port=0, transport=transport, auth=auth
         ) as client:
             console.print(f"[bold]MESSAGE [cyan]{uri}[/cyan]: {text}[/bold]")

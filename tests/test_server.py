@@ -153,7 +153,7 @@ class TestServerDecorators:
     def test_invite_property_decorator(self, mock_udp_cls):
         server = SIPServer(local_host="127.0.0.1", local_port=0)
 
-        @server.invite
+        @server.invite()
         def on_invite(request, source):
             return Response(200)
 
@@ -163,7 +163,7 @@ class TestServerDecorators:
     def test_register_property_decorator(self, mock_udp_cls):
         server = SIPServer(local_host="127.0.0.1", local_port=0)
 
-        @server.register
+        @server.register()
         def on_register(request, source):
             return Response(200)
 
@@ -173,7 +173,7 @@ class TestServerDecorators:
     def test_message_property_decorator(self, mock_udp_cls):
         server = SIPServer(local_host="127.0.0.1", local_port=0)
 
-        @server.message
+        @server.message()
         def on_message(request, source):
             return Response(200)
 
@@ -183,7 +183,7 @@ class TestServerDecorators:
     def test_options_property_decorator(self, mock_udp_cls):
         server = SIPServer(local_host="127.0.0.1", local_port=0)
 
-        @server.options
+        @server.options()
         def on_options(request, source):
             return Response(200)
 
@@ -193,11 +193,11 @@ class TestServerDecorators:
     def test_multiple_decorators(self, mock_udp_cls):
         server = SIPServer(local_host="127.0.0.1", local_port=0)
 
-        @server.invite
+        @server.invite()
         def h1(request, source):
             return Response(200)
 
-        @server.bye
+        @server.bye()
         def h2(request, source):
             return Response(200)
 

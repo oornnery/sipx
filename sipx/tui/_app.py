@@ -428,7 +428,7 @@ class SipxApp(App):
             if getattr(widget, "id", None) == "capture-detail-page":
                 is_capture = True
                 break
-            widget = widget.parent
+            widget = widget.parent  # type: ignore[assignment]
         if is_capture:
             self._show_capture_packet(pkt)
         else:
@@ -580,7 +580,8 @@ class SipxApp(App):
         method = str(self.query_one("#method-select", Select).value or "INVITE")
         uri = self.query_one("#uri-input", Input).value
         req = self.query_one(RequestSection)
-        return method, uri, req.get_headers(), req.get_body(), *req.get_auth()
+        auth_user, auth_pass = req.get_auth()
+        return method, uri, req.get_headers(), req.get_body(), auth_user, auth_pass
 
     @work(exclusive=True, thread=False)
     async def action_send(self) -> None:
@@ -606,16 +607,16 @@ class SipxApp(App):
         t0 = time.monotonic()
 
         try:
-            from ..client import AsyncClient
+            from ..client import AsyncSIPClient
             from ..models._auth import SipAuthCredentials
-            from .._types import TimeoutError as SipTimeout
+            from .._types import SIPTimeoutError as SipTimeout
             from .._types import TransportError
 
             auth = None
             if auth_user and auth_pass:
                 auth = SipAuthCredentials(username=auth_user, password=auth_pass)
 
-            async with AsyncClient(auth=auth) as client:
+            async with AsyncSIPClient(auth=auth) as client:
                 self._wrap_client_transport(client)
 
                 kwargs: dict[str, Any] = {}
@@ -747,9 +748,9 @@ class SipxApp(App):
         )
 
         try:
-            from ..client import AsyncClient
+            from ..client import AsyncSIPClient
 
-            async with AsyncClient() as client:
+            async with AsyncSIPClient() as client:
                 self._wrap_client_transport(client)
                 await runner.run(client=client)
         except Exception as exc:

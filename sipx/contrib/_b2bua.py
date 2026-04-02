@@ -6,15 +6,15 @@ an incoming A-leg (server side) to an outgoing B-leg (client side).
 The bridge is minimal: SDP is relayed verbatim, BYE/CANCEL from either side
 terminates both legs.  The caller keeps full control over the underlying
 :class:`~sipx.server.SIPServer` / :class:`~sipx.server.AsyncSIPServer` and
-:class:`~sipx.client.Client` / :class:`~sipx.client.AsyncClient` instances.
+:class:`~sipx.client.SIPClient` / :class:`~sipx.client.AsyncSIPClient` instances.
 
 Example (sync)::
 
-    from sipx import SIPServer, Client
+    from sipx import SIPServer, SIPClient
     from sipx.contrib import B2BUA
 
     server = SIPServer(local_port=5060)
-    client = Client()
+    client = SIPClient()
 
     b2b = B2BUA(server, client, target="sip:pbx@192.168.1.1")
 
@@ -23,12 +23,12 @@ Example (sync)::
 
 Example (async)::
 
-    from sipx import AsyncSIPServer, AsyncClient
+    from sipx import AsyncSIPServer, AsyncSIPClient
     from sipx.contrib import AsyncB2BUA
 
     async def main():
         server = AsyncSIPServer(local_port=5060)
-        client = AsyncClient()
+        client = AsyncSIPClient()
         b2b = AsyncB2BUA(server, client, target="sip:pbx@192.168.1.1")
         async with b2b:
             await asyncio.sleep(3600)
@@ -53,7 +53,7 @@ class B2BUA:
 
     Args:
         server: A :class:`~sipx.server.SIPServer` instance (not yet started).
-        client: A :class:`~sipx.client.Client` instance.
+        client: A :class:`~sipx.client.SIPClient` instance.
         target: B-leg destination URI (e.g. ``"sip:pbx@192.168.1.1"``).
         on_bridge: Optional callback ``(a_request, b_response)`` fired when
             both legs are connected.
@@ -170,11 +170,11 @@ class AsyncB2BUA:
     """Asynchronous Back-to-Back User Agent.
 
     Drop-in async replacement for :class:`B2BUA`.  Requires an
-    :class:`~sipx.server.AsyncSIPServer` and :class:`~sipx.client.AsyncClient`.
+    :class:`~sipx.server.AsyncSIPServer` and :class:`~sipx.client.AsyncSIPClient`.
 
     Args:
         server: An :class:`~sipx.server.AsyncSIPServer` (not yet started).
-        client: An :class:`~sipx.client.AsyncClient`.
+        client: An :class:`~sipx.client.AsyncSIPClient`.
         target: B-leg destination URI.
         on_bridge: Optional async or sync callback ``(a_request, b_response)``.
         on_terminate: Optional async or sync callback ``(call_id: str)``.

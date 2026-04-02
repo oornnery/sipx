@@ -371,8 +371,8 @@ class StateManager:
         for handler in handlers:
             try:
                 handler(transaction)
-            except Exception:
-                pass  # Ignore handler errors
+            except (ValueError, TypeError, RuntimeError, OSError) as e:
+                _log.debug("Transaction state handler error: %s", e, exc_info=True)
 
     def _trigger_dialog_handlers(self, dialog: Dialog) -> None:
         """Trigger handlers for dialog state."""
@@ -380,8 +380,8 @@ class StateManager:
         for handler in handlers:
             try:
                 handler(dialog)
-            except Exception:
-                pass  # Ignore handler errors
+            except (ValueError, TypeError, RuntimeError, OSError) as e:
+                _log.debug("Dialog state handler error: %s", e, exc_info=True)
 
     # Utility methods
 
