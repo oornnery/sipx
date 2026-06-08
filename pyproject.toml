@@ -1,0 +1,18 @@
+[project]
+name = "sipx"
+version = "0.1.0"
+description = "Python programmable Voice/SIP harness for call automation, IVR testing, technical softphones, and media validation"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.16",
+    "taskipy>=1.14.1",
+    "ty>=0.0.44",
+]

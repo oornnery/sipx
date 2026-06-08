@@ -1,0 +1,38 @@
+# Hot Memory
+
+- Repo: `/home/oornnery/proj/sipx`.
+- Project name in `pyproject.toml`: `sipx`.
+- Public package/import name: `sipx`.
+- CLI command name: `sipx`.
+- Python requirement: `>=3.14`.
+- Dev deps present: `pytest`, `pytest-asyncio`, `pytest-cov`, `ruff`, `ty`, `taskipy`, `pre-commit`.
+- `README.md` now documents product identity, architecture, concepts, backends, expectations, evidence, roadmap, development, and security.
+- `IDEA.md` is long-form source vision for a Voice/SIP Harness.
+- `IDEA.md` is now historical source material only; implementation should use maintained English files in the current structure.
+- No separate `/docs` tree is desired; detailed context belongs in `README.md`, `SPEC.md`, `DESIGN.md`, `TODO.md`, `.spec/*`, and `.mem/*`.
+- Product identity: Python programmable Voice/SIP Harness, not just SIP bot or Asterisk wrapper.
+- Core vocabulary: `Harness`, `Actor`, `Scenario`, `Expect`, `Timeline`, `Verdict`, `Artifact`, `Call`, `CallLeg`.
+- Main decision: Harness core is product; Asterisk and Native SIP are backends.
+- First backend: `AsteriskBackend` for MVP speed, production-ish telephony, PBX, trunks, bridges, queues, recordings.
+- Asterisk control path: ARI REST + ARI WebSocket + dialplan `Stasis()`.
+- Asterisk media options: WebSocket media, AudioSocket, ExternalMedia RTP. MVP choice still open.
+- Native backend: `NativeSipBackend` for technical softphone, SIP wire-level tests, fuzzing, malformed messages, RTP impairment.
+- Native SIP core should be sans-I/O; async runtime owns sockets/timers.
+- Native modes: `strict` for real interop, `lab` for controlled protocol manipulation.
+- Technical softphone must be built on `NativeSipBackend`, not on Asterisk.
+- Technical softphone is headless engine first; CLI/TUI/GUI are later clients.
+- Scenario recorder/exporter is a key feature: manual call + timeline/actions -> YAML/Python scenario.
+- Lab hooks needed: before send request, after receive response, before SDP offer/answer.
+- Profiles needed: `strict` for interop, `lab` for controlled malformed behavior.
+- Mixed scenario target: native caller + Asterisk backend/app + native agent in one timeline.
+- PJSIP/PJSUA2 can be optional future backend, not replacement for native protocol-lab backend.
+- Public API must stay backend-neutral.
+- Capability model required: unsupported expectations fail loud with `UnsupportedExpectation`.
+- Critical regressions require deterministic/temporal assertions; AI semantic checks are supplemental.
+- Timeline is central evidence layer and feeds replay, reports, debugging, assertions.
+- Verdict is first-class, not just raised exception.
+- Artifacts expected: timeline JSONL, recording WAV, transcript JSON, SIP PCAP, HTML/text report.
+- Media loop must not block on STT/TTS/LLM.
+- DTMF is media event; RFC4733 telephone-event primary.
+- G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
+- Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
