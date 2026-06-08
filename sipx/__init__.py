@@ -31,6 +31,15 @@ from sipx.media import (
     TtsEngine,
 )
 from sipx.security import Redactor, default_redactor
+from sipx.sdp import (
+    AudioMedia,
+    SdpCodec,
+    SdpNegotiationError,
+    SessionDescription,
+    create_audio_answer,
+    create_audio_offer,
+    parse_sdp,
+)
 from sipx.sip import (
     HeaderMap,
     SipMessage,
@@ -44,6 +53,7 @@ from sipx.sip import (
 __all__ = [
     "Actor",
     "AudioFrame",
+    "AudioMedia",
     "Artifact",
     "ArtifactKind",
     "ArtifactStore",
@@ -60,6 +70,9 @@ __all__ = [
     "MediaPort",
     "Redactor",
     "Scenario",
+    "SdpCodec",
+    "SdpNegotiationError",
+    "SessionDescription",
     "SipMessage",
     "SipParseError",
     "SipRequest",
@@ -73,8 +86,11 @@ __all__ = [
     "TtsEngine",
     "UnsupportedExpectation",
     "Verdict",
+    "create_audio_answer",
+    "create_audio_offer",
     "expect",
     "default_redactor",
+    "parse_sdp",
     "parse_sip_message",
     "scenario",
 ]

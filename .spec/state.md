@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.4.0` delivered sans-I/O SIP URI, headers, parser, serializer, and Content-Length validation.
+Implement `sipx` in verified commit blocks. Block `0.5.0` delivered SDP audio model/parser/serializer and offer-answer helpers.
 
 ## Sources Read
 
@@ -40,6 +40,10 @@ Implement `sipx` in verified commit blocks. Block `0.4.0` delivered sans-I/O SIP
 - Added `sipx.sip` package with `SipUri`, `HeaderMap`, `SipRequest`, `SipResponse`, `SipParseError`, and `parse_sip_message`.
 - Added SIP parser tests for URI round-trip, compact header expansion, request/response parsing, Content-Length mismatch, oversized messages, and serializer Content-Length rewrite.
 - Marked SPEC tasks T16 and T17 complete after verification.
+- Bumped `pyproject.toml` version from `0.4.0` to `0.5.0`.
+- Added `sipx.sdp` package with `SessionDescription`, `AudioMedia`, `SdpCodec`, `parse_sdp`, `create_audio_offer`, and `create_audio_answer`.
+- Added SDP tests for audio parsing, static codecs, `telephone-event`, offer serialization, answer codec selection, direction inversion, and negotiation failure.
+- Marked SPEC task T18 complete after verification.
 
 ## Active Decision
 
@@ -49,8 +53,8 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Implement SDP model/parser/offer-answer for audio PCMU/PCMA/telephone-event.
-2. Implement RTP packet parsing/stats and DTMF RFC4733 primitives.
+1. Implement RTP packet parsing/stats and DTMF RFC4733 primitives.
+2. Implement SIP transaction/dialog skeletons.
 3. Add richer fake media events and example mock scenario.
 4. Choose first Asterisk media path.
 5. Decide artifact retention policy before real recordings/transcripts.
@@ -64,6 +68,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
 - SIP parser exists, but transaction/dialog state machines are not implemented yet.
+- SDP exists, but RTP packetization and RFC4733 DTMF are not implemented yet.
 
 ## Open Questions
 

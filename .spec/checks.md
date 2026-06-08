@@ -51,6 +51,14 @@
 | 2026-06-08 | `ruff check .` | pass | All checks passed after SIP formatting. |
 | 2026-06-08 | `ruff format --check .` | pass | 36 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `python -m pytest` | pass | 26 tests passed for SDP block before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for SDP block. |
+| 2026-06-08 | `ruff format --check .` | fail | `sipx/sdp/parser.py` needed formatting; fixed with targeted `ruff format`. |
+| 2026-06-08 | `ruff format sipx/sdp/parser.py` | pass | 1 file reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 26 tests passed after SDP formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after SDP formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 41 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 
 ## Validation Policy
 

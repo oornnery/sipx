@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.5.0 - 2026-06-08
+
+- Added SDP session/audio model, parser, and serializer.
+- Added audio offer/answer helpers for PCMU, PCMA, and `telephone-event`.
+- Added SDP direction handling for `sendrecv`, `sendonly`, `recvonly`, and `inactive`.
+- Added tests for SDP parsing, serialization, offer/answer codec selection, direction inversion, and negotiation failure.
+
 ## 0.4.0 - 2026-06-08
 
 - Added sans-I/O SIP URI, header map, message parser, and serializer primitives.

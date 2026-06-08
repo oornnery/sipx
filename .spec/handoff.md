@@ -2,7 +2,7 @@
 
 ## Summary
 
-Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.4.0` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, and SIP parser primitives.
+Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.5.0` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, and SDP audio offer/answer.
 
 ## Read First
 
@@ -37,8 +37,8 @@ Build `sipx` as a Python Voice/SIP Harness:
 
 Continue after block `0.2.0`:
 
-1. Implement SDP model/parser/offer-answer for audio PCMU/PCMA/telephone-event.
-2. Implement RTP packet parsing/stats and DTMF RFC4733 primitives.
+1. Implement RTP packet parsing/stats and DTMF RFC4733 primitives.
+2. Implement SIP transaction/dialog skeletons.
 3. Add richer mock media events and an example scenario.
 4. Choose first Asterisk media path.
 
@@ -51,7 +51,7 @@ Continue after block `0.2.0`:
 
 ## Latest Validation
 
-- `python -m pytest`: pass, 22 tests.
+- `python -m pytest`: pass, 26 tests.
 - `ruff check .`: pass.
 - `ruff format --check .`: pass.
 - `python -m ty check`: blocked, active interpreter has no `ty` module.
