@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.1.0` adds operational softphone/profile CLI commands and GitHub CI/release workflows adapted to the new project.
+Implement `sipx` in verified commit blocks. Block `1.1.1` backpropagates phone CLI missing-config UX and makes network commands fail fast before opening sockets.
 
 ## Sources Read
 
@@ -164,6 +164,13 @@ Implement `sipx` in verified commit blocks. Block `1.1.0` adds operational softp
 - Added no-network CLI tests that fake `NativeSoftphone` while validating profile and explicit account configuration.
 - Added `.github/workflows/ci.yml`, `asterisk.yml`, `create-release.yml`, and `release.yml` using Python 3.14, current project metadata, uv, ruff, pytest, package build, Docker Asterisk integration, and PyPI trusted publishing.
 - Marked SPEC tasks T33-T34 complete after validation.
+- Committed and force-pushed the new project to `origin/master` at `8457a73`; old remote branches `dev` and `copilot/modularize-sipx-modules` were deleted.
+- Deleted old remote Git tags `v0.0.4` through `v0.0.7` and old GitHub release records `v0.0.4` through `v0.0.7`.
+- Bumped `pyproject.toml` version from `1.1.0` to `1.1.1`.
+- Recorded SPEC B5 and V27 after `sipx register` without profile/flags timed out against localhost defaults.
+- Added fail-fast phone CLI validation: commands require a profile or explicit `--aor` and `--registrar` before opening network sockets.
+- Phone commands now derive default remote host and port from `--registrar` when `--remote-host` and `--remote-port` are omitted.
+- Added phone CLI help examples and no-network regression tests for missing config, explicit register config, and help output.
 
 ## Active Decision
 
@@ -173,12 +180,11 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Configure `origin` and replace the old GitHub repo only after explicit confirmation of the destructive remote update and tag policy.
-2. Decide license before public distribution and Asterisk/commercial positioning.
-3. Decide whether to fix the 29 diagnostics from `uv run ty check` or defer type checking as a later hardening block.
-4. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest tests/test_asterisk_integration.py` after starting `docker/asterisk`.
-5. Add richer fake media events, recording/transcript artifacts, and retention policy.
-6. Add live SIP inspector and advanced RTP/media runtime behavior.
+1. Decide license before public distribution and Asterisk/commercial positioning.
+2. Decide whether to fix the 29 diagnostics from `uv run ty check` or defer type checking as a later hardening block.
+3. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest tests/test_asterisk_integration.py` after starting `docker/asterisk`.
+4. Add richer fake media events, recording/transcript artifacts, and retention policy.
+5. Add live SIP inspector and advanced RTP/media runtime behavior.
 
 ## Risks
 
@@ -197,4 +203,4 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 - License choice before public release is still open.
 - Next advanced media/runtime priority is still open: recordings/transcripts, jitter/RTCP/impairment, or AI slow-path behavior.
-- Remote replacement and tag policy for `https://github.com/oornnery/sipx` still need explicit confirmation before push.
+- GitHub release draft policy after `1.1.1` should keep only the latest draft release before publishing.

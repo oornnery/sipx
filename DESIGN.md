@@ -1578,11 +1578,19 @@ The CLI command is `sipx`.
 
 ```bash
 sipx phone register lab_account
-sipx phone call sip:6000@pbx.lab --scenario validate-menu
-sipx scenario run ivr_second_copy.yml
-sipx call inspect --live
+sipx phone unregister lab_account
+sipx phone call sip:6000@pbx.lab --profile lab_account --duration 5
+sipx phone listen lab_account --duration 30
+sipx register lab_account
+sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password secret
+sipx call sip:6000@pbx.lab --profile lab_account
+sipx scenario run ivr_second_copy.py
+sipx scenario export timeline.jsonl --format python
 sipx replay timeline.jsonl
 ```
+
+Implemented profile inspection commands are `sipx profile list` and `sipx profile show <name>`.
+Implemented phone commands fail before network access unless a profile or explicit SIP account identity is provided.
 
 ## Technical Softphone Python Shape
 

@@ -14,5 +14,5 @@
 | O10 | Type-check gate? | fix `uv run ty check` diagnostics, sync system `python -m ty`, or defer hard gate | Before claiming full type-check validation. |
 | O11 | Slow AI media behavior? | silence, comfort tone, waiting prompt, configurable policy | Before real STT/TTS/LLM runtime. |
 | O12 | Advanced RTP depth? | jitter buffer, RTCP, impairment, payload validation | After basic RTP/DTMF primitives. |
-| O13 | Next native SIP/softphone layer after 1.1.0? | media wiring, live inspector, recordings/transcripts | Before choosing work outside current SPEC table. |
-| O14 | Remote replacement policy? | force-push master only, preserve/delete old tags, push new tags later | Before replacing `https://github.com/oornnery/sipx`. |
+| O13 | Next native SIP/softphone layer after 1.1.1? | media wiring, live inspector, recordings/transcripts | Before choosing work outside current SPEC table. |
+| O14 | Release draft policy? | keep latest draft only, publish manually, automate cleanup | Before first public `sipx` release is published. |

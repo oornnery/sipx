@@ -100,6 +100,7 @@ V23: implementation work ! rely on maintained current-structure docs; `IDEA.md` 
 V24: `cmd: sipx` ! runnable via package-manager console script from repo root.
 V25: operational softphone CLI ! build `NativeSoftphoneConfig` from profile or explicit account args; tests must not require network.
 V26: GitHub workflows ! use current project metadata/commands; ⊥ old `_version.py`, old Python pin, or task-only aliases.
+V27: phone CLI network commands ! fail before network unless profile or explicit SIP identity exists; help must show required account flags/examples.
 
 ## §T
 
@@ -139,6 +140,7 @@ T31|x|document optional future `PjsipBackend` tradeoffs|C15,I.backend
 T32|x|consolidate detailed implementation context into current structure, not `/docs`|C17,V23
 T33|x|add operational softphone/profile CLI commands plus no-network CLI tests|V17,V21,V24,V25,I.cmd
 T34|x|adapt GitHub CI, Asterisk integration, draft release, and PyPI publish workflows|V24,V26,I.ci
+T35|x|backprop phone CLI missing-config UX: no silent localhost network defaults|V25,V27,I.cmd
 
 ## §B
 
@@ -148,3 +150,4 @@ B1|2026-06-08|tests used `pytest.mark.asyncio` but active `pytest` lacked async 
 B2|2026-06-08|redaction regex replacement assumed every secret pattern had capture group|fix replacement helper; covered by V13
 B3|2026-06-08|retransmission timer code used `asyncio` without module import|focused runtime tests caught it; no new §V, mechanical import failure
 B4|2026-06-08|`uv run sipx` had no installable build backend, so uv ran `sipx/__main__.py` directly and imports failed|V24
+B5|2026-06-08|`sipx register` without profile/flags silently used localhost defaults and timed out|V27

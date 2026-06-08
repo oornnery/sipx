@@ -244,6 +244,18 @@
 | 2026-06-08 | workflow trailing-whitespace grep | pass/no output | No trailing whitespace in `.github/workflows/*.yml`. |
 | 2026-06-08 | release tag comparison shell command | pass/no output | Exact publish-workflow command accepts `v1.1.0` from `pyproject.toml`. |
 | 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.1.0-final` | pass | Built final `1.1.0` sdist and wheel outside the repo. |
+| 2026-06-08 | `uv run sipx register` | fail-fast expected | Exits with local config error; no `SipUdpError` timeout. |
+| 2026-06-08 | `uv run sipx register --help` | pass | Shows `--aor`, `--registrar`, auth flags, remote flags, and examples. |
+| 2026-06-08 | `python -m pytest tests/test_cli.py` | pass | 10 CLI tests passed after B5/V27 fix. |
+| 2026-06-08 | `ruff check sipx/cli/main.py tests/test_cli.py` | pass | Focused lint for B5/V27 fix. |
+| 2026-06-08 | `ruff format --check sipx/cli/main.py tests/test_cli.py` | pass | Focused format check for B5/V27 fix. |
+| 2026-06-08 | `uv run sipx --help` | pass | Console script works after `1.1.1` bump. |
+| 2026-06-08 | `python -m pytest` | pass | 106 passed, 2 skipped after B5/V27 fix. |
+| 2026-06-08 | `ruff check .` | pass | All lint checks passed after B5/V27 fix. |
+| 2026-06-08 | `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | `uv run ty check` | fail | 29 existing diagnostics remain; B5/V27 fix did not add a new diagnostic. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors before check/state log updates. |
+| 2026-06-08 | `uv build --out-dir /tmp/opencode/sipx-build-1.1.1-final` | pass | Built final `1.1.1` sdist and wheel outside the repo. |
 
 ## Validation Policy
 

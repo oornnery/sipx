@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, plus GitHub CI/release workflows adapted to the new project.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, GitHub CI/release workflows adapted to the new project, and fail-fast phone CLI config validation.
 
 ## Milestone 0 - Project Grounding
 
@@ -339,6 +339,15 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added no-network CLI tests with fake `NativeSoftphone` objects.
 - [x] Added GitHub workflows for CI, Asterisk integration, draft release creation, and PyPI publish.
 - [x] Marked `SPEC.md` T33-T34 complete after validation.
+
+## Block 1.1.1 Done
+
+- [x] Bumped package version to `1.1.1`.
+- [x] Backpropagated `sipx register` missing-config timeout as `SPEC.md` B5 and V27.
+- [x] Made phone commands fail before network access unless a profile or explicit `--aor` and `--registrar` are provided.
+- [x] Made phone commands derive default remote host/port from `--registrar` when explicit remote flags are omitted.
+- [x] Added account-flag examples to phone command help.
+- [x] Added no-network regression tests for missing config, explicit register config, and help output.
 
 ## Blocked Or Pending
 

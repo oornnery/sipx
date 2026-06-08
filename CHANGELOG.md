@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.1.1 - 2026-06-08
+
+- Fixed `sipx register` without profile or account flags so it fails before opening a SIP socket instead of timing out against localhost defaults.
+- Made phone commands derive the default remote host and port from `--registrar` when `--remote-host` and `--remote-port` are omitted.
+- Added account-flag examples to phone command help.
+- Recorded SPEC B5 and invariant V27 for phone CLI configuration UX.
+
 ## 1.1.0 - 2026-06-08
 
 - Added operational softphone CLI commands: `sipx phone register`, `unregister`, `call`, and `listen`.

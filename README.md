@@ -242,8 +242,11 @@ sipx phone unregister lab --config harness.toml
 sipx phone call sip:6000@pbx.lab --profile lab --config harness.toml
 sipx phone listen lab --config harness.toml --duration 30
 sipx register lab --config harness.toml
+sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password secret
 sipx call sip:6000@pbx.lab --profile lab --duration 5
 ```
+
+Phone commands that touch the network require either a profile or explicit `--aor` and `--registrar` flags. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the registrar host and port.
 
 GitHub automation lives under `.github/workflows`:
 

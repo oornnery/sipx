@@ -2,6 +2,8 @@ from pathlib import Path
 from types import SimpleNamespace
 import tomllib
 
+import pytest
+
 from sipx.cli.main import main
 
 
@@ -121,6 +123,70 @@ def test_cli_registers_phone_from_profile(tmp_path: Path, monkeypatch, capsys) -
     assert phone_config.mode == "lab"
 
 
+def test_cli_register_requires_profile_or_account_args(monkeypatch, capsys) -> None:
+    def fail_if_network_starts(config):
+        raise AssertionError("NativeSoftphone must not be constructed")
+
+    monkeypatch.setattr("sipx.cli.main.NativeSoftphone", fail_if_network_starts)
+
+    code = main(["register"])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "requires a profile or explicit --aor and --registrar" in captured.err
+    assert "timed out" not in captured.err
+
+
+def test_cli_register_uses_registrar_as_default_remote(monkeypatch, capsys) -> None:
+    created = {}
+
+    class FakeSoftphone:
+        def __init__(self, config) -> None:
+            created["config"] = config
+            self.contact = "sip:alice@127.0.0.1:45000"
+            self.local_address = ("127.0.0.1", 45000)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def register(self):
+            return SimpleNamespace(value="registered")
+
+    monkeypatch.setattr("sipx.cli.main.NativeSoftphone", FakeSoftphone)
+
+    code = main(
+        [
+            "register",
+            "--aor",
+            "sip:alice@example.com",
+            "--registrar",
+            "sip:pbx.example.com:5070",
+            "--username",
+            "alice",
+            "--password",
+            "secret",
+        ]
+    )
+
+    assert code == 0
+    assert created["config"].remote == ("pbx.example.com", 5070)
+    assert "registered: registered" in capsys.readouterr().out
+
+
+def test_cli_register_help_shows_account_flags(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["register", "--help"])
+
+    output = capsys.readouterr().out
+    assert exc_info.value.code == 0
+    assert "--aor" in output
+    assert "--registrar" in output
+    assert "examples:" in output
+
+
 def test_cli_places_top_level_call(monkeypatch, capsys) -> None:
     created = {"hangups": 0}
 
@@ -164,7 +230,7 @@ def test_cli_places_top_level_call(monkeypatch, capsys) -> None:
     assert created["hangups"] == 1
     assert created["hungup_call"] == "call-1"
     assert str(phone_config.account.aor) == "sip:alice@example.com"
-    assert phone_config.remote == ("127.0.0.1", 5060)
+    assert phone_config.remote == ("example.com", 5060)
     assert "call confirmed: call-1" in output
     assert "call terminated: call-1" in output
 

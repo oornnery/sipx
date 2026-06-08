@@ -32,12 +32,14 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.1.0`.
+- Current implementation version: `1.1.1`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
 - Minimum scenario artifacts now written: `timeline.jsonl`, `verdict.json`, `report.txt`, and `report.html`.
 - CLI exists: `sipx scenario run <file>`, `sipx scenario export <timeline.jsonl>`, `sipx replay <timeline.jsonl>`, `sipx profile list|show`, `sipx phone register|unregister|call|listen`, and top-level `sipx register|unregister|call|listen` aliases.
+- Phone CLI network commands require a profile or explicit `--aor` and `--registrar`; without config they fail before opening sockets.
+- Phone CLI derives default remote host/port from `--registrar` when `--remote-host/--remote-port` are omitted.
 - Tests currently run with plain `pytest`; async tests use `asyncio.run` because active `pytest` lacks `pytest-asyncio` plugin.
 - `ty` is declared as a dev dependency but unavailable in the active interpreter used during block `0.2.0`.
 - Media primitives now exist: `AudioFrame`, `MediaPort`, `TranscriptEvent`, STT/TTS protocols, `BargeInPolicy`.
@@ -70,4 +72,4 @@
 - `.github/workflows/asterisk.yml` starts `docker/asterisk` and runs `SIPX_ASTERISK_INTEGRATION=1 uv run pytest tests/test_asterisk_integration.py`.
 - `.github/workflows/create-release.yml` reads `pyproject.toml` version and creates a draft `v<version>` release on `master` if missing.
 - `.github/workflows/release.yml` verifies release tag vs `pyproject.toml`, tests/builds, and publishes to PyPI with trusted publishing.
-- Local repo still has no `origin` remote configured; replacing `https://github.com/oornnery/sipx` needs explicit destructive-update and tag-policy confirmation before push.
+- `origin` is `https://github.com/oornnery/sipx.git`; old remote branches/tags/releases were removed during replacement.

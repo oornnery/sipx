@@ -35,6 +35,10 @@ class PhoneCommandConfig:
     keepalive: float = 0.0
 
 
+class PhoneCommandError(RuntimeError):
+    pass
+
+
 def load_scenario(path: str | Path) -> Scenario:
     scenario_path = Path(path)
     namespace = runpy.run_path(str(scenario_path))
@@ -107,7 +111,10 @@ async def run_phone_listen(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="sipx")
+    parser = argparse.ArgumentParser(
+        prog="sipx",
+        description="Programmable Voice/SIP harness and technical softphone.",
+    )
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     scenario_parser = subcommands.add_parser("scenario")
@@ -148,15 +155,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     phone_parser = subcommands.add_parser("phone")
     phone_subcommands = phone_parser.add_subparsers(dest="phone_command", required=True)
-    _add_phone_register_parser(phone_subcommands.add_parser("register"))
-    _add_phone_unregister_parser(phone_subcommands.add_parser("unregister"))
-    _add_phone_call_parser(phone_subcommands.add_parser("call"))
-    _add_phone_listen_parser(phone_subcommands.add_parser("listen"))
+    _add_phone_register_parser(_phone_parser(phone_subcommands, "register"))
+    _add_phone_unregister_parser(_phone_parser(phone_subcommands, "unregister"))
+    _add_phone_call_parser(_phone_parser(phone_subcommands, "call"))
+    _add_phone_listen_parser(_phone_parser(phone_subcommands, "listen"))
 
-    _add_phone_register_parser(subcommands.add_parser("register"))
-    _add_phone_unregister_parser(subcommands.add_parser("unregister"))
-    _add_phone_call_parser(subcommands.add_parser("call"))
-    _add_phone_listen_parser(subcommands.add_parser("listen"))
+    _add_phone_register_parser(_phone_parser(subcommands, "register"))
+    _add_phone_unregister_parser(_phone_parser(subcommands, "unregister"))
+    _add_phone_call_parser(_phone_parser(subcommands, "call"))
+    _add_phone_listen_parser(_phone_parser(subcommands, "listen"))
 
     return parser
 
@@ -226,21 +233,46 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _add_phone_common(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--profile", dest="profile_option")
-    parser.add_argument("--config", default="harness.toml")
-    parser.add_argument("--aor")
-    parser.add_argument("--registrar")
-    parser.add_argument("--username")
-    parser.add_argument("--password")
-    parser.add_argument("--contact-user")
-    parser.add_argument("--remote-host")
-    parser.add_argument("--remote-port", type=int)
-    parser.add_argument("--local-host", default="127.0.0.1")
-    parser.add_argument("--local-port", type=int, default=0)
-    parser.add_argument("--mode", choices=("strict", "lab"))
-    parser.add_argument("--timeout", type=float, default=5.0)
-    parser.add_argument("--expires", type=int, default=3600)
-    parser.add_argument("--actor-id", default="softphone")
+    parser.add_argument(
+        "--profile", dest="profile_option", help="Profile name from --config."
+    )
+    parser.add_argument("--config", default="harness.toml", help="Profile config path.")
+    parser.add_argument(
+        "--aor", help="Account address, for example sip:1001@example.com."
+    )
+    parser.add_argument(
+        "--registrar", help="Registrar URI, for example sip:pbx.example.com:5060."
+    )
+    parser.add_argument("--username", help="Digest auth username.")
+    parser.add_argument("--password", help="Digest auth password.")
+    parser.add_argument(
+        "--contact-user", help="User part for the generated Contact URI."
+    )
+    parser.add_argument(
+        "--remote-host", help="SIP peer host; defaults to registrar host."
+    )
+    parser.add_argument(
+        "--remote-port",
+        type=int,
+        help="SIP peer UDP port; defaults to registrar port or 5060.",
+    )
+    parser.add_argument(
+        "--local-host", default="127.0.0.1", help="Local UDP bind host."
+    )
+    parser.add_argument(
+        "--local-port",
+        type=int,
+        default=0,
+        help="Local UDP bind port; 0 picks a free port.",
+    )
+    parser.add_argument("--mode", choices=("strict", "lab"), help="Native SIP mode.")
+    parser.add_argument(
+        "--timeout", type=float, default=5.0, help="SIP transaction timeout in seconds."
+    )
+    parser.add_argument(
+        "--expires", type=int, default=3600, help="REGISTER expiration in seconds."
+    )
+    parser.add_argument("--actor-id", default="softphone", help="Timeline actor id.")
 
 
 def _add_phone_register_parser(parser: argparse.ArgumentParser) -> None:
@@ -288,10 +320,7 @@ def _phone_command_config(args: argparse.Namespace) -> PhoneCommandConfig:
     account = _phone_account(args, profile)
     config = NativeSoftphoneConfig(
         account=account,
-        remote=(
-            str(_arg_or_profile(args, profile, "remote_host", default="127.0.0.1")),
-            int(_arg_or_profile(args, profile, "remote_port", default=5060)),
-        ),
+        remote=_phone_remote(args, profile, _sip_uri(account.registrar)),
         mode=str(args.mode or (profile.mode if profile else "strict")),
         local_host=args.local_host,
         local_port=args.local_port,
@@ -325,8 +354,13 @@ def _phone_account(
     args: argparse.Namespace,
     profile: Profile | None,
 ) -> NativeSoftphoneAccount:
-    aor = _arg_or_profile(args, profile, "aor", default="sip:softphone@127.0.0.1")
-    registrar = _arg_or_profile(args, profile, "registrar", default="sip:127.0.0.1")
+    aor = _arg_or_profile(args, profile, "aor")
+    registrar = _arg_or_profile(args, profile, "registrar")
+    if not aor or not registrar:
+        raise PhoneCommandError(
+            "phone command requires a profile or explicit --aor and --registrar; "
+            "try `sipx register --help`"
+        )
     return NativeSoftphoneAccount(
         aor=SipUri.parse(str(aor)),
         registrar=SipUri.parse(str(registrar)),
@@ -335,6 +369,32 @@ def _phone_account(
         contact_user=_arg_or_profile(args, profile, "contact_user"),
         expires=args.expires,
     )
+
+
+def _phone_remote(
+    args: argparse.Namespace,
+    profile: Profile | None,
+    registrar: SipUri,
+) -> tuple[str, int]:
+    if args.remote_host is not None:
+        host = args.remote_host
+    elif profile is not None:
+        host = profile.account.remote_host
+    else:
+        host = registrar.host
+
+    if args.remote_port is not None:
+        port = args.remote_port
+    elif profile is not None:
+        port = profile.account.remote_port
+    else:
+        port = registrar.port or 5060
+
+    return host, port
+
+
+def _sip_uri(value: SipUri | str) -> SipUri:
+    return value if isinstance(value, SipUri) else SipUri.parse(value)
 
 
 def _arg_or_profile(
@@ -359,12 +419,49 @@ def _format_address(address: tuple[str, int]) -> str:
     return f"{address[0]}:{address[1]}"
 
 
+def _phone_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+    name: str,
+) -> argparse.ArgumentParser:
+    examples = {
+        "register": (
+            "examples:\n"
+            "  sipx register lab --config harness.toml\n"
+            "  sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password secret"
+        ),
+        "unregister": (
+            "examples:\n"
+            "  sipx unregister lab --config harness.toml\n"
+            "  sipx unregister --aor sip:1001@example.com --registrar sip:pbx.example.com"
+        ),
+        "call": (
+            "examples:\n"
+            "  sipx call sip:6000@pbx.example.com --profile lab --duration 5\n"
+            "  sipx call sip:6000@pbx.example.com --aor sip:1001@example.com --registrar sip:pbx.example.com"
+        ),
+        "listen": (
+            "examples:\n"
+            "  sipx listen lab --config harness.toml --duration 30\n"
+            "  sipx listen --aor sip:1001@example.com --registrar sip:pbx.example.com --local-port 5062"
+        ),
+    }
+    return subcommands.add_parser(
+        name,
+        description=f"Native SIP softphone {name} command.",
+        epilog=examples[name],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+
 def _run_phone_command(coro: Coroutine[Any, Any, int]) -> int:
     try:
         return asyncio.run(coro)
     except KeyboardInterrupt:
         print("stopped", file=sys.stderr)
         return 130
+    except PhoneCommandError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     except Exception as exc:
         print(f"error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
