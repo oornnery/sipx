@@ -223,6 +223,27 @@
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; system interpreter blocker unchanged. |
 | 2026-06-08 | `uv run ty check` | fail | 29 existing typing diagnostics surfaced now that uv can run `ty`; not part of CLI packaging fix. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after CLI packaging fix. |
+| 2026-06-08 | `python -m pytest tests/test_cli.py` | pass | 7 CLI tests passed after operational CLI additions. |
+| 2026-06-08 | `ruff check sipx/cli/main.py tests/test_cli.py` | pass | Focused lint for operational CLI changes. |
+| 2026-06-08 | `ruff format --check sipx/cli/main.py tests/test_cli.py` | pass | 2 changed CLI files already formatted. |
+| 2026-06-08 | `uv lock` | pass | Updated lockfile project version from `1.0.1` to `1.1.0`. |
+| 2026-06-08 | `uv run sipx --help` | pass | Help now lists `scenario`, `replay`, `profile`, `phone`, `register`, `unregister`, `call`, and `listen`. |
+| 2026-06-08 | `python -m pytest` | pass | 103 passed, 2 skipped after CLI/workflow block. |
+| 2026-06-08 | `ruff check .` | pass | All lint checks passed after CLI/workflow block. |
+| 2026-06-08 | `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | `uv build` | pass | Built `dist/sipx-1.1.0.tar.gz` and `dist/sipx-1.1.0-py3-none-any.whl`; generated artifacts removed after validation. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after CLI/workflow block before docs/state updates. |
+| 2026-06-08 | `uv run ty check` | fail | 29 existing typing diagnostics remain; not addressed in this block. |
+| 2026-06-08 | `docker compose -f docker/asterisk/docker-compose.yml config` | blocked | Docker command unavailable in this WSL environment. |
+| 2026-06-08 | `python3 -c <read pyproject version>` | pass | Release workflow version source resolves to `1.1.0`. |
+| 2026-06-08 | final `uv run sipx --help` | pass | Commands include `scenario`, `replay`, `profile`, `phone`, `register`, `unregister`, `call`, and `listen`. |
+| 2026-06-08 | final `python -m pytest` | pass | 103 passed, 2 skipped. |
+| 2026-06-08 | final `ruff check .` | pass | All lint checks passed. |
+| 2026-06-08 | final `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors after docs/state updates. |
+| 2026-06-08 | workflow trailing-whitespace grep | pass/no output | No trailing whitespace in `.github/workflows/*.yml`. |
+| 2026-06-08 | release tag comparison shell command | pass/no output | Exact publish-workflow command accepts `v1.1.0` from `pyproject.toml`. |
+| 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.1.0-final` | pass | Built final `1.1.0` sdist and wheel outside the repo. |
 
 ## Validation Policy
 

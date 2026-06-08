@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 1.1.0 - 2026-06-08
+
+- Added operational softphone CLI commands: `sipx phone register`, `unregister`, `call`, and `listen`.
+- Added top-level operational aliases: `sipx register`, `unregister`, `call`, and `listen`.
+- Added `sipx profile list` and `sipx profile show` for `harness.toml` profile inspection.
+- Added no-network CLI tests that fake `NativeSoftphone` while validating profile and explicit account configuration.
+- Added GitHub workflows for CI, Asterisk integration, draft release creation, and PyPI publishing.
+- Bumped package version to `1.1.0`.
+
 ## 1.0.1 - 2026-06-08
 
 - Added package build metadata so `uv run sipx` installs and runs the configured console script from the repo root.

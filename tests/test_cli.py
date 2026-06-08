@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 import tomllib
 
 from sipx.cli.main import main
@@ -66,3 +67,123 @@ def test_cli_replays_timeline_as_text_report(tmp_path: Path, capsys) -> None:
     assert code == 0
     assert "sipx report: run-2" in output
     assert "sip.response_received" in output
+
+
+def test_cli_lists_and_shows_profiles(tmp_path: Path, capsys) -> None:
+    config = _write_profile_config(tmp_path)
+
+    list_code = main(["profile", "list", "--config", str(config)])
+    list_output = capsys.readouterr().out
+
+    show_code = main(["profile", "show", "demo", "--config", str(config)])
+    show_output = capsys.readouterr().out
+
+    assert list_code == 0
+    assert "demo\tlab\tnative" in list_output
+    assert show_code == 0
+    assert "name: demo" in show_output
+    assert "aor: sip:alice@example.com" in show_output
+    assert "remote: 198.51.100.10:5070" in show_output
+
+
+def test_cli_registers_phone_from_profile(tmp_path: Path, monkeypatch, capsys) -> None:
+    config_path = _write_profile_config(tmp_path)
+    created = {}
+
+    class FakeSoftphone:
+        def __init__(self, config) -> None:
+            created["config"] = config
+            self.contact = "sip:alice@127.0.0.1:45000"
+            self.local_address = ("127.0.0.1", 45000)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def register(self):
+            return SimpleNamespace(value="registered")
+
+    monkeypatch.setattr("sipx.cli.main.NativeSoftphone", FakeSoftphone)
+
+    code = main(["phone", "register", "demo", "--config", str(config_path)])
+
+    output = capsys.readouterr().out
+    phone_config = created["config"]
+    assert code == 0
+    assert "registered: registered" in output
+    assert str(phone_config.account.aor) == "sip:alice@example.com"
+    assert str(phone_config.account.registrar) == "sip:example.com"
+    assert phone_config.account.username == "alice"
+    assert phone_config.account.password == "secret"
+    assert phone_config.remote == ("198.51.100.10", 5070)
+    assert phone_config.mode == "lab"
+
+
+def test_cli_places_top_level_call(monkeypatch, capsys) -> None:
+    created = {"hangups": 0}
+
+    class FakeSoftphone:
+        def __init__(self, config) -> None:
+            created["config"] = config
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def call(self, target):
+            created["target"] = target
+            return SimpleNamespace(call_id="call-1", remote=("203.0.113.10", 5060))
+
+        async def hangup(self, call) -> None:
+            created["hangups"] += 1
+            created["hungup_call"] = call.call_id
+
+    monkeypatch.setattr("sipx.cli.main.NativeSoftphone", FakeSoftphone)
+
+    code = main(
+        [
+            "call",
+            "sip:bob@example.com",
+            "--aor",
+            "sip:alice@example.com",
+            "--registrar",
+            "sip:example.com",
+            "--duration",
+            "0",
+        ]
+    )
+
+    output = capsys.readouterr().out
+    phone_config = created["config"]
+    assert code == 0
+    assert created["target"] == "sip:bob@example.com"
+    assert created["hangups"] == 1
+    assert created["hungup_call"] == "call-1"
+    assert str(phone_config.account.aor) == "sip:alice@example.com"
+    assert phone_config.remote == ("127.0.0.1", 5060)
+    assert "call confirmed: call-1" in output
+    assert "call terminated: call-1" in output
+
+
+def _write_profile_config(tmp_path: Path) -> Path:
+    config = tmp_path / "harness.toml"
+    config.write_text(
+        "[profiles.demo]\n"
+        "mode = 'lab'\n"
+        "backend = 'native'\n"
+        "[profiles.demo.account]\n"
+        "aor = 'sip:alice@example.com'\n"
+        "registrar = 'sip:example.com'\n"
+        "username = 'alice'\n"
+        "password = 'secret'\n"
+        "remote_host = '198.51.100.10'\n"
+        "remote_port = 5070\n"
+        "[profiles.demo.media]\n"
+        "codecs = ['PCMU']\n",
+        encoding="utf-8",
+    )
+    return config

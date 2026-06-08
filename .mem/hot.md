@@ -6,8 +6,6 @@
 - CLI command name: `sipx`.
 - Python requirement: `>=3.14`.
 - Dev deps present: `pytest`, `pytest-asyncio`, `pytest-cov`, `ruff`, `ty`, `taskipy`, `pre-commit`.
-- `README.md` now documents product identity, architecture, concepts, backends, expectations, evidence, roadmap, development, and security.
-- `IDEA.md` is long-form source vision for a Voice/SIP Harness.
 - `IDEA.md` is now historical source material only; implementation should use maintained English files in the current structure.
 - No separate `/docs` tree is desired; detailed context belongs in `README.md`, `SPEC.md`, `DESIGN.md`, `TODO.md`, `.spec/*`, and `.mem/*`.
 - Product identity: Python programmable Voice/SIP Harness, not just SIP bot or Asterisk wrapper.
@@ -22,8 +20,6 @@
 - Technical softphone must be built on `NativeSipBackend`, not on Asterisk.
 - Technical softphone is headless engine first; CLI/TUI/GUI are later clients.
 - Scenario recorder/exporter is a key feature: manual call + timeline/actions -> YAML/Python scenario.
-- Lab hooks needed: before send request, after receive response, before SDP offer/answer.
-- Profiles needed: `strict` for interop, `lab` for controlled malformed behavior.
 - Mixed scenario target: native caller + Asterisk backend/app + native agent in one timeline.
 - PJSIP/PJSUA2 can be optional future backend, not replacement for native protocol-lab backend.
 - Public API must stay backend-neutral.
@@ -36,24 +32,20 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.0.1`.
+- Current implementation version: `1.1.0`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
 - Minimum scenario artifacts now written: `timeline.jsonl`, `verdict.json`, `report.txt`, and `report.html`.
-- CLI exists: `sipx scenario run <file>`, `sipx scenario export <timeline.jsonl>`, and `sipx replay <timeline.jsonl>`.
+- CLI exists: `sipx scenario run <file>`, `sipx scenario export <timeline.jsonl>`, `sipx replay <timeline.jsonl>`, `sipx profile list|show`, `sipx phone register|unregister|call|listen`, and top-level `sipx register|unregister|call|listen` aliases.
 - Tests currently run with plain `pytest`; async tests use `asyncio.run` because active `pytest` lacks `pytest-asyncio` plugin.
 - `ty` is declared as a dev dependency but unavailable in the active interpreter used during block `0.2.0`.
 - Media primitives now exist: `AudioFrame`, `MediaPort`, `TranscriptEvent`, STT/TTS protocols, `BargeInPolicy`.
 - Central redaction now exists in `sipx.security.redaction`; `ArtifactStore` redacts JSON/text writes by default.
-- SPEC T12, T27, and T9-T11 are complete; first Asterisk media path is WebSocket media.
 - `sipx.sip` now has sans-I/O primitives: `SipUri`, `HeaderMap`, `SipRequest`, `SipResponse`, `SipParseError`, `parse_sip_message`.
 - SIP parser validates max size and exact `Content-Length`; serializers rewrite `Content-Length` from body bytes.
-- SPEC T16 and T17 are complete; SIP UAS/runtime work plus advanced protocol layers remain pending.
 - `sipx.sdp` now has SDP audio model/parser/serializer and offer-answer helpers for PCMU, PCMA, and `telephone-event`.
-- SPEC T18 is complete; RTP packet/stats and RFC4733 DTMF are now covered by T19-T20.
 - `sipx.rtp` now has RTP packet parse/serialize, sequence stats, and RFC4733 DTMF encode/decode helpers.
-- SPEC T19 and T20 are complete; full SIP transaction/dialog runtime remains pending.
 - `sipx.sip` now has dialog skeletons and INVITE client transaction skeletons with ACK/CANCEL helpers.
 - `sipx.sip` now has non-INVITE client transaction, REGISTER request/flow, Digest auth, UAS INVITE server transaction, UAS dialog creation, BYE request helpers, and real UDP wire transport.
 - `NativeSipBackend` now has real UDP start/stop, send_request, send_response, lab raw datagrams, strict raw-send rejection, typed receive events, and timeline recording.
@@ -61,24 +53,21 @@
 - `NativeSipBackend` now has real UDP CANCEL runtime for pending INVITE attempts.
 - `NativeSipBackend` now has real UDP REGISTER/unregister orchestration with Digest challenge retry and no backend password storage.
 - `NativeSipBackend` now has configurable retransmission timers for native SIP transactions and final INVITE responses.
-- SPEC T21 is complete: basic UAC/UAS INVITE/ACK/BYE/CANCEL/REGISTER over real UDP is implemented and tested.
 - `AsteriskBackend` now has an async ARI REST client, injectable transport, ARI WebSocket event ingestion, and timeline recording for ARI requests/events.
-- SPEC T9 is complete: Asterisk ARI client plus WebSocket event consumer is implemented and tested without requiring real Asterisk.
 - `AsteriskBackend` now maps ARI channel/bridge/playback/hangup/DTMF control methods and known ARI events to timeline events.
-- SPEC T10 is complete: ARI channels, bridges, playback, hangup, and DTMF are mapped to timeline without requiring real Asterisk in tests.
 - `AsteriskWebSocketMediaPort` now provides async binary WebSocket media receive/send and `AudioFrame` conversion for Asterisk media MVP.
-- SPEC T11 is complete: WebSocket media is the chosen Asterisk media MVP path; AudioSocket and ExternalMedia RTP are explicit future paths.
 - `sipx.examples.asterisk_stasis` now has an inbound `Stasis(sipx)` example with minimal config snippets and no-Asterisk tests.
-- SPEC T15 is complete: inbound Stasis example answers, bridges, creates WebSocket media, optionally plays greeting, and records timeline evidence.
 - `sipx.softphone.NativeSoftphone` now provides a headless technical softphone engine on `NativeSipBackend`.
-- SPEC T22 is complete: native softphone can start/stop, register/unregister, place calls, answer inbound calls, and hang up in loopback tests.
 - `NativeSipBackend` now has lab-only `NativeSipLabHooks` for before-send message mutation/raw bytes, before-SDP-body mutation, after-receive observation/filtering, and retransmission interval overrides.
 - `NativeSoftphoneConfig` now passes lab hooks to the underlying native backend.
-- SPEC T23 is complete: lab hooks cover headers, SDP, timers, malformed SIP bytes, and receive events while strict mode rejects hooks.
 - `ScenarioRecorder` exports timeline/user actions to Python or YAML; `Timeline.read_jsonl()` supports replay/export input.
 - `Profile` config loads strict/lab/account/SIP/media overrides from `harness.toml`.
 - `MixedScenario` binds native, Asterisk, and mock actors onto one shared harness timeline.
 - `docker/asterisk` provides an Asterisk 22 lab for opt-in ARI and Native SIP integration tests.
-- SPEC T24-T26 and T28-T31 are complete; remaining work is beyond current SPEC table: license, type-check env, richer media/runtime, recordings/transcripts, UI.
 - `uv run sipx --help` works after adding hatchling build metadata and committing `uv.lock`.
 - `python -m ty check` is still blocked on the system interpreter; `uv run ty check` runs but reports 29 existing typing diagnostics.
+- `.github/workflows/ci.yml` runs uv sync, `sipx --help`, ruff, pytest, and `uv build` on Python 3.14.
+- `.github/workflows/asterisk.yml` starts `docker/asterisk` and runs `SIPX_ASTERISK_INTEGRATION=1 uv run pytest tests/test_asterisk_integration.py`.
+- `.github/workflows/create-release.yml` reads `pyproject.toml` version and creates a draft `v<version>` release on `master` if missing.
+- `.github/workflows/release.yml` verifies release tag vs `pyproject.toml`, tests/builds, and publishes to PyPI with trusted publishing.
+- Local repo still has no `origin` remote configured; replacing `https://github.com/oornnery/sipx` needs explicit destructive-update and tag-policy confirmation before push.

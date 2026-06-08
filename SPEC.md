@@ -58,9 +58,17 @@ doc: `.mem/hot.md` → compact durable facts.
 doc: `.mem/decisions.md` → accepted decisions.
 doc: `.mem/open-loops.md` → unresolved choices.
 cmd: `sipx scenario run <file>` → verdict + artifacts.
-cmd: `sipx phone register <profile>` → registered headless softphone.
-cmd: `sipx phone call <target>` → manual/automated call.
+cmd: `sipx profile list|show` → inspect `harness.toml` profiles.
+cmd: `sipx phone register [profile]` → registered headless softphone.
+cmd: `sipx phone unregister [profile]` → unregister headless softphone.
+cmd: `sipx phone call <target>` → manual/automated outbound call.
+cmd: `sipx phone listen [profile]` → answer inbound call.
+cmd: `sipx register|unregister|call|listen` → top-level operational aliases.
 cmd: `sipx replay <timeline.jsonl>` → replay/inspection.
+ci: `.github/workflows/ci.yml` → uv sync, console-script smoke, ruff, pytest, build.
+ci: `.github/workflows/asterisk.yml` → Docker Asterisk lab + opt-in integration tests.
+ci: `.github/workflows/create-release.yml` → draft `v<pyproject version>` release on `master`.
+ci: `.github/workflows/release.yml` → verify tag, test/build, PyPI trusted publish.
 proto: SIP RFC 3261, SDP RFC 8866, Offer/Answer RFC 3264, RTP/RTCP RFC 3550/3551, DTMF RFC 4733.
 proto: Asterisk ARI/Stasis, ExternalMedia, AudioSocket, chan_websocket, PJSIP.
 
@@ -90,6 +98,8 @@ V21: profiles ! separate strict real interop from lab fault-injection behavior.
 V22: mixed scenario ! support native actors + Asterisk actors + remote targets in one timeline.
 V23: implementation work ! rely on maintained current-structure docs; `IDEA.md` and `/docs` must not be required for context.
 V24: `cmd: sipx` ! runnable via package-manager console script from repo root.
+V25: operational softphone CLI ! build `NativeSoftphoneConfig` from profile or explicit account args; tests must not require network.
+V26: GitHub workflows ! use current project metadata/commands; ⊥ old `_version.py`, old Python pin, or task-only aliases.
 
 ## §T
 
@@ -127,6 +137,8 @@ T29|x|add profile config for strict/lab/account/media overrides|V15,V21,I.api
 T30|x|add mixed scenario support: native caller + Asterisk backend + native agent|V22,I.api
 T31|x|document optional future `PjsipBackend` tradeoffs|C15,I.backend
 T32|x|consolidate detailed implementation context into current structure, not `/docs`|C17,V23
+T33|x|add operational softphone/profile CLI commands plus no-network CLI tests|V17,V21,V24,V25,I.cmd
+T34|x|adapt GitHub CI, Asterisk integration, draft release, and PyPI publish workflows|V24,V26,I.ci
 
 ## §B
 

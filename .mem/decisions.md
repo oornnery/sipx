@@ -45,3 +45,5 @@
 | D41 | 2026-06-08 | Asterisk integration tests are opt-in behind `SIPX_ASTERISK_INTEGRATION=1`. | Normal CI must stay no-secret/no-Docker; local lab can still validate ARI and Native SIP against Asterisk. |
 | D42 | 2026-06-08 | `PjsipBackend` remains optional future backend after native lab and Asterisk paths. | PJSIP is better for robust endpoint interop but worse for malformed wire-level control than `NativeSipBackend`. |
 | D43 | 2026-06-08 | Use hatchling build metadata for package-manager CLI execution. | `uv run sipx` needs an installable project so the configured console script wins over direct local package execution. |
+| D44 | 2026-06-08 | Operational CLI stays on stdlib `argparse` for now. | Avoids new runtime dependencies while exposing existing `NativeSoftphone` and profile behavior. |
+| D45 | 2026-06-08 | GitHub workflows read version from `pyproject.toml`. | The new project uses hatchling metadata and has no old `sipx/_version.py`. |

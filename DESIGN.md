@@ -2107,7 +2107,7 @@ Standard local checks:
 ```bash
 ruff format --check .
 ruff check .
-ty check
+uv run ty check
 pytest
 ```
 

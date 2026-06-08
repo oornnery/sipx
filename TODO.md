@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, and lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, plus GitHub CI/release workflows adapted to the new project.
 
 ## Milestone 0 - Project Grounding
 
@@ -105,6 +105,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement profile config.
 - [x] Implement register/unregister.
 - [x] Implement outbound call and inbound call handlers.
+- [x] Add operational CLI commands for profile inspection, register, unregister, call, and listen.
 - [ ] Implement live SIP inspector events.
 - [x] Implement strict/lab profiles.
 - [x] Implement lab hooks for SIP headers, SDP, timers, and malformed behavior.
@@ -328,6 +329,16 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added CLI regression test for package build metadata and `sipx` console script declaration.
 - [x] Added `uv.lock` for reproducible `uv` execution.
 - [x] Recorded `SPEC.md` B4 and V24 for package-manager CLI execution.
+
+## Block 1.1.0 Done
+
+- [x] Bumped package version to `1.1.0`.
+- [x] Added `sipx profile list` and `sipx profile show`.
+- [x] Added `sipx phone register`, `sipx phone unregister`, `sipx phone call`, and `sipx phone listen`.
+- [x] Added top-level `sipx register`, `sipx unregister`, `sipx call`, and `sipx listen` aliases.
+- [x] Added no-network CLI tests with fake `NativeSoftphone` objects.
+- [x] Added GitHub workflows for CI, Asterisk integration, draft release creation, and PyPI publish.
+- [x] Marked `SPEC.md` T33-T34 complete after validation.
 
 ## Blocked Or Pending
 

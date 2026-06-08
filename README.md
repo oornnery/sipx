@@ -235,7 +235,22 @@ Useful CLI commands:
 sipx scenario run path/to/scenario.py --artifacts-dir artifacts
 sipx scenario export artifacts/<run_id>/timeline.jsonl --format python
 sipx replay artifacts/<run_id>/timeline.jsonl
+sipx profile list --config harness.toml
+sipx profile show lab --config harness.toml
+sipx phone register lab --config harness.toml
+sipx phone unregister lab --config harness.toml
+sipx phone call sip:6000@pbx.lab --profile lab --config harness.toml
+sipx phone listen lab --config harness.toml --duration 30
+sipx register lab --config harness.toml
+sipx call sip:6000@pbx.lab --profile lab --duration 5
 ```
+
+GitHub automation lives under `.github/workflows`:
+
+- `ci.yml` runs uv sync, console-script smoke test, ruff, pytest, and package build.
+- `asterisk.yml` starts the local Docker Asterisk lab and runs opt-in integration tests.
+- `create-release.yml` creates a draft `v<pyproject version>` release on `master`.
+- `release.yml` verifies the release tag, tests, builds, and publishes to PyPI via trusted publishing.
 
 ## Asterisk Lab
 
