@@ -177,6 +177,16 @@
 | 2026-06-08 | `python -m pytest` | pass | 70 tests passed after WebSocket media MVP state/design updates. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after WebSocket media MVP state/design updates. |
+| 2026-06-08 | `python -m pytest tests/test_asterisk_stasis_example.py` | pass | 3 no-Asterisk tests passed for inbound Stasis example before formatting. |
+| 2026-06-08 | `ruff check .` | fail | Unused `Any` import in `tests/test_asterisk_stasis_example.py`; removed. |
+| 2026-06-08 | `ruff format --check .` | fail | `sipx/examples/asterisk_stasis.py` needed formatting. |
+| 2026-06-08 | `ruff format sipx/examples/asterisk_stasis.py` | pass | 1 file reformatted. |
+| 2026-06-08 | `python -m pytest tests/test_asterisk_stasis_example.py` | pass | 3 no-Asterisk tests passed after formatting/import fix. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after Stasis example import fix. |
+| 2026-06-08 | `ruff format --check .` | pass | 60 files already formatted. |
+| 2026-06-08 | `python -m pytest` | pass | 73 tests passed after Stasis example state/design updates. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after Stasis example state/design updates. |
 
 ## Validation Policy
 

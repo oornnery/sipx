@@ -331,6 +331,8 @@ Suggested implementation order:
 
 ## Asterisk Inbound AI Flow
 
+The minimal inbound `Stasis(sipx)` example lives in `sipx.examples.asterisk_stasis`.
+
 ```text
 1. Customer calls DID.
 2. Asterisk receives via PJSIP trunk.

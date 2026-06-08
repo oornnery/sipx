@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, and WebSocket media as the Asterisk media MVP path.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, and an inbound `Stasis(sipx)` example app.
 
 ## Milestone 0 - Project Grounding
 
@@ -60,7 +60,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement originate, answer, hangup, playback, send DTMF.
 - [x] Implement bridge creation and channel membership.
 - [ ] Implement recording collection.
-- [ ] Add minimal `Stasis(sipx)` example config.
+- [x] Add minimal `Stasis(sipx)` example config.
 - [ ] Add integration tests guarded by env vars and local Asterisk availability.
 
 ## Milestone 4 - Media And AI Runtime
@@ -279,6 +279,15 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added focused no-Asterisk tests for media path selection, injected media frames, and local binary WebSocket exchange.
 - [x] Marked `SPEC.md` T11 complete after validation.
 
+## Block 0.9.3 Done
+
+- [x] Bumped package version to `0.9.3`.
+- [x] Added `sipx.examples.asterisk_stasis` inbound `Stasis(sipx)` example.
+- [x] Added minimal `http.conf`, `ari.conf`, and `extensions.conf` snippets using `${ARI_PASSWORD}` placeholder.
+- [x] Added inbound handler that answers the channel, creates a bridge, creates WebSocket media, bridges both channels, and optionally plays a greeting.
+- [x] Added focused no-Asterisk tests for config snippets, media-event filtering, ARI request sequencing, and timeline evidence.
+- [x] Marked `SPEC.md` T15 complete after validation.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
@@ -289,7 +298,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 
 ## Open Questions
 
-- Which Asterisk media path is MVP: WebSocket media, AudioSocket, or ExternalMedia RTP?
+- Which Asterisk media path should follow WebSocket MVP: AudioSocket or ExternalMedia RTP?
 - Should the first shipped product optimize for IVR testing or technical softphone?
 - Which STT/TTS providers should have first adapters?
 - What artifact retention/redaction policy is acceptable for real recordings?

@@ -39,3 +39,4 @@
 | D35 | 2026-06-08 | Asterisk ARI control plane starts dependency-free with injectable transports. | Stdlib HTTP plus local WebSocket text-frame reader keeps first T9 block testable without syncing new runtime dependencies or requiring real Asterisk. |
 | D36 | 2026-06-08 | Asterisk control method mapping remains at ARI resource level first. | T10 needs timeline evidence for channels/bridges/playback/hangup/DTMF before higher-level call facades and media port decisions. |
 | D37 | 2026-06-08 | WebSocket media is the Asterisk MVP media path. | Best project-wide tradeoff: simpler bidirectional media and flow control now, while preserving AudioSocket and ExternalMedia RTP as later paths. |
+| D38 | 2026-06-08 | Inbound Stasis example lives in `sipx.examples`, not separate docs. | Current structure remains source of truth while keeping the example executable and testable without real Asterisk. |

@@ -2,7 +2,7 @@
 
 ## Summary
 
-Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.9.2` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, INVITE/non-INVITE client transactions, REGISTER helper/flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI control-plane client/event backend, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, and WebSocket media MVP. SPEC T21 and T9-T11 are complete.
+Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.9.3` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, INVITE/non-INVITE client transactions, REGISTER helper/flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI control-plane client/event backend, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media MVP, and inbound `Stasis(sipx)` example. SPEC T21, T9-T11, and T15 are complete.
 
 ## Read First
 
@@ -35,13 +35,13 @@ Build `sipx` as a Python Voice/SIP Harness:
 
 ## Recommended Next Task
 
-Continue after block `0.9.2`:
+Continue after block `0.9.3`:
 
-1. Implement inbound Asterisk app via Stasis example for SPEC T15.
-2. Add richer mock media events and an example scenario.
-3. Decide artifact retention policy before real recordings/transcripts.
-4. Add lab hooks for controlled malformed behavior.
-5. Add profile config for strict/lab/account/media overrides.
+1. Implement headless technical softphone on `NativeSipBackend` for SPEC T22.
+2. Add lab hooks for controlled malformed behavior for SPEC T23.
+3. Add recorder/export scenario from timeline + user actions for SPEC T24.
+4. Add richer mock media events and an example scenario.
+5. Decide artifact retention policy before real recordings/transcripts.
 
 ## Do Not Do Yet
 
@@ -52,9 +52,10 @@ Continue after block `0.9.2`:
 
 ## Latest Validation
 
-- `python -m pytest`: pass, 70 tests.
+- `python -m pytest`: pass, 73 tests.
+- `python -m pytest tests/test_asterisk_stasis_example.py`: pass, 3 no-Asterisk Stasis example tests during block `0.9.3`.
 - `python -m pytest tests/test_asterisk_backend.py`: pass, 10 no-Asterisk ARI/media tests during block `0.9.2`.
 - `python -m pytest tests/test_native_sip_backend.py`: pass, 9 loopback UDP tests during block `0.8.4`.
 - `ruff check .`: pass.
-- `ruff format --check .`: pass, 57 files already formatted.
+- `ruff format --check .`: pass, 60 files already formatted.
 - `python -m ty check`: blocked, active interpreter has no `ty` module.

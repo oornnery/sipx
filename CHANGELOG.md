@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.9.3 - 2026-06-08
+
+- Added an executable inbound `Stasis(sipx)` example under `sipx.examples.asterisk_stasis`.
+- Added minimal Asterisk `http.conf`, `ari.conf`, and `extensions.conf` snippets with `${ARI_PASSWORD}` placeholder.
+- Added inbound Stasis handling that answers, creates a bridge, creates WebSocket media, joins both channels, and optionally plays a greeting.
+- Added no-Asterisk tests for config snippets, media-event filtering, ARI request sequencing, and timeline evidence.
+- Marked SPEC T15 complete after validation.
+
 ## 0.9.2 - 2026-06-08
 
 - Chose WebSocket media as the Asterisk media MVP path for the overall project.

@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.9.2` chooses WebSocket media as the Asterisk media MVP, adds the media port, and completes SPEC T11.
+Implement `sipx` in verified commit blocks. Block `0.9.3` adds the inbound Asterisk `Stasis(sipx)` example and completes SPEC T15.
 
 ## Sources Read
 
@@ -123,6 +123,12 @@ Implement `sipx` in verified commit blocks. Block `0.9.2` chooses WebSocket medi
 - Added explicit unsupported errors for planned AudioSocket and ExternalMedia RTP paths.
 - Added no-Asterisk tests for media path selection, injected media frames, and local binary WebSocket exchange.
 - Marked SPEC task T11 complete after validation.
+- Bumped `pyproject.toml` version from `0.9.2` to `0.9.3`.
+- Added `sipx.examples.asterisk_stasis` inbound `Stasis(sipx)` example.
+- Added minimal Asterisk `http.conf`, `ari.conf`, and `extensions.conf` snippets with `${ARI_PASSWORD}` placeholder.
+- Added inbound handler that filters media-channel `StasisStart`, answers inbound channels, creates bridges, creates WebSocket media, joins both channels, and optionally plays a greeting.
+- Added no-Asterisk tests for config snippets, event filtering, ARI request sequencing, and timeline evidence.
+- Marked SPEC task T15 complete after validation.
 
 ## Active Decision
 
@@ -132,11 +138,11 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Implement inbound Asterisk app via Stasis example for SPEC T15.
-2. Add richer fake media events and example mock scenario.
-3. Decide artifact retention policy before real recordings/transcripts.
-4. Add lab hooks for controlled malformed behavior.
-5. Add profile config for strict/lab/account/media overrides.
+1. Implement headless technical softphone on `NativeSipBackend` for SPEC T22.
+2. Add lab hooks for controlled malformed behavior for SPEC T23.
+3. Add recorder/export scenario from timeline + user actions for SPEC T24.
+4. Add richer fake media events and example mock scenario.
+5. Decide artifact retention policy before real recordings/transcripts.
 
 ## Risks
 
@@ -147,7 +153,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
 - T21 basic native SIP signaling is complete, but lab hooks, profile config, technical softphone, media wiring, and advanced runtime behavior remain pending.
-- T9-T11 Asterisk ARI control-plane, timeline mapping, and WebSocket media MVP are complete; real Asterisk integration is still guarded/pending.
+- T9-T11 and T15 Asterisk ARI control-plane, timeline mapping, WebSocket media MVP, and inbound Stasis example are complete; real Asterisk integration is still guarded/pending.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
 
 ## Open Questions
