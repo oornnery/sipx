@@ -7,7 +7,10 @@ from sipx.backends.asterisk import (
     AsteriskBackend,
     AsteriskBridge,
     AsteriskChannel,
+    AsteriskMediaPath,
+    AsteriskMediaPortConfig,
     AsteriskPlayback,
+    AsteriskWebSocketMediaPort,
 )
 from sipx.backends.mock import MockBackend
 from sipx.backends.native import (
@@ -30,7 +33,10 @@ __all__ = [
     "AsteriskBackend",
     "AsteriskBridge",
     "AsteriskChannel",
+    "AsteriskMediaPath",
+    "AsteriskMediaPortConfig",
     "AsteriskPlayback",
+    "AsteriskWebSocketMediaPort",
     "MockBackend",
     "NativeSipBackend",
     "NativeSipCall",

@@ -171,6 +171,12 @@
 | 2026-06-08 | `ruff format --check .` | pass | 57 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after Asterisk ARI control/timeline mapping block. |
+| 2026-06-08 | `python -m pytest tests/test_asterisk_backend.py` | pass | 10 no-Asterisk tests passed for WebSocket media MVP. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after WebSocket media MVP. |
+| 2026-06-08 | `ruff format --check .` | pass | 57 files already formatted after WebSocket media MVP. |
+| 2026-06-08 | `python -m pytest` | pass | 70 tests passed after WebSocket media MVP state/design updates. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after WebSocket media MVP state/design updates. |
 
 ## Validation Policy
 

@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 0.9.2 - 2026-06-08
+
+- Chose WebSocket media as the Asterisk media MVP path for the overall project.
+- Added `AsteriskMediaPath`, `AsteriskMediaPortConfig`, and `AsteriskWebSocketMediaPort`.
+- Added async WebSocket binary media receive/send support that converts frames to `AudioFrame` without blocking on AI work.
+- Added Asterisk backend media channel and media port creation helpers with explicit errors for planned AudioSocket and ExternalMedia RTP paths.
+- Added no-Asterisk tests for media path selection, injected WebSocket media frames, and local binary WebSocket frame exchange.
+- Marked SPEC T11 complete after validation.
+
 ## 0.9.1 - 2026-06-08
 
 - Added typed Asterisk ARI resource models for channels, bridges, and playbacks.

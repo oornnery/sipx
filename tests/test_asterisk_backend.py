@@ -14,6 +14,10 @@ from sipx import (
     AsteriskAriError,
     AsteriskAriHttpResponse,
     AsteriskBackend,
+    AsteriskMediaPath,
+    AsteriskMediaPortConfig,
+    AsteriskWebSocketMediaPort,
+    AudioFrame,
     BackendCapability,
     Timeline,
 )
@@ -321,6 +325,171 @@ async def _map_known_ari_events_to_timeline() -> None:
     }
 
 
+def test_asterisk_media_config_selects_websocket_mvp() -> None:
+    asyncio.run(_select_websocket_media_mvp())
+
+
+async def _select_websocket_media_mvp() -> None:
+    calls: list[tuple[str, str, dict[str, list[str]]]] = []
+
+    async def transport(
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: float,
+    ) -> AsteriskAriHttpResponse:
+        parsed = urlsplit(url)
+        calls.append((method, parsed.path, parse_qs(parsed.query)))
+        return AsteriskAriHttpResponse(
+            status_code=200,
+            body=b'{"id":"media-1","name":"WebSocket/sipx","state":"Up"}',
+        )
+
+    config = AsteriskMediaPortConfig()
+    assert config.path is AsteriskMediaPath.WEBSOCKET
+
+    client = AsteriskAriClient(transport=transport)
+    timeline = Timeline(run_id="media-path")
+    backend = AsteriskBackend(client=client, timeline=timeline, actor_id="pbx")
+
+    channel = await backend.create_websocket_media_channel(
+        "WebSocket/sipx",
+        media_config=config,
+        channel_id="media-1",
+    )
+
+    assert backend.supports(BackendCapability.MEDIA)
+    assert channel.id == "media-1"
+    assert calls[0] == (
+        "POST",
+        "/ari/channels",
+        {
+            "endpoint": ["WebSocket/sipx"],
+            "app": ["sipx"],
+            "channelId": ["media-1"],
+        },
+    )
+    assert timeline.events[-1].name == "media_channel_created"
+    assert timeline.events[-1].data["path"] == "websocket_media"
+
+    with pytest.raises(AsteriskAriError, match="MVP path"):
+        await backend.create_media_port(
+            config=AsteriskMediaPortConfig(path=AsteriskMediaPath.AUDIOSOCKET),
+            incoming=_binary_source(b""),
+            sender=lambda payload: None,
+        )
+
+
+def test_asterisk_websocket_media_port_sends_and_receives_frames() -> None:
+    asyncio.run(_send_and_receive_media_frames())
+
+
+async def _send_and_receive_media_frames() -> None:
+    sent: list[bytes] = []
+    closed: list[bool] = []
+    timeline = Timeline(run_id="media-port")
+    backend = AsteriskBackend(timeline=timeline, actor_id="pbx")
+    port = await backend.create_media_port(
+        incoming=_binary_source(b"\x01\x02\x03\x04"),
+        sender=lambda payload: sent.append(payload),
+        closer=lambda: closed.append(True),
+        channel_id="chan-1",
+        clock_ns=lambda: 123,
+    )
+
+    frame = await port.recv_frame()
+    assert frame.pcm.tobytes() == b"\x01\x02\x03\x04"
+    assert frame.sample_rate == 16000
+    assert frame.channels == 1
+    assert frame.duration_ms == 20
+    assert frame.timestamp_ns == 123
+    assert frame.source == "websocket"
+
+    await port.send_frame(
+        AudioFrame(
+            pcm=memoryview(b"\x05\x06"),
+            sample_rate=16000,
+            channels=1,
+            duration_ms=20,
+            timestamp_ns=124,
+            source="tts",
+        )
+    )
+    await port.close()
+
+    assert sent == [b"\x05\x06"]
+    assert closed == [True]
+    names = [(event.category, event.name) for event in timeline.events]
+    assert names == [
+        ("asterisk", "media_path_selected"),
+        ("media", "frame_received"),
+        ("media", "frame_sent"),
+        ("media", "media_port_closed"),
+    ]
+    assert timeline.events[1].data["channel_id"] == "chan-1"
+    assert timeline.events[1].data["byte_length"] == 4
+
+
+def test_asterisk_websocket_media_port_connects_to_binary_websocket() -> None:
+    asyncio.run(_connect_binary_websocket_media_port())
+
+
+async def _connect_binary_websocket_media_port() -> None:
+    received: dict[str, Any] = {}
+
+    async def handle_client(
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
+        await _accept_websocket_client(reader, writer, received)
+        _write_server_binary_frame(writer, b"\x10\x20")
+        await writer.drain()
+
+        opcode, payload = await _read_client_frame(reader)
+        received["opcode"] = opcode
+        received["payload"] = payload
+
+        close_opcode, _ = await _read_client_frame(reader)
+        received["close_opcode"] = close_opcode
+        writer.write(b"\x88\x00")
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
+    server = await asyncio.start_server(handle_client, "127.0.0.1", 0)
+    try:
+        port_number = server.sockets[0].getsockname()[1]
+        port = await AsteriskWebSocketMediaPort.connect(
+            f"ws://127.0.0.1:{port_number}/media",
+            config=AsteriskMediaPortConfig(frame_duration_ms=10),
+            timeout=1.0,
+            clock_ns=lambda: 999,
+        )
+        frame = await port.recv_frame()
+        await port.send_frame(
+            AudioFrame(
+                pcm=memoryview(b"\x30\x40"),
+                sample_rate=16000,
+                channels=1,
+                duration_ms=10,
+                timestamp_ns=1000,
+                source="tts",
+            )
+        )
+        await port.close()
+    finally:
+        server.close()
+        await server.wait_closed()
+
+    assert frame.pcm.tobytes() == b"\x10\x20"
+    assert frame.duration_ms == 10
+    assert received["request_line"] == "GET /media HTTP/1.1"
+    assert received["opcode"] == 0x2
+    assert received["payload"] == b"\x30\x40"
+    assert received["close_opcode"] == 0x8
+
+
 def test_asterisk_ari_client_reads_websocket_events() -> None:
     asyncio.run(_read_websocket_events())
 
@@ -392,11 +561,73 @@ async def _read_websocket_events() -> None:
     assert received["headers"]["authorization"] == "Basic dXNlcjpzZWNyZXQ="
 
 
+async def _binary_source(payload: bytes):
+    yield payload
+
+
+async def _accept_websocket_client(
+    reader: asyncio.StreamReader,
+    writer: asyncio.StreamWriter,
+    received: dict[str, Any],
+) -> None:
+    request_line = (await reader.readline()).decode("ascii").strip()
+    headers: dict[str, str] = {}
+    while True:
+        line = await reader.readline()
+        if line in {b"\r\n", b"\n", b""}:
+            break
+        name, _, value = line.decode("ascii").partition(":")
+        headers[name.lower()] = value.strip()
+    received["request_line"] = request_line
+    received["headers"] = headers
+
+    accept = base64.b64encode(
+        hashlib.sha1(
+            f"{headers['sec-websocket-key']}{_WEBSOCKET_GUID}".encode("ascii")
+        ).digest()
+    ).decode("ascii")
+    writer.write(
+        (
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Accept: {accept}\r\n"
+            "\r\n"
+        ).encode("ascii")
+    )
+    await writer.drain()
+
+
+async def _read_client_frame(reader: asyncio.StreamReader) -> tuple[int, bytes]:
+    head = await reader.readexactly(2)
+    opcode = head[0] & 0x0F
+    length = head[1] & 0x7F
+    if length == 126:
+        length = int.from_bytes(await reader.readexactly(2), "big")
+    elif length == 127:
+        length = int.from_bytes(await reader.readexactly(8), "big")
+    mask = await reader.readexactly(4)
+    payload = await reader.readexactly(length)
+    return opcode, bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
+
+
+def _write_server_binary_frame(writer: asyncio.StreamWriter, payload: bytes) -> None:
+    _write_server_frame(writer, 0x2, payload)
+
+
 def _write_server_text_frame(writer: asyncio.StreamWriter, payload: bytes) -> None:
+    _write_server_frame(writer, 0x1, payload)
+
+
+def _write_server_frame(
+    writer: asyncio.StreamWriter,
+    opcode: int,
+    payload: bytes,
+) -> None:
     if len(payload) < 126:
-        header = bytes([0x81, len(payload)])
+        header = bytes([0x80 | opcode, len(payload)])
     elif len(payload) < 65536:
-        header = bytes([0x81, 126]) + len(payload).to_bytes(2, "big")
+        header = bytes([0x80 | opcode, 126]) + len(payload).to_bytes(2, "big")
     else:
-        header = bytes([0x81, 127]) + len(payload).to_bytes(8, "big")
+        header = bytes([0x80 | opcode, 127]) + len(payload).to_bytes(8, "big")
     writer.write(header + payload)

@@ -8,6 +8,8 @@ import secrets
 import ssl as ssl_module
 from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
+from enum import StrEnum
+import time
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit, urlunsplit
@@ -15,6 +17,7 @@ from urllib.request import Request, urlopen
 
 from sipx.core.capabilities import BackendCapability
 from sipx.core.timeline import Timeline
+from sipx.media.frame import AudioFrame
 
 _WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 _MAX_EVENT_BYTES = 1_048_576
@@ -31,6 +34,48 @@ class AsteriskAriError(Exception):
         self.status_code = status_code
         self.body = body
         super().__init__(message)
+
+
+class AsteriskMediaPath(StrEnum):
+    WEBSOCKET = "websocket_media"
+    AUDIOSOCKET = "audiosocket"
+    EXTERNAL_MEDIA_RTP = "external_media_rtp"
+
+
+@dataclass(frozen=True, slots=True)
+class AsteriskMediaPortConfig:
+    path: AsteriskMediaPath | str = AsteriskMediaPath.WEBSOCKET
+    codec: str = "slin16"
+    sample_rate: int = 16000
+    channels: int = 1
+    frame_duration_ms: int = 20
+    direction: str = "both"
+    max_frame_bytes: int = _MAX_EVENT_BYTES
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "path", AsteriskMediaPath(self.path))
+        if self.sample_rate <= 0:
+            raise ValueError("sample_rate must be positive")
+        if self.channels <= 0:
+            raise ValueError("channels must be positive")
+        if self.frame_duration_ms <= 0:
+            raise ValueError("frame_duration_ms must be positive")
+        if self.max_frame_bytes <= 0:
+            raise ValueError("max_frame_bytes must be positive")
+        if self.direction not in {"in", "out", "both"}:
+            raise ValueError("direction must be in, out, or both")
+        if not self.codec:
+            raise ValueError("codec is required")
+
+    def to_timeline_data(self) -> dict[str, int | str]:
+        return {
+            "path": self.path.value,
+            "codec": self.codec,
+            "sample_rate": self.sample_rate,
+            "channels": self.channels,
+            "frame_duration_ms": self.frame_duration_ms,
+            "direction": self.direction,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,6 +241,125 @@ HttpTransport = Callable[
     [str, str, bytes | None, Mapping[str, str], float],
     AsteriskAriHttpResponse | Awaitable[AsteriskAriHttpResponse],
 ]
+BinarySender = Callable[[bytes], None | Awaitable[None]]
+CloseCallback = Callable[[], None | Awaitable[None]]
+
+
+class AsteriskWebSocketMediaPort:
+    def __init__(
+        self,
+        *,
+        config: AsteriskMediaPortConfig | None = None,
+        incoming: AsyncIterable[bytes],
+        sender: BinarySender,
+        closer: CloseCallback | None = None,
+        timeline: Timeline | None = None,
+        actor_id: str | None = None,
+        channel_id: str | None = None,
+        clock_ns: Callable[[], int] = time.monotonic_ns,
+    ) -> None:
+        self.config = config or AsteriskMediaPortConfig()
+        if self.config.path is not AsteriskMediaPath.WEBSOCKET:
+            raise ValueError("AsteriskWebSocketMediaPort requires websocket media path")
+        self.timeline = timeline
+        self.actor_id = actor_id
+        self.channel_id = channel_id
+        self._incoming = incoming.__aiter__()
+        self._sender = sender
+        self._closer = closer
+        self._clock_ns = clock_ns
+        self._closed = False
+
+    @classmethod
+    async def connect(
+        cls,
+        url: str,
+        *,
+        config: AsteriskMediaPortConfig | None = None,
+        headers: Mapping[str, str] | None = None,
+        timeout: float = 5.0,
+        timeline: Timeline | None = None,
+        actor_id: str | None = None,
+        channel_id: str | None = None,
+        clock_ns: Callable[[], int] = time.monotonic_ns,
+    ) -> AsteriskWebSocketMediaPort:
+        connection = await _open_websocket_connection(
+            url,
+            headers=headers or {},
+            timeout=timeout,
+        )
+        return cls(
+            config=config,
+            incoming=connection.binary_messages(timeout=timeout),
+            sender=connection.send_binary,
+            closer=connection.close,
+            timeline=timeline,
+            actor_id=actor_id,
+            channel_id=channel_id,
+            clock_ns=clock_ns,
+        )
+
+    async def recv_frame(self) -> AudioFrame:
+        self._raise_if_closed()
+        payload = await anext(self._incoming)
+        if len(payload) > self.config.max_frame_bytes:
+            raise AsteriskAriError("Asterisk WebSocket media frame exceeds size limit")
+        frame = AudioFrame(
+            pcm=memoryview(payload),
+            sample_rate=self.config.sample_rate,
+            channels=self.config.channels,
+            duration_ms=self.config.frame_duration_ms,
+            timestamp_ns=self._clock_ns(),
+            source="websocket",
+        )
+        self._record_media_event("frame_received", frame)
+        return frame
+
+    async def send_frame(self, frame: AudioFrame) -> None:
+        self._raise_if_closed()
+        if frame.sample_rate != self.config.sample_rate:
+            raise ValueError("frame sample_rate does not match media port")
+        if frame.channels != self.config.channels:
+            raise ValueError("frame channels do not match media port")
+        result = self._sender(frame.pcm.tobytes())
+        if isinstance(result, Awaitable):
+            await result
+        self._record_media_event("frame_sent", frame)
+
+    async def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        if self._closer is not None:
+            result = self._closer()
+            if isinstance(result, Awaitable):
+                await result
+        self._record_timeline(
+            "media_port_closed",
+            self.config.to_timeline_data(),
+        )
+
+    def _record_media_event(self, name: str, frame: AudioFrame) -> None:
+        data = self.config.to_timeline_data()
+        data.update(frame.to_dict())
+        self._record_timeline(name, data)
+
+    def _record_timeline(self, name: str, data: Mapping[str, Any]) -> None:
+        if self.timeline is None:
+            return
+        event_data = dict(data)
+        if self.channel_id is not None:
+            event_data["channel_id"] = self.channel_id
+        self.timeline.record(
+            "media",
+            name,
+            actor_id=self.actor_id,
+            data=event_data,
+        )
+
+    def _raise_if_closed(self) -> None:
+        if self._closed:
+            raise AsteriskAriError("Asterisk WebSocket media port is closed")
 
 
 class AsteriskAriClient:
@@ -296,6 +460,7 @@ class AsteriskBackend:
         {
             BackendCapability.ASTERISK_ARI,
             BackendCapability.CALL_CONTROL,
+            BackendCapability.MEDIA,
             BackendCapability.TIMELINE,
         }
     )
@@ -442,6 +607,68 @@ class AsteriskBackend:
             {"bridge_id": bridge_id, "channel_id": channel_id},
         )
 
+    async def create_websocket_media_channel(
+        self,
+        endpoint: str,
+        *,
+        media_config: AsteriskMediaPortConfig | None = None,
+        app_args: str | None = None,
+        variables: Mapping[str, object] | None = None,
+        channel_id: str | None = None,
+    ) -> AsteriskChannel:
+        config = media_config or AsteriskMediaPortConfig()
+        self._ensure_websocket_media_path(config)
+        channel = await self.originate(
+            endpoint,
+            app_args=app_args,
+            variables=variables,
+            channel_id=channel_id,
+        )
+        data = channel.to_timeline_data()
+        data.update(config.to_timeline_data())
+        self._record_timeline("media_channel_created", data)
+        return channel
+
+    async def create_media_port(
+        self,
+        *,
+        config: AsteriskMediaPortConfig | None = None,
+        websocket_url: str | None = None,
+        incoming: AsyncIterable[bytes] | None = None,
+        sender: BinarySender | None = None,
+        closer: CloseCallback | None = None,
+        channel_id: str | None = None,
+        clock_ns: Callable[[], int] = time.monotonic_ns,
+    ) -> AsteriskWebSocketMediaPort:
+        media_config = config or AsteriskMediaPortConfig()
+        self._ensure_websocket_media_path(media_config)
+        self._record_timeline("media_path_selected", media_config.to_timeline_data())
+        if websocket_url is not None:
+            return await AsteriskWebSocketMediaPort.connect(
+                websocket_url,
+                config=media_config,
+                headers={"Authorization": self.config.authorization_header()},
+                timeout=self.config.timeout,
+                timeline=self.timeline,
+                actor_id=self.actor_id,
+                channel_id=channel_id,
+                clock_ns=clock_ns,
+            )
+        if incoming is None or sender is None:
+            raise AsteriskAriError(
+                "incoming and sender are required when websocket_url is not provided"
+            )
+        return AsteriskWebSocketMediaPort(
+            config=media_config,
+            incoming=incoming,
+            sender=sender,
+            closer=closer,
+            timeline=self.timeline,
+            actor_id=self.actor_id,
+            channel_id=channel_id,
+            clock_ns=clock_ns,
+        )
+
     async def events(
         self,
         source: AsyncIterable[str | bytes | Mapping[str, Any]] | None = None,
@@ -456,6 +683,14 @@ class AsteriskBackend:
         if name is None:
             return
         self._record_timeline(name, _ari_event_timeline_data(event))
+
+    def _ensure_websocket_media_path(self, config: AsteriskMediaPortConfig) -> None:
+        if config.path is AsteriskMediaPath.WEBSOCKET:
+            return
+        raise AsteriskAriError(
+            f"Asterisk media path {config.path.value!r} is planned; "
+            "MVP path is 'websocket_media'"
+        )
 
     def _record_timeline(self, name: str, data: Mapping[str, Any]) -> None:
         if self.timeline is None:
@@ -533,17 +768,52 @@ def _sync_http_request(
         raise AsteriskAriError(f"ARI request failed: {exc.reason}") from exc
 
 
-async def _read_websocket_text_messages(
+@dataclass(slots=True)
+class _WebSocketConnection:
+    reader: asyncio.StreamReader
+    writer: asyncio.StreamWriter
+
+    async def text_messages(self, *, timeout: float) -> AsyncIterator[str]:
+        async for opcode, payload in self._messages(timeout=timeout):
+            if opcode == 0x1:
+                yield payload.decode("utf-8")
+
+    async def binary_messages(self, *, timeout: float) -> AsyncIterator[bytes]:
+        async for opcode, payload in self._messages(timeout=timeout):
+            if opcode == 0x2:
+                yield payload
+
+    async def send_binary(self, payload: bytes) -> None:
+        await _write_websocket_frame(self.writer, 0x2, payload)
+
+    async def close(self) -> None:
+        if not self.writer.is_closing():
+            await _write_websocket_frame(self.writer, 0x8, b"")
+        self.writer.close()
+        await self.writer.wait_closed()
+
+    async def _messages(self, *, timeout: float) -> AsyncIterator[tuple[int, bytes]]:
+        while True:
+            opcode, payload = await _read_websocket_frame(self.reader, timeout)
+            if opcode == 0x8:
+                break
+            if opcode == 0x9:
+                await _write_websocket_frame(self.writer, 0xA, payload)
+                continue
+            yield opcode, payload
+
+
+async def _open_websocket_connection(
     url: str,
     *,
     headers: Mapping[str, str],
     timeout: float,
-) -> AsyncIterator[str]:
+) -> _WebSocketConnection:
     parts = urlsplit(url)
     if parts.scheme not in {"ws", "wss"}:
-        raise AsteriskAriError("events_url must use ws or wss")
+        raise AsteriskAriError("WebSocket URL must use ws or wss")
     if parts.hostname is None:
-        raise AsteriskAriError("events_url must include a host")
+        raise AsteriskAriError("WebSocket URL must include a host")
 
     port = parts.port or (443 if parts.scheme == "wss" else 80)
     ssl_context = ssl_module.create_default_context() if parts.scheme == "wss" else None
@@ -551,20 +821,27 @@ async def _read_websocket_text_messages(
         asyncio.open_connection(parts.hostname, port, ssl=ssl_context),
         timeout=timeout,
     )
+    key = await _send_websocket_handshake(writer, url, headers, timeout)
+    await _read_websocket_handshake(reader, timeout, key)
+    return _WebSocketConnection(reader=reader, writer=writer)
+
+
+async def _read_websocket_text_messages(
+    url: str,
+    *,
+    headers: Mapping[str, str],
+    timeout: float,
+) -> AsyncIterator[str]:
+    connection = await _open_websocket_connection(
+        url,
+        headers=headers,
+        timeout=timeout,
+    )
     try:
-        key = await _send_websocket_handshake(writer, url, headers, timeout)
-        await _read_websocket_handshake(reader, timeout, key)
-        while True:
-            opcode, payload = await _read_websocket_frame(reader, timeout)
-            if opcode == 0x1:
-                yield payload.decode("utf-8")
-            elif opcode == 0x8:
-                break
-            elif opcode == 0x9:
-                await _write_websocket_frame(writer, 0xA, payload)
+        async for message in connection.text_messages(timeout=timeout):
+            yield message
     finally:
-        writer.close()
-        await writer.wait_closed()
+        await connection.close()
 
 
 async def _send_websocket_handshake(

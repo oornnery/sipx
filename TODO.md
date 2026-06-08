@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, and Asterisk channel/bridge/playback/hangup/DTMF timeline mapping.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, and WebSocket media as the Asterisk media MVP path.
 
 ## Milestone 0 - Project Grounding
 
@@ -53,7 +53,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 
 ## Milestone 3 - AsteriskBackend MVP
 
-- [ ] Choose first media path: WebSocket media, AudioSocket, or ExternalMedia RTP.
+- [x] Choose first media path: WebSocket media, AudioSocket, or ExternalMedia RTP.
 - [x] Create async ARI REST client.
 - [x] Create ARI WebSocket event consumer.
 - [x] Map ARI events to timeline events.
@@ -268,10 +268,21 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added focused no-Asterisk tests for control method request mapping and known event timeline mapping.
 - [x] Marked `SPEC.md` T10 complete after validation.
 
+## Block 0.9.2 Done
+
+- [x] Bumped package version to `0.9.2`.
+- [x] Chose WebSocket media as the Asterisk media MVP path.
+- [x] Added `AsteriskMediaPath`, `AsteriskMediaPortConfig`, and `AsteriskWebSocketMediaPort`.
+- [x] Added async WebSocket binary media receive/send support and `AudioFrame` conversion.
+- [x] Added Asterisk backend helpers for WebSocket media channel creation and media port creation.
+- [x] Added explicit unsupported errors for planned AudioSocket and ExternalMedia RTP paths.
+- [x] Added focused no-Asterisk tests for media path selection, injected media frames, and local binary WebSocket exchange.
+- [x] Marked `SPEC.md` T11 complete after validation.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
-- [ ] Asterisk media path decision remains open before Asterisk media port work.
+- [ ] Next Asterisk media path after WebSocket MVP remains open: AudioSocket or ExternalMedia RTP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
 - [ ] Lab hooks, profile config, technical softphone, and advanced media/runtime behavior remain pending after T21.

@@ -2,7 +2,7 @@
 
 | id | question | options | needed decision |
 | --- | --- | --- | --- |
-| O1 | First Asterisk media path? | WebSocket media, AudioSocket, ExternalMedia RTP | Before Asterisk media port work. |
+| O1 | Next Asterisk media path after WebSocket MVP? | AudioSocket, ExternalMedia RTP | After WebSocket media MVP proves the first Asterisk media path. |
 | O2 | First target user? | IVR QA, contact center app, technical SIP tester | Before product positioning beyond README. |
 | O3 | First STT/TTS providers? | local fake, OpenAI, Deepgram, ElevenLabs, other | Before media/AI adapters. |
 | O4 | Artifact retention policy? | local only, configurable TTL, encrypted storage | Before real recordings/transcripts. |

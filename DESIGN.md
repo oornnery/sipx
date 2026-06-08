@@ -315,6 +315,8 @@ SIP trunk / endpoint / softphone
 
 ## Asterisk Media Options
 
+MVP selection: WebSocket media. AudioSocket and ExternalMedia RTP remain future paths.
+
 | Media path | Use |
 | --- | --- |
 | WebSocket media | Preferred if available; avoids manual RTP timing burden and can support TLS and flow control. |

@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.9.1` maps Asterisk ARI channel/bridge/playback/hangup/DTMF control and events to timeline and completes SPEC T10.
+Implement `sipx` in verified commit blocks. Block `0.9.2` chooses WebSocket media as the Asterisk media MVP, adds the media port, and completes SPEC T11.
 
 ## Sources Read
 
@@ -115,6 +115,14 @@ Implement `sipx` in verified commit blocks. Block `0.9.1` maps Asterisk ARI chan
 - Added timeline event recording for Asterisk control method results and known ARI events.
 - Added no-Asterisk tests for control method request mapping and known ARI event timeline mapping.
 - Marked SPEC task T10 complete after validation.
+- Bumped `pyproject.toml` version from `0.9.1` to `0.9.2`.
+- Chose WebSocket media as the Asterisk media MVP path for the overall project.
+- Added `AsteriskMediaPath`, `AsteriskMediaPortConfig`, and `AsteriskWebSocketMediaPort`.
+- Added async WebSocket binary media receive/send support and `AudioFrame` conversion without synchronous AI calls.
+- Added Asterisk backend helpers for WebSocket media channel creation and media port creation.
+- Added explicit unsupported errors for planned AudioSocket and ExternalMedia RTP paths.
+- Added no-Asterisk tests for media path selection, injected media frames, and local binary WebSocket exchange.
+- Marked SPEC task T11 complete after validation.
 
 ## Active Decision
 
@@ -124,7 +132,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Choose first Asterisk media path before SPEC T11.
+1. Implement inbound Asterisk app via Stasis example for SPEC T15.
 2. Add richer fake media events and example mock scenario.
 3. Decide artifact retention policy before real recordings/transcripts.
 4. Add lab hooks for controlled malformed behavior.
@@ -139,10 +147,10 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
 - T21 basic native SIP signaling is complete, but lab hooks, profile config, technical softphone, media wiring, and advanced runtime behavior remain pending.
-- T9-T10 Asterisk ARI control-plane and timeline mapping are complete, but T11 media port is blocked on first media path choice.
+- T9-T11 Asterisk ARI control-plane, timeline mapping, and WebSocket media MVP are complete; real Asterisk integration is still guarded/pending.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
 
 ## Open Questions
 
-- First media backend: WebSocket media, AudioSocket, or ExternalMedia RTP?
+- Next Asterisk media backend after WebSocket MVP: AudioSocket or ExternalMedia RTP?
 - Target first user: IVR QA, contact center, or technical SIP tester?

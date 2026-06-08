@@ -15,7 +15,7 @@
 - Main decision: Harness core is product; Asterisk and Native SIP are backends.
 - First backend: `AsteriskBackend` for MVP speed, production-ish telephony, PBX, trunks, bridges, queues, recordings.
 - Asterisk control path: ARI REST + ARI WebSocket + dialplan `Stasis()`.
-- Asterisk media options: WebSocket media, AudioSocket, ExternalMedia RTP. MVP choice still open.
+- Asterisk media MVP path: WebSocket media. AudioSocket and ExternalMedia RTP remain future/secondary paths.
 - Native backend: `NativeSipBackend` for technical softphone, SIP wire-level tests, fuzzing, malformed messages, RTP impairment.
 - Native SIP core should be sans-I/O; async runtime owns sockets/timers.
 - Native modes: `strict` for real interop, `lab` for controlled protocol manipulation.
@@ -36,7 +36,7 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `0.9.1`.
+- Current implementation version: `0.9.2`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
@@ -46,7 +46,7 @@
 - `ty` is declared as a dev dependency but unavailable in the active interpreter used during block `0.2.0`.
 - Media primitives now exist: `AudioFrame`, `MediaPort`, `TranscriptEvent`, STT/TTS protocols, `BargeInPolicy`.
 - Central redaction now exists in `sipx.security.redaction`; `ArtifactStore` redacts JSON/text writes by default.
-- SPEC T12, T27, T9, and T10 are complete; T11 remains blocked on or adjacent to Asterisk media-path choice.
+- SPEC T12, T27, and T9-T11 are complete; first Asterisk media path is WebSocket media.
 - `sipx.sip` now has sans-I/O primitives: `SipUri`, `HeaderMap`, `SipRequest`, `SipResponse`, `SipParseError`, `parse_sip_message`.
 - SIP parser validates max size and exact `Content-Length`; serializers rewrite `Content-Length` from body bytes.
 - SPEC T16 and T17 are complete; SIP UAS/runtime work plus advanced protocol layers remain pending.
@@ -66,3 +66,5 @@
 - SPEC T9 is complete: Asterisk ARI client plus WebSocket event consumer is implemented and tested without requiring real Asterisk.
 - `AsteriskBackend` now maps ARI channel/bridge/playback/hangup/DTMF control methods and known ARI events to timeline events.
 - SPEC T10 is complete: ARI channels, bridges, playback, hangup, and DTMF are mapped to timeline without requiring real Asterisk in tests.
+- `AsteriskWebSocketMediaPort` now provides async binary WebSocket media receive/send and `AudioFrame` conversion for Asterisk media MVP.
+- SPEC T11 is complete: WebSocket media is the chosen Asterisk media MVP path; AudioSocket and ExternalMedia RTP are explicit future paths.
