@@ -12,6 +12,7 @@ class SipTransactionError(ValueError):
 
 
 class ClientTransactionState(StrEnum):
+    TRYING = "trying"
     CALLING = "calling"
     PROCEEDING = "proceeding"
     COMPLETED = "completed"
@@ -84,6 +85,51 @@ class InviteClientTransaction:
         cancel = _related_request(self.request, "CANCEL")
         self.events.append(TransactionEvent(state=self.state, name="cancel_created"))
         return cancel
+
+
+class NonInviteClientTransaction:
+    def __init__(self, request: SipRequest) -> None:
+        if request.method == "INVITE":
+            raise SipTransactionError("NonInviteClientTransaction rejects INVITE")
+        self.request = request
+        self.branch = _branch_id(_required_header(request, "Via"))
+        self.state = ClientTransactionState.TRYING
+        self.responses: list[SipResponse] = []
+        self.events: list[TransactionEvent] = [
+            TransactionEvent(state=self.state, name="request_sent")
+        ]
+
+    @property
+    def final_response(self) -> SipResponse | None:
+        for response in reversed(self.responses):
+            if response.status_code >= 200:
+                return response
+        return None
+
+    def receive_response(self, response: SipResponse) -> ClientTransactionState:
+        self.responses.append(response)
+        if 100 <= response.status_code < 200:
+            self.state = ClientTransactionState.PROCEEDING
+            event_name = "provisional_response"
+        elif 200 <= response.status_code < 700:
+            self.state = ClientTransactionState.COMPLETED
+            event_name = "final_response"
+        else:
+            raise SipTransactionError(
+                f"invalid SIP response code: {response.status_code}"
+            )
+        self.events.append(
+            TransactionEvent(
+                state=self.state,
+                name=event_name,
+                status_code=response.status_code,
+            )
+        )
+        return self.state
+
+    def terminate(self) -> None:
+        self.state = ClientTransactionState.TERMINATED
+        self.events.append(TransactionEvent(state=self.state, name="terminated"))
 
 
 def _related_request(

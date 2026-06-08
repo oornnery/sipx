@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, and SIP dialog/INVITE transaction skeletons.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request helper, and Digest auth helper.
 
 ## Milestone 0 - Project Grounding
 
@@ -82,6 +82,9 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [ ] Implement transaction skeleton for INVITE and non-INVITE.
 - [x] Implement dialog model with Call-ID, tags, CSeq, route set.
 - [x] Implement INVITE client transaction skeleton with ACK/CANCEL helpers.
+- [x] Implement non-INVITE client transaction skeleton.
+- [x] Implement REGISTER request helper.
+- [x] Implement Digest auth challenge/authorization helper.
 - [x] Implement SDP model/parser/serializer for audio.
 - [x] Implement offer/answer for PCMU, PCMA, telephone-event.
 - [x] Implement RTP packet parse/serialize and sequence stats.
@@ -168,6 +171,15 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added SIP transaction/dialog tests.
 - [ ] Kept `SPEC.md` T21 pending because UAS, non-INVITE, REGISTER, Digest auth, sockets/timers, and strict runtime are not complete.
 
+## Block 0.7.1 Done
+
+- [x] Bumped package version to `0.7.1`.
+- [x] Added non-INVITE client transaction skeleton.
+- [x] Added REGISTER request helper.
+- [x] Added Digest challenge parser and authorization helper.
+- [x] Added SIP auth/register tests.
+- [ ] Kept `SPEC.md` T21 pending because UAS behavior, BYE flow, sockets/timers, strict runtime, and complete REGISTER client flow are not complete.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
@@ -175,7 +187,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
 - [ ] Full SIP transaction/dialog runtime remains pending after SIP/SDP/RTP/DTMF primitives.
-- [ ] Non-INVITE transaction, UAS behavior, REGISTER, and Digest auth are still required before T21 can be marked complete.
+- [ ] UAS behavior, BYE flow, sockets/timers, strict runtime, and complete REGISTER client flow are still required before T21 can be marked complete.
 
 ## Open Questions
 

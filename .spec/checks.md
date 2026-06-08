@@ -75,6 +75,15 @@
 | 2026-06-08 | `ruff check .` | pass | All checks passed after formatting. |
 | 2026-06-08 | `ruff format --check .` | pass | 49 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `python -m pytest` | pass | 41 tests passed for SIP auth/register block before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for SIP auth/register block. |
+| 2026-06-08 | `ruff format --check .` | fail | 2 auth/register files needed formatting; fixed with targeted `ruff format`. |
+| 2026-06-08 | auth helper grep | pass | Password is only used inside Digest HA1 calculation; MD5 uses `usedforsecurity=False`. |
+| 2026-06-08 | `ruff format sipx/sip/transaction.py tests/test_sip_auth_requests.py` | pass | 2 files reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 41 tests passed after auth/register formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after auth/register formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 52 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 
 ## Validation Policy
 

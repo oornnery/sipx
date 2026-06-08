@@ -2,7 +2,7 @@
 
 ## Summary
 
-Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.7.0` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, and INVITE client transactions.
+Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.7.1` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, INVITE/non-INVITE client transactions, REGISTER helper, and Digest auth helper.
 
 ## Read First
 
@@ -37,8 +37,8 @@ Build `sipx` as a Python Voice/SIP Harness:
 
 Continue after block `0.2.0`:
 
-1. Add non-INVITE transaction and basic REGISTER request/auth skeletons.
-2. Add UAS-side INVITE/dialog behavior.
+1. Add UAS-side INVITE/dialog behavior.
+2. Add BYE request/dialog termination helpers.
 3. Add richer mock media events and an example scenario.
 4. Choose first Asterisk media path.
 
@@ -51,7 +51,7 @@ Continue after block `0.2.0`:
 
 ## Latest Validation
 
-- `python -m pytest`: pass, 38 tests.
+- `python -m pytest`: pass, 41 tests.
 - `ruff check .`: pass.
 - `ruff format --check .`: pass.
 - `python -m ty check`: blocked, active interpreter has no `ty` module.

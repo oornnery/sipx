@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.7.1 - 2026-06-08
+
+- Added non-INVITE client transaction skeleton.
+- Added REGISTER request creation helper.
+- Added SIP Digest challenge parsing and authorization header generation.
+- Added tests for REGISTER headers, non-INVITE final response handling, and RFC Digest response generation.
+- Kept full T21 open: UAS behavior, BYE flow, sockets/timers, strict runtime, and complete REGISTER client flow remain pending.
+
 ## 0.7.0 - 2026-06-08
 
 - Added sans-I/O SIP dialog skeleton with dialog IDs, tag extraction, state transitions, and local CSeq progression.
