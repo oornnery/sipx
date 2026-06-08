@@ -67,6 +67,14 @@
 | 2026-06-08 | `ruff check .` | pass | All checks passed after RTP formatting. |
 | 2026-06-08 | `ruff format --check .` | pass | 46 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `python -m pytest` | pass | 38 tests passed for SIP transaction/dialog block before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for SIP transaction/dialog block. |
+| 2026-06-08 | `ruff format --check .` | fail | 3 SIP transaction/dialog files needed formatting; fixed with targeted `ruff format`. |
+| 2026-06-08 | `ruff format sipx/sip/dialog.py sipx/sip/transaction.py tests/test_sip_transaction_dialog.py` | pass | 3 files reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 38 tests passed after SIP transaction/dialog formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 49 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 
 ## Validation Policy
 

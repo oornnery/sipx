@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.7.0 - 2026-06-08
+
+- Added sans-I/O SIP dialog skeleton with dialog IDs, tag extraction, state transitions, and local CSeq progression.
+- Added INVITE client transaction skeleton with provisional/success/failure response handling.
+- Added related ACK and CANCEL request creation for INVITE transactions.
+- Added tests for INVITE transaction state, ACK/CANCEL creation, dialog tags/state, and header tag parsing.
+- Left full T21 open: UAS behavior, non-INVITE transactions, REGISTER, Digest auth, sockets/timers, and strict runtime are still pending.
+
 ## 0.6.0 - 2026-06-08
 
 - Added RTP packet parse/serialize primitives for RTP v2 packets.

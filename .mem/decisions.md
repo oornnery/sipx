@@ -27,3 +27,4 @@
 | D23 | 2026-06-08 | Native SIP starts with sans-I/O parse/serialize primitives. | Keeps protocol correctness testable before sockets, timers, transactions, or backend runtime. |
 | D24 | 2026-06-08 | SDP starts with audio-only PCMU/PCMA plus `telephone-event`. | Matches MVP codec/DTMF scope without adding premature video or advanced media negotiation. |
 | D25 | 2026-06-08 | RTP/DTMF starts sans-I/O before media runtime. | Packet correctness and RFC4733 event behavior should be deterministic before sockets/jitter/audio clocks. |
+| D26 | 2026-06-08 | SIP transactions/dialogs start sans-I/O and partial. | T21 is broad; client INVITE and dialog state should be verified before adding UAS, REGISTER, auth, sockets, and timers. |

@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP packet primitives, and RFC4733 DTMF.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, and SIP dialog/INVITE transaction skeletons.
 
 ## Milestone 0 - Project Grounding
 
@@ -80,7 +80,8 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement SIP URI and header models.
 - [x] Implement SIP parser/serializer with bounds and typed errors.
 - [ ] Implement transaction skeleton for INVITE and non-INVITE.
-- [ ] Implement dialog model with Call-ID, tags, CSeq, route set.
+- [x] Implement dialog model with Call-ID, tags, CSeq, route set.
+- [x] Implement INVITE client transaction skeleton with ACK/CANCEL helpers.
 - [x] Implement SDP model/parser/serializer for audio.
 - [x] Implement offer/answer for PCMU, PCMA, telephone-event.
 - [x] Implement RTP packet parse/serialize and sequence stats.
@@ -158,13 +159,23 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added RTP/DTMF tests.
 - [x] Marked `SPEC.md` T19 and T20 complete after verification.
 
+## Block 0.7.0 Done
+
+- [x] Bumped package version to `0.7.0`.
+- [x] Added SIP dialog ID/state model with tag extraction and local CSeq progression.
+- [x] Added INVITE client transaction state handling.
+- [x] Added ACK/CANCEL helper request creation for INVITE transactions.
+- [x] Added SIP transaction/dialog tests.
+- [ ] Kept `SPEC.md` T21 pending because UAS, non-INVITE, REGISTER, Digest auth, sockets/timers, and strict runtime are not complete.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
 - [ ] Asterisk media path decision remains open before AsteriskBackend MVP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] SIP transaction/dialog work remains pending after SIP/SDP/RTP/DTMF primitives.
+- [ ] Full SIP transaction/dialog runtime remains pending after SIP/SDP/RTP/DTMF primitives.
+- [ ] Non-INVITE transaction, UAS behavior, REGISTER, and Digest auth are still required before T21 can be marked complete.
 
 ## Open Questions
 
