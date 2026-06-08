@@ -59,6 +59,14 @@
 | 2026-06-08 | `ruff check .` | pass | All checks passed after SDP formatting. |
 | 2026-06-08 | `ruff format --check .` | pass | 41 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `python -m pytest` | pass | 32 tests passed for RTP/DTMF block before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for RTP/DTMF block. |
+| 2026-06-08 | `ruff format --check .` | fail | `tests/test_rtp.py` needed formatting; fixed with targeted `ruff format`. |
+| 2026-06-08 | `ruff format tests/test_rtp.py` | pass | 1 file reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 32 tests passed after RTP formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after RTP formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 46 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 
 ## Validation Policy
 

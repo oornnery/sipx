@@ -112,8 +112,8 @@ T15|.|implement inbound Asterisk app via Stasis example|C3,V14
 T16|x|implement `NativeSipBackend` SIP parser/serializer sans-I/O|C4,V7,V8
 T17|x|implement robust URI/HeaderMap/Content-Length + tests|V8,T16
 T18|x|implement SDP model/parser/offer-answer audio PCMU/PCMA/telephone-event|V7,V11,V12
-T19|.|implement RTP packet parse/serialize + seq/timestamp/SSRC stats|V7,V8,V12
-T20|.|implement DTMF RFC4733 encoder/decoder + event model|V11,T19
+T19|x|implement RTP packet parse/serialize + seq/timestamp/SSRC stats|V7,V8,V12
+T20|x|implement DTMF RFC4733 encoder/decoder + event model|V11,T19
 T21|.|implement basic UAC/UAS INVITE/ACK/BYE/CANCEL/REGISTER|C4,V7,V15
 T22|.|implement headless technical softphone on `NativeSipBackend`|G1,C4,V15,V17
 T23|.|add lab hooks for headers/SDP/timers/malformed SIP|V15,V20,T22

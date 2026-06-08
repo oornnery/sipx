@@ -31,6 +31,15 @@ from sipx.media import (
     TtsEngine,
 )
 from sipx.security import Redactor, default_redactor
+from sipx.rtp import (
+    DtmfEvent,
+    RtpPacket,
+    RtpParseError,
+    RtpSequenceStats,
+    RtpStatsSnapshot,
+    decode_dtmf_event,
+    encode_dtmf_event,
+)
 from sipx.sdp import (
     AudioMedia,
     SdpCodec,
@@ -62,6 +71,7 @@ __all__ = [
     "BargeInSignal",
     "Call",
     "CallLeg",
+    "DtmfEvent",
     "ExpectationFailure",
     "ExpectationResult",
     "Harness",
@@ -69,6 +79,10 @@ __all__ = [
     "Metrics",
     "MediaPort",
     "Redactor",
+    "RtpPacket",
+    "RtpParseError",
+    "RtpSequenceStats",
+    "RtpStatsSnapshot",
     "Scenario",
     "SdpCodec",
     "SdpNegotiationError",
@@ -88,6 +102,8 @@ __all__ = [
     "Verdict",
     "create_audio_answer",
     "create_audio_offer",
+    "decode_dtmf_event",
+    "encode_dtmf_event",
     "expect",
     "default_redactor",
     "parse_sdp",

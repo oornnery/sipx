@@ -36,7 +36,7 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `0.5.0`.
+- Current implementation version: `0.6.0`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
@@ -52,3 +52,5 @@
 - SPEC T16 and T17 are complete; SIP transaction/dialog/SDP/RTP work remains pending.
 - `sipx.sdp` now has SDP audio model/parser/serializer and offer-answer helpers for PCMU, PCMA, and `telephone-event`.
 - SPEC T18 is complete; RTP packet/stats and RFC4733 DTMF remain pending.
+- `sipx.rtp` now has RTP packet parse/serialize, sequence stats, and RFC4733 DTMF encode/decode helpers.
+- SPEC T19 and T20 are complete; SIP transaction/dialog runtime remains pending.

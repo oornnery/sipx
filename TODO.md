@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, and SDP audio offer/answer.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP packet primitives, and RFC4733 DTMF.
 
 ## Milestone 0 - Project Grounding
 
@@ -83,8 +83,8 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [ ] Implement dialog model with Call-ID, tags, CSeq, route set.
 - [x] Implement SDP model/parser/serializer for audio.
 - [x] Implement offer/answer for PCMU, PCMA, telephone-event.
-- [ ] Implement RTP packet parse/serialize and sequence stats.
-- [ ] Implement DTMF RFC4733 events.
+- [x] Implement RTP packet parse/serialize and sequence stats.
+- [x] Implement DTMF RFC4733 events.
 - [ ] Implement strict mode UAC/UAS basic calls.
 - [ ] Implement lab mode hooks for controlled malformed behavior.
 
@@ -149,13 +149,22 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added SDP tests.
 - [x] Marked `SPEC.md` T18 complete after verification.
 
+## Block 0.6.0 Done
+
+- [x] Bumped package version to `0.6.0`.
+- [x] Added RTP packet parse/serialize primitives.
+- [x] Added RTP sequence stats.
+- [x] Added RFC4733 DTMF event encode/decode helpers.
+- [x] Added RTP/DTMF tests.
+- [x] Marked `SPEC.md` T19 and T20 complete after verification.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
 - [ ] Asterisk media path decision remains open before AsteriskBackend MVP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] SIP transaction/dialog and RTP/DTMF work remains pending after SIP/SDP primitives.
+- [ ] SIP transaction/dialog work remains pending after SIP/SDP/RTP/DTMF primitives.
 
 ## Open Questions
 

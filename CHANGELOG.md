@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.6.0 - 2026-06-08
+
+- Added RTP packet parse/serialize primitives for RTP v2 packets.
+- Added RTP sequence statistics for received packets, gaps/loss, out-of-order packets, highest sequence, and SSRC.
+- Added RFC4733 DTMF encode/decode helpers and `DtmfEvent` validation.
+- Added RTP and DTMF tests.
+
 ## 0.5.0 - 2026-06-08
 
 - Added SDP session/audio model, parser, and serializer.
