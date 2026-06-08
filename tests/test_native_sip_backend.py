@@ -195,3 +195,56 @@ async def _strict_call_flow() -> None:
     ]
     assert caller_call_events == ["invite_sent", "confirmed", "terminated"]
     assert callee_call_events == ["invite_received", "confirmed", "terminated"]
+
+
+def test_native_sip_backend_cancels_pending_invite_over_udp() -> None:
+    asyncio.run(_cancel_pending_invite())
+
+
+async def _cancel_pending_invite() -> None:
+    caller_timeline = Timeline(run_id="cancel-caller")
+    callee_timeline = Timeline(run_id="cancel-callee")
+    caller = NativeSipBackend(timeline=caller_timeline, actor_id="caller")
+    callee = NativeSipBackend(timeline=callee_timeline, actor_id="callee")
+    try:
+        await caller.start()
+        await callee.start()
+        caller_contact = SipUri.parse(f"sip:alice@127.0.0.1:{caller.local_address[1]}")
+
+        receive_task = asyncio.create_task(callee.receive_invite(timeout=1.0))
+        invite = await caller.start_invite(
+            remote=callee.local_address,
+            target=SipUri.parse("sip:bob@example.com"),
+            caller=SipUri.parse("sip:alice@example.com"),
+            contact=caller_contact,
+            call_id="cancel-call-1",
+            branch="z9hG4bK-cancel-invite",
+            from_tag="caller-tag",
+        )
+        incoming = await receive_task
+
+        answer_cancel_task = asyncio.create_task(
+            callee.answer_cancel(
+                incoming,
+                local_tag="callee-tag",
+                timeout=1.0,
+            )
+        )
+        invite_final = await caller.cancel_invite(invite, timeout=1.0)
+        uas_final = await answer_cancel_task
+
+        assert invite_final.status_code == 487
+        assert invite_final.reason == "Request Terminated"
+        assert uas_final.status_code == 487
+    finally:
+        await caller.stop()
+        await callee.stop()
+
+    caller_call_events = [
+        event.name for event in caller_timeline.events if event.category == "call"
+    ]
+    callee_call_events = [
+        event.name for event in callee_timeline.events if event.category == "call"
+    ]
+    assert caller_call_events == ["invite_sent", "cancelled"]
+    assert callee_call_events == ["invite_received", "cancelled"]

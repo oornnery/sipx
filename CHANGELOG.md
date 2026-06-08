@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.8.2 - 2026-06-08
+
+- Added real UDP CANCEL runtime for pending INVITE attempts.
+- Added pending/incoming INVITE attempt models and backend methods for `start_invite`, `receive_invite`, `cancel_invite`, and `answer_cancel`.
+- Added UAS CANCEL handling with 200 OK to CANCEL, 487 Request Terminated to INVITE, and UAC ACK for the terminated INVITE.
+- Added loopback UDP CANCEL test covering INVITE -> CANCEL -> 200(CANCEL) -> 487(INVITE) -> ACK.
+- Kept full T21 open: REGISTER over-UDP orchestration and transaction retransmission timers remain pending.
+
 ## 0.8.1 - 2026-06-08
 
 - Added strict UAC/UAS call runtime on `NativeSipBackend` for real UDP INVITE, provisional/final response, ACK, BYE, and BYE 200 OK flows.

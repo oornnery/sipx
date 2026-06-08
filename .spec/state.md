@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.8.1` adds strict UAC/UAS INVITE/ACK/BYE call runtime over real UDP.
+Implement `sipx` in verified commit blocks. Block `0.8.2` adds real UDP CANCEL runtime for pending INVITE attempts.
 
 ## Sources Read
 
@@ -82,6 +82,12 @@ Implement `sipx` in verified commit blocks. Block `0.8.1` adds strict UAC/UAS IN
 - Added `NativeSipCall`, call states, and call timeline events.
 - Added loopback UDP test for INVITE -> 180/200 -> ACK -> BYE/200.
 - Kept SPEC task T21 pending because CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers are not complete.
+- Bumped `pyproject.toml` version from `0.8.1` to `0.8.2`.
+- Added pending/incoming INVITE attempt models.
+- Added `start_invite`, `receive_invite`, `cancel_invite`, and `answer_cancel` methods on `NativeSipBackend`.
+- Added real UDP CANCEL flow with 200 OK to CANCEL, 487 Request Terminated to INVITE, and ACK of the terminated INVITE.
+- Added loopback UDP CANCEL test for INVITE -> CANCEL -> 200/487 -> ACK.
+- Kept SPEC task T21 pending because REGISTER over-UDP orchestration and transaction retransmission timers are not complete.
 
 ## Active Decision
 
@@ -91,11 +97,11 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Add CANCEL runtime over UDP.
-2. Add REGISTER over-UDP orchestration.
-3. Add transaction retransmission timers for strict runtime.
-4. Add richer fake media events and example mock scenario.
-5. Choose first Asterisk media path.
+1. Add REGISTER over-UDP orchestration.
+2. Add transaction retransmission timers for strict runtime.
+3. Add richer fake media events and example mock scenario.
+4. Choose first Asterisk media path.
+5. Decide artifact retention policy before real recordings/transcripts.
 
 ## Risks
 
@@ -105,7 +111,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - Recordings/transcripts are sensitive; design redaction/retention before real deployments.
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
-- SIP transaction/dialog/register primitives, real UDP transport, and strict INVITE/ACK/BYE flow exist, but T21 remains incomplete until CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers are implemented.
+- SIP transaction/dialog/register primitives, real UDP transport, strict INVITE/ACK/BYE flow, and CANCEL runtime exist, but T21 remains incomplete until REGISTER over-UDP orchestration and transaction retransmission timers are implemented.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
 
 ## Open Questions

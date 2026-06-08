@@ -2,7 +2,7 @@
 
 ## Summary
 
-Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.8.1` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, INVITE/non-INVITE client transactions, REGISTER helper/flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, and strict INVITE/ACK/BYE call flow.
+Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.8.2` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, INVITE/non-INVITE client transactions, REGISTER helper/flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict INVITE/ACK/BYE call flow, and CANCEL runtime.
 
 ## Read First
 
@@ -35,12 +35,12 @@ Build `sipx` as a Python Voice/SIP Harness:
 
 ## Recommended Next Task
 
-Continue after block `0.8.1`:
+Continue after block `0.8.2`:
 
-1. Add CANCEL runtime over UDP.
-2. Add REGISTER over-UDP orchestration.
-3. Add transaction retransmission timers for strict runtime.
-4. Add richer mock media events and an example scenario.
+1. Add REGISTER over-UDP orchestration.
+2. Add transaction retransmission timers for strict runtime.
+3. Add richer mock media events and an example scenario.
+4. Choose first Asterisk media path.
 
 ## Do Not Do Yet
 
@@ -51,8 +51,8 @@ Continue after block `0.8.1`:
 
 ## Latest Validation
 
-- `python -m pytest`: pass, 56 tests.
-- `python -m pytest tests/test_native_sip_backend.py`: pass, 5 loopback UDP tests during block `0.8.1`.
+- `python -m pytest`: pass, 57 tests.
+- `python -m pytest tests/test_native_sip_backend.py`: pass, 6 loopback UDP tests during block `0.8.2`.
 - `ruff check .`: pass.
 - `ruff format --check .`: pass, 55 files already formatted.
 - `python -m ty check`: blocked, active interpreter has no `ty` module.

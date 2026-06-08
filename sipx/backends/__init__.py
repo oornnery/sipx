@@ -4,6 +4,8 @@ from sipx.backends.native import (
     NativeSipCall,
     NativeSipCallError,
     NativeSipCallState,
+    NativeSipIncomingInvite,
+    NativeSipInviteAttempt,
 )
 
 __all__ = [
@@ -12,4 +14,6 @@ __all__ = [
     "NativeSipCall",
     "NativeSipCallError",
     "NativeSipCallState",
+    "NativeSipIncomingInvite",
+    "NativeSipInviteAttempt",
 ]

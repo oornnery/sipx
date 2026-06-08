@@ -50,6 +50,22 @@ class NativeSipCall:
     state: NativeSipCallState = NativeSipCallState.CONFIRMED
 
 
+@dataclass(slots=True)
+class NativeSipInviteAttempt:
+    call_id: str
+    request: SipRequest
+    remote: UdpAddress
+    transaction: InviteClientTransaction
+
+
+@dataclass(slots=True)
+class NativeSipIncomingInvite:
+    call_id: str
+    request: SipRequest
+    remote: UdpAddress
+    transaction: InviteServerTransaction
+
+
 class NativeSipBackend:
     capabilities = frozenset(
         {
@@ -164,7 +180,8 @@ class NativeSipBackend:
         body: bytes = b"",
         content_type: str | None = None,
     ) -> NativeSipCall:
-        request = create_invite_request(
+        attempt = await self.start_invite(
+            remote=remote,
             target=target,
             caller=caller,
             contact=contact,
@@ -174,9 +191,8 @@ class NativeSipBackend:
             body=body,
             content_type=content_type,
         )
-        transaction = InviteClientTransaction(request)
-        await self.send_request(request, remote)
-        self._record_call("invite_sent", call_id=call_id, data={"target": str(target)})
+        request = attempt.request
+        transaction = attempt.transaction
 
         while True:
             event = await self._receive_matching(
@@ -221,6 +237,142 @@ class NativeSipBackend:
                 f"INVITE failed with {response.status_code} {response.reason}"
             )
 
+    async def start_invite(
+        self,
+        *,
+        remote: UdpAddress,
+        target: SipUri,
+        caller: SipUri,
+        contact: SipUri,
+        call_id: str,
+        branch: str,
+        from_tag: str,
+        body: bytes = b"",
+        content_type: str | None = None,
+    ) -> NativeSipInviteAttempt:
+        request = create_invite_request(
+            target=target,
+            caller=caller,
+            contact=contact,
+            call_id=call_id,
+            branch=branch,
+            from_tag=from_tag,
+            body=body,
+            content_type=content_type,
+        )
+        transaction = InviteClientTransaction(request)
+        await self.send_request(request, remote)
+        self._record_call("invite_sent", call_id=call_id, data={"target": str(target)})
+        return NativeSipInviteAttempt(
+            call_id=call_id,
+            request=request,
+            remote=remote,
+            transaction=transaction,
+        )
+
+    async def cancel_invite(
+        self,
+        attempt: NativeSipInviteAttempt,
+        *,
+        timeout: float = 1.0,
+    ) -> SipResponse:
+        cancel = attempt.transaction.create_cancel()
+        await self.send_request(cancel, attempt.remote)
+        await self._receive_matching(
+            timeout=timeout,
+            predicate=lambda item: _response_matches(
+                item,
+                call_id=attempt.call_id,
+                cseq_method="CANCEL",
+            ),
+        )
+        event = await self._receive_matching(
+            timeout=timeout,
+            predicate=lambda item: _response_matches(
+                item,
+                call_id=attempt.call_id,
+                cseq_method="INVITE",
+            ),
+        )
+        response = event.message
+        if not isinstance(response, SipResponse):
+            raise NativeSipCallError("expected INVITE final response after CANCEL")
+        attempt.transaction.receive_response(response)
+        if response.status_code != 487:
+            raise NativeSipCallError(
+                f"expected 487 after CANCEL, got {response.status_code}"
+            )
+        ack = attempt.transaction.create_ack()
+        await self.send_request(ack, attempt.remote)
+        self._record_call("cancelled", call_id=attempt.call_id, data={"role": "uac"})
+        return response
+
+    async def receive_invite(self, *, timeout: float = 1.0) -> NativeSipIncomingInvite:
+        event = await self._receive_matching(
+            timeout=timeout,
+            predicate=lambda item: _request_matches(item, method="INVITE"),
+        )
+        request = event.message
+        if not isinstance(request, SipRequest):
+            raise NativeSipCallError("expected INVITE request")
+        call_id = _required_header(request, "Call-ID")
+        transaction = InviteServerTransaction(request)
+        self._record_call("invite_received", call_id=call_id, data={"role": "uas"})
+        return NativeSipIncomingInvite(
+            call_id=call_id,
+            request=request,
+            remote=event.remote,
+            transaction=transaction,
+        )
+
+    async def answer_cancel(
+        self,
+        invite: NativeSipIncomingInvite,
+        *,
+        local_tag: str,
+        timeout: float = 1.0,
+    ) -> SipResponse:
+        event = await self._receive_matching(
+            timeout=timeout,
+            predicate=lambda item: _request_matches(
+                item,
+                method="CANCEL",
+                call_id=invite.call_id,
+            ),
+        )
+        cancel = event.message
+        if not isinstance(cancel, SipRequest):
+            raise NativeSipCallError("expected CANCEL request")
+        cancel_response = create_response_for_request(
+            request=cancel,
+            status_code=200,
+            reason="OK",
+            to_tag=local_tag,
+        )
+        await self.send_response(cancel_response, event.remote)
+
+        final = create_response_for_request(
+            request=invite.request,
+            status_code=487,
+            reason="Request Terminated",
+            to_tag=local_tag,
+        )
+        invite.transaction.send_response(final)
+        await self.send_response(final, invite.remote)
+        ack_event = await self._receive_matching(
+            timeout=timeout,
+            predicate=lambda item: _request_matches(
+                item,
+                method="ACK",
+                call_id=invite.call_id,
+            ),
+        )
+        ack = ack_event.message
+        if isinstance(ack, SipRequest):
+            invite.transaction.receive_ack(ack)
+        self._record_call("cancelled", call_id=invite.call_id, data={"role": "uas"})
+        return final
+
     async def accept_call(
         self,
         *,
@@ -232,16 +384,11 @@ class NativeSipBackend:
         final_body: bytes = b"",
         final_content_type: str | None = None,
     ) -> NativeSipCall:
-        event = await self._receive_matching(
-            timeout=timeout,
-            predicate=lambda item: _request_matches(item, method="INVITE"),
-        )
-        request = event.message
-        if not isinstance(request, SipRequest):
-            raise NativeSipCallError("expected INVITE request")
-        call_id = _required_header(request, "Call-ID")
-        transaction = InviteServerTransaction(request)
-        self._record_call("invite_received", call_id=call_id, data={"role": "uas"})
+        incoming = await self.receive_invite(timeout=timeout)
+        event_remote = incoming.remote
+        request = incoming.request
+        call_id = incoming.call_id
+        transaction = incoming.transaction
 
         if provisional_status is not None:
             provisional = create_response_for_request(
@@ -252,7 +399,7 @@ class NativeSipBackend:
                 contact=contact,
             )
             transaction.send_response(provisional)
-            await self.send_response(provisional, event.remote)
+            await self.send_response(provisional, event_remote)
 
         final = create_response_for_request(
             request=request,
@@ -264,7 +411,7 @@ class NativeSipBackend:
             content_type=final_content_type,
         )
         transaction.send_response(final)
-        await self.send_response(final, event.remote)
+        await self.send_response(final, event_remote)
 
         await self._receive_matching(
             timeout=timeout,
@@ -280,7 +427,7 @@ class NativeSipBackend:
         return NativeSipCall(
             call_id=call_id,
             dialog=dialog,
-            remote=event.remote,
+            remote=event_remote,
             request_uri=_uri_from_name_addr(_required_header(request, "From")),
         )
 

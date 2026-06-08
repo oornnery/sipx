@@ -124,6 +124,12 @@
 | 2026-06-08 | `ruff format --check .` | pass | 55 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after strict call runtime block. |
+| 2026-06-08 | `python -m pytest tests/test_native_sip_backend.py` | pass | 6 loopback UDP tests passed for CANCEL runtime before full validation. |
+| 2026-06-08 | `python -m pytest` | pass | 57 tests passed for CANCEL runtime. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for CANCEL runtime. |
+| 2026-06-08 | `ruff format --check .` | pass | 55 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after CANCEL runtime block. |
 
 ## Validation Policy
 

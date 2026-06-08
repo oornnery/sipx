@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, and strict UAC/UAS INVITE/ACK/BYE call flow.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, and CANCEL runtime.
 
 ## Milestone 0 - Project Grounding
 
@@ -94,7 +94,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement DTMF RFC4733 events.
 - [x] Implement real async UDP SIP transport and NativeSipBackend send/receive runtime.
 - [x] Implement strict mode UAC/UAS basic INVITE/ACK/BYE calls over UDP.
-- [ ] Implement CANCEL runtime over UDP.
+- [x] Implement CANCEL runtime over UDP.
 - [ ] Implement REGISTER runtime orchestration over UDP.
 - [ ] Implement transaction retransmission timers for strict runtime.
 - [ ] Implement lab mode hooks for controlled malformed behavior.
@@ -222,6 +222,15 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added loopback UDP test for INVITE -> 180/200 -> ACK -> BYE/200.
 - [ ] Kept `SPEC.md` T21 pending because CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers are not complete.
 
+## Block 0.8.2 Done
+
+- [x] Bumped package version to `0.8.2`.
+- [x] Added pending/incoming INVITE attempt models.
+- [x] Added `start_invite`, `receive_invite`, `cancel_invite`, and `answer_cancel` methods on `NativeSipBackend`.
+- [x] Added real UDP CANCEL flow with 200 OK to CANCEL, 487 Request Terminated to INVITE, and ACK of the terminated INVITE.
+- [x] Added loopback UDP CANCEL test for INVITE -> CANCEL -> 200/487 -> ACK.
+- [ ] Kept `SPEC.md` T21 pending because REGISTER over-UDP orchestration and transaction retransmission timers are not complete.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
@@ -229,7 +238,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
 - [ ] Full SIP transaction/dialog runtime remains pending after SIP/SDP/RTP/DTMF primitives.
-- [ ] CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers are still required before T21 can be marked complete.
+- [ ] REGISTER over-UDP orchestration and transaction retransmission timers are still required before T21 can be marked complete.
 
 ## Open Questions
 
