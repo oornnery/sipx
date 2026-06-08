@@ -29,6 +29,7 @@ from sipx.backends import (
     NativeSipIncomingInvite,
     NativeSipInviteAttempt,
     NativeSipRegisterError,
+    NativeSipRetransmissionPolicy,
 )
 from sipx.media import (
     AudioFrame,
@@ -134,6 +135,7 @@ __all__ = [
     "NativeSipIncomingInvite",
     "NativeSipInviteAttempt",
     "NativeSipRegisterError",
+    "NativeSipRetransmissionPolicy",
     "NonInviteClientTransaction",
     "RegisterChallenge",
     "RegisterClientError",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from dataclasses import dataclass
 from enum import StrEnum
@@ -8,7 +9,12 @@ from typing import Any, Callable
 from sipx.core.capabilities import BackendCapability
 from sipx.core.timeline import Timeline
 from sipx.sip.dialog import Dialog
-from sipx.sip.message import DEFAULT_MAX_MESSAGE_SIZE, SipRequest, SipResponse
+from sipx.sip.message import (
+    DEFAULT_MAX_MESSAGE_SIZE,
+    SipMessage,
+    SipRequest,
+    SipResponse,
+)
 from sipx.sip.requests import (
     create_ack_request,
     create_bye_request,
@@ -46,6 +52,29 @@ class NativeSipCallState(StrEnum):
     FAILED = "failed"
 
 
+@dataclass(frozen=True, slots=True)
+class NativeSipRetransmissionPolicy:
+    initial_interval: float = 0.5
+    max_interval: float = 4.0
+    max_attempts: int = 6
+
+    def __post_init__(self) -> None:
+        if self.initial_interval <= 0:
+            raise ValueError("initial_interval must be positive")
+        if self.max_interval <= 0:
+            raise ValueError("max_interval must be positive")
+        if self.max_attempts < 0:
+            raise ValueError("max_attempts must be non-negative")
+
+    def intervals(self) -> tuple[float, ...]:
+        interval = self.initial_interval
+        values: list[float] = []
+        for _ in range(self.max_attempts):
+            values.append(interval)
+            interval = min(interval * 2, self.max_interval)
+        return tuple(values)
+
+
 @dataclass(slots=True)
 class NativeSipCall:
     call_id: str
@@ -71,6 +100,12 @@ class NativeSipIncomingInvite:
     transaction: InviteServerTransaction
 
 
+@dataclass(slots=True)
+class _RetransmissionHandle:
+    stop: asyncio.Event
+    task: asyncio.Task[None]
+
+
 class NativeSipBackend:
     capabilities = frozenset(
         {
@@ -88,12 +123,16 @@ class NativeSipBackend:
         timeline: Timeline | None = None,
         actor_id: str | None = None,
         max_message_size: int = DEFAULT_MAX_MESSAGE_SIZE,
+        retransmission_policy: NativeSipRetransmissionPolicy | None = None,
     ) -> None:
         if mode not in {"strict", "lab"}:
             raise ValueError("mode must be strict or lab")
         self.mode = mode
         self.timeline = timeline
         self.actor_id = actor_id
+        self.retransmission_policy = (
+            retransmission_policy or NativeSipRetransmissionPolicy()
+        )
         self.endpoint = SipUdpEndpoint(
             local_host=local_host,
             local_port=local_port,
@@ -197,52 +236,58 @@ class NativeSipBackend:
         )
         request = flow.create_register(branch=branch)
         transaction = NonInviteClientTransaction(request)
-        await self.send_request(request, remote)
+        retransmission = await self._send_with_retransmissions(request, remote)
 
-        while True:
-            event = await self._receive_matching(
-                timeout=timeout,
-                predicate=lambda item: _response_matches(
-                    item,
-                    call_id=call_id,
-                    cseq_method="REGISTER",
-                ),
-            )
-            response = event.message
-            if not isinstance(response, SipResponse):
-                continue
-            transaction.receive_response(response)
-            state = flow.receive_response(response)
-            if state is RegisterClientState.CHALLENGED:
-                if username is None or password is None:
-                    raise NativeSipRegisterError(
-                        "REGISTER challenge requires credentials"
+        try:
+            while True:
+                event = await self._receive_matching(
+                    timeout=timeout,
+                    predicate=lambda item: _response_matches(
+                        item,
+                        call_id=call_id,
+                        cseq_method="REGISTER",
+                    ),
+                )
+                response = event.message
+                if not isinstance(response, SipResponse):
+                    continue
+                await self._stop_retransmission(retransmission)
+                transaction.receive_response(response)
+                state = flow.receive_response(response)
+                if state is RegisterClientState.CHALLENGED:
+                    if username is None or password is None:
+                        raise NativeSipRegisterError(
+                            "REGISTER challenge requires credentials"
+                        )
+                    request = flow.create_authenticated_register(
+                        branch=auth_branch or f"{branch}-auth",
+                        username=username,
+                        password=password,
+                        cnonce=cnonce,
                     )
-                request = flow.create_authenticated_register(
-                    branch=auth_branch or f"{branch}-auth",
-                    username=username,
-                    password=password,
-                    cnonce=cnonce,
-                )
-                transaction = NonInviteClientTransaction(request)
-                await self.send_request(request, remote)
-                continue
-            if state in {
-                RegisterClientState.REGISTERED,
-                RegisterClientState.UNREGISTERED,
-            }:
-                self._record_call(
-                    "registered"
-                    if state is RegisterClientState.REGISTERED
-                    else "unregistered",
-                    call_id=call_id,
-                    data={"aor": str(aor), "registrar": str(registrar)},
-                )
-                return state
-            if state is RegisterClientState.FAILED:
-                raise NativeSipRegisterError(
-                    f"REGISTER failed with {response.status_code} {response.reason}"
-                )
+                    transaction = NonInviteClientTransaction(request)
+                    retransmission = await self._send_with_retransmissions(
+                        request, remote
+                    )
+                    continue
+                if state in {
+                    RegisterClientState.REGISTERED,
+                    RegisterClientState.UNREGISTERED,
+                }:
+                    self._record_call(
+                        "registered"
+                        if state is RegisterClientState.REGISTERED
+                        else "unregistered",
+                        call_id=call_id,
+                        data={"aor": str(aor), "registrar": str(registrar)},
+                    )
+                    return state
+                if state is RegisterClientState.FAILED:
+                    raise NativeSipRegisterError(
+                        f"REGISTER failed with {response.status_code} {response.reason}"
+                    )
+        finally:
+            await self._stop_retransmission(retransmission)
 
     async def unregister_account(
         self,
@@ -304,49 +349,63 @@ class NativeSipBackend:
         )
         request = attempt.request
         transaction = attempt.transaction
+        retransmission = self._start_retransmission(request, remote)
+        retransmission_stopped = False
 
-        while True:
-            event = await self._receive_matching(
-                timeout=timeout,
-                predicate=lambda item: _response_matches(
-                    item,
-                    call_id=call_id,
-                    cseq_method="INVITE",
-                ),
-            )
-            response = event.message
-            if not isinstance(response, SipResponse):
-                continue
-            transaction.receive_response(response)
-            if response.status_code < 200:
-                continue
-            if 200 <= response.status_code < 300:
-                dialog = Dialog.from_uac_invite_response(request, response)
-                ack = create_ack_request(
-                    invite=request,
-                    response=response,
-                    via_host=self.local_address[0],
-                    branch=ack_branch,
+        try:
+            while True:
+                event = await self._receive_matching(
+                    timeout=timeout,
+                    predicate=lambda item: _response_matches(
+                        item,
+                        call_id=call_id,
+                        cseq_method="INVITE",
+                    ),
                 )
+                response = event.message
+                if not isinstance(response, SipResponse):
+                    continue
+                if not retransmission_stopped:
+                    await self._stop_retransmission(retransmission)
+                    retransmission_stopped = True
+                transaction.receive_response(response)
+                if response.status_code < 200:
+                    continue
+                if 200 <= response.status_code < 300:
+                    dialog = Dialog.from_uac_invite_response(request, response)
+                    ack = create_ack_request(
+                        invite=request,
+                        response=response,
+                        via_host=self.local_address[0],
+                        branch=ack_branch,
+                    )
+                    await self.send_request(ack, remote)
+                    self._record_call(
+                        "confirmed", call_id=call_id, data={"role": "uac"}
+                    )
+                    return NativeSipCall(
+                        call_id=call_id,
+                        dialog=dialog,
+                        remote=remote,
+                        request_uri=target,
+                    )
+
+                ack = transaction.create_ack()
                 await self.send_request(ack, remote)
-                self._record_call("confirmed", call_id=call_id, data={"role": "uac"})
-                return NativeSipCall(
+                self._record_call(
+                    "failed",
                     call_id=call_id,
-                    dialog=dialog,
-                    remote=remote,
-                    request_uri=target,
+                    data={
+                        "status_code": response.status_code,
+                        "reason": response.reason,
+                    },
                 )
-
-            ack = transaction.create_ack()
-            await self.send_request(ack, remote)
-            self._record_call(
-                "failed",
-                call_id=call_id,
-                data={"status_code": response.status_code, "reason": response.reason},
-            )
-            raise NativeSipCallError(
-                f"INVITE failed with {response.status_code} {response.reason}"
-            )
+                raise NativeSipCallError(
+                    f"INVITE failed with {response.status_code} {response.reason}"
+                )
+        finally:
+            if not retransmission_stopped:
+                await self._stop_retransmission(retransmission)
 
     async def start_invite(
         self,
@@ -388,15 +447,18 @@ class NativeSipBackend:
         timeout: float = 1.0,
     ) -> SipResponse:
         cancel = attempt.transaction.create_cancel()
-        await self.send_request(cancel, attempt.remote)
-        await self._receive_matching(
-            timeout=timeout,
-            predicate=lambda item: _response_matches(
-                item,
-                call_id=attempt.call_id,
-                cseq_method="CANCEL",
-            ),
-        )
+        retransmission = await self._send_with_retransmissions(cancel, attempt.remote)
+        try:
+            await self._receive_matching(
+                timeout=timeout,
+                predicate=lambda item: _response_matches(
+                    item,
+                    call_id=attempt.call_id,
+                    cseq_method="CANCEL",
+                ),
+            )
+        finally:
+            await self._stop_retransmission(retransmission)
         event = await self._receive_matching(
             timeout=timeout,
             predicate=lambda item: _response_matches(
@@ -469,18 +531,21 @@ class NativeSipBackend:
             to_tag=local_tag,
         )
         invite.transaction.send_response(final)
-        await self.send_response(final, invite.remote)
-        ack_event = await self._receive_matching(
-            timeout=timeout,
-            predicate=lambda item: _request_matches(
-                item,
-                method="ACK",
-                call_id=invite.call_id,
-            ),
-        )
-        ack = ack_event.message
-        if isinstance(ack, SipRequest):
-            invite.transaction.receive_ack(ack)
+        retransmission = await self._send_with_retransmissions(final, invite.remote)
+        try:
+            ack_event = await self._receive_matching(
+                timeout=timeout,
+                predicate=lambda item: _request_matches(
+                    item,
+                    method="ACK",
+                    call_id=invite.call_id,
+                ),
+            )
+            ack = ack_event.message
+            if isinstance(ack, SipRequest):
+                invite.transaction.receive_ack(ack)
+        finally:
+            await self._stop_retransmission(retransmission)
         self._record_call("cancelled", call_id=invite.call_id, data={"role": "uas"})
         return final
 
@@ -522,16 +587,19 @@ class NativeSipBackend:
             content_type=final_content_type,
         )
         transaction.send_response(final)
-        await self.send_response(final, event_remote)
+        retransmission = await self._send_with_retransmissions(final, event_remote)
 
-        await self._receive_matching(
-            timeout=timeout,
-            predicate=lambda item: _request_matches(
-                item,
-                method="ACK",
-                call_id=call_id,
-            ),
-        )
+        try:
+            await self._receive_matching(
+                timeout=timeout,
+                predicate=lambda item: _request_matches(
+                    item,
+                    method="ACK",
+                    call_id=call_id,
+                ),
+            )
+        finally:
+            await self._stop_retransmission(retransmission)
         dialog = Dialog.from_uas_invite_request(request, local_tag=local_tag)
         dialog.confirm()
         self._record_call("confirmed", call_id=call_id, data={"role": "uas"})
@@ -558,18 +626,21 @@ class NativeSipBackend:
             branch=branch,
         )
         transaction = NonInviteClientTransaction(request)
-        await self.send_request(request, call.remote)
-        event = await self._receive_matching(
-            timeout=timeout,
-            predicate=lambda item: _response_matches(
-                item,
-                call_id=call.call_id,
-                cseq_method="BYE",
-            ),
-        )
-        response = event.message
-        if not isinstance(response, SipResponse):
-            raise NativeSipCallError("expected BYE response")
+        retransmission = await self._send_with_retransmissions(request, call.remote)
+        try:
+            event = await self._receive_matching(
+                timeout=timeout,
+                predicate=lambda item: _response_matches(
+                    item,
+                    call_id=call.call_id,
+                    cseq_method="BYE",
+                ),
+            )
+            response = event.message
+            if not isinstance(response, SipResponse):
+                raise NativeSipCallError("expected BYE response")
+        finally:
+            await self._stop_retransmission(retransmission)
         transaction.receive_response(response)
         if 200 <= response.status_code < 300:
             call.dialog.terminate()
@@ -632,6 +703,64 @@ class NativeSipBackend:
     def _record_event(self, event: SipWireEvent) -> None:
         self._record(sip_wire_event_name(event), data=_event_data(event))
 
+    async def _send_with_retransmissions(
+        self,
+        message: SipMessage,
+        remote: UdpAddress,
+    ) -> _RetransmissionHandle | None:
+        event = self.endpoint.send_message(message, remote)
+        self._record_event(event)
+        return self._start_retransmission(message, remote)
+
+    def _start_retransmission(
+        self,
+        message: SipMessage,
+        remote: UdpAddress,
+    ) -> _RetransmissionHandle | None:
+        if self.retransmission_policy.max_attempts == 0:
+            return None
+        stop = asyncio.Event()
+        task = asyncio.create_task(
+            self._retransmit_until_stopped(message, remote, stop)
+        )
+        return _RetransmissionHandle(stop=stop, task=task)
+
+    async def _stop_retransmission(
+        self,
+        handle: _RetransmissionHandle | None,
+    ) -> None:
+        if handle is None:
+            return
+        handle.stop.set()
+        await handle.task
+
+    async def _retransmit_until_stopped(
+        self,
+        message: SipMessage,
+        remote: UdpAddress,
+        stop: asyncio.Event,
+    ) -> None:
+        for attempt, interval in enumerate(
+            self.retransmission_policy.intervals(),
+            start=1,
+        ):
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=interval)
+                return
+            except TimeoutError:
+                pass
+            event = self.endpoint.send_message(message, remote)
+            self._record_event(event)
+            self._record(
+                "retransmitted",
+                data={
+                    "attempt": attempt,
+                    "remote_host": remote[0],
+                    "remote_port": remote[1],
+                    "message_type": _message_type(message),
+                },
+            )
+
     def _record_call(self, name: str, *, call_id: str, data: dict[str, Any]) -> None:
         self._record(name, category="call", call_id=call_id, data=data)
 
@@ -682,6 +811,14 @@ def _event_data(event: SipWireEvent) -> dict[str, Any]:
     elif event.message is not None:
         data["message_type"] = type(event.message).__name__
     return data
+
+
+def _message_type(message: SipMessage) -> str:
+    if isinstance(message, SipRequest):
+        return message.method
+    if isinstance(message, SipResponse):
+        return str(message.status_code)
+    return type(message).__name__
 
 
 def _request_matches(

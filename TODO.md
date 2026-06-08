@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, and REGISTER over-UDP orchestration.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers.
 
 ## Milestone 0 - Project Grounding
 
@@ -96,7 +96,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement strict mode UAC/UAS basic INVITE/ACK/BYE calls over UDP.
 - [x] Implement CANCEL runtime over UDP.
 - [x] Implement REGISTER runtime orchestration over UDP.
-- [ ] Implement transaction retransmission timers for strict runtime.
+- [x] Implement transaction retransmission timers for strict runtime.
 - [ ] Implement lab mode hooks for controlled malformed behavior.
 
 ## Milestone 6 - Technical Softphone
@@ -240,14 +240,22 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added loopback UDP tests for Digest REGISTER and unregister `Expires: 0`.
 - [ ] Kept `SPEC.md` T21 pending because transaction retransmission timers are not complete.
 
+## Block 0.8.4 Done
+
+- [x] Bumped package version to `0.8.4`.
+- [x] Added configurable native SIP retransmission policy.
+- [x] Added async retransmission timers for REGISTER, INVITE, CANCEL, BYE, and final INVITE responses.
+- [x] Added retransmission timeline events and cleanup on timeout/error paths.
+- [x] Added loopback UDP retransmission test with delayed REGISTER response.
+- [x] Marked `SPEC.md` T21 complete after validation.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
 - [ ] Asterisk media path decision remains open before AsteriskBackend MVP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] Full SIP transaction/dialog runtime remains pending after SIP/SDP/RTP/DTMF primitives.
-- [ ] Transaction retransmission timers are still required before T21 can be marked complete.
+- [ ] Lab hooks, profile config, technical softphone, and advanced media/runtime behavior remain pending after T21.
 
 ## Open Questions
 

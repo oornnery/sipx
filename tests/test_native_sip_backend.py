@@ -6,6 +6,7 @@ from sipx import (
     HeaderMap,
     NativeSipBackend,
     NativeSipCallState,
+    NativeSipRetransmissionPolicy,
     RegisterClientState,
     SipRequest,
     SipResponse,
@@ -361,3 +362,60 @@ async def _unregister_responder(registrar: NativeSipBackend) -> str:
     )
     await registrar.send_response(response, event.remote)
     return request.headers.get("Expires") or ""
+
+
+def test_native_sip_backend_retransmits_register_until_response() -> None:
+    asyncio.run(_retransmit_register_until_response())
+
+
+async def _retransmit_register_until_response() -> None:
+    client_timeline = Timeline(run_id="retransmit-client")
+    client = NativeSipBackend(
+        actor_id="client",
+        timeline=client_timeline,
+        retransmission_policy=NativeSipRetransmissionPolicy(
+            initial_interval=0.01,
+            max_interval=0.01,
+            max_attempts=2,
+        ),
+    )
+    registrar = NativeSipBackend(actor_id="registrar")
+    try:
+        await client.start()
+        await registrar.start()
+        registrar_task = asyncio.create_task(_delayed_register_responder(registrar))
+
+        state = await client.register_account(
+            remote=registrar.local_address,
+            registrar=SipUri.parse("sip:example.com"),
+            aor=SipUri.parse("sip:alice@example.com"),
+            contact=SipUri.parse(f"sip:alice@127.0.0.1:{client.local_address[1]}"),
+            call_id="retransmit-register-1",
+            branch="z9hG4bK-register-retransmit",
+            from_tag="from-tag",
+            timeout=1.0,
+        )
+        received_count = await registrar_task
+
+        assert state == RegisterClientState.REGISTERED
+        assert received_count == 2
+        assert any(event.name == "retransmitted" for event in client_timeline.events)
+    finally:
+        await client.stop()
+        await registrar.stop()
+
+
+async def _delayed_register_responder(registrar: NativeSipBackend) -> int:
+    first = await registrar.receive_event(timeout=1.0)
+    first_request = first.message
+    assert isinstance(first_request, SipRequest)
+    second = await registrar.receive_event(timeout=1.0)
+    second_request = second.message
+    assert isinstance(second_request, SipRequest)
+    response = create_response_for_request(
+        request=second_request,
+        status_code=200,
+        reason="OK",
+    )
+    await registrar.send_response(response, second.remote)
+    return 2

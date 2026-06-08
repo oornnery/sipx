@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.8.3` adds real UDP REGISTER/register-unregister orchestration.
+Implement `sipx` in verified commit blocks. Block `0.8.4` adds native SIP transaction retransmission timers and completes SPEC T21.
 
 ## Sources Read
 
@@ -94,6 +94,12 @@ Implement `sipx` in verified commit blocks. Block `0.8.3` adds real UDP REGISTER
 - Added REGISTER timeline events for registered and unregistered states.
 - Added loopback UDP tests for Digest REGISTER and unregister `Expires: 0`.
 - Kept SPEC task T21 pending because transaction retransmission timers are not complete.
+- Bumped `pyproject.toml` version from `0.8.3` to `0.8.4`.
+- Added configurable native SIP retransmission policy.
+- Added async retransmission timers for REGISTER, INVITE, CANCEL, BYE, and final INVITE responses until matching response/ACK arrives.
+- Added retransmission timeline events and cleanup on timeout/error paths.
+- Added loopback UDP test with delayed REGISTER response to verify retransmission before 200 OK.
+- Marked SPEC task T21 complete after validation.
 
 ## Active Decision
 
@@ -103,11 +109,11 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Add transaction retransmission timers for strict runtime.
-2. Add richer fake media events and example mock scenario.
-3. Choose first Asterisk media path.
-4. Decide artifact retention policy before real recordings/transcripts.
-5. Add lab hooks for controlled malformed behavior.
+1. Add richer fake media events and example mock scenario.
+2. Choose first Asterisk media path.
+3. Decide artifact retention policy before real recordings/transcripts.
+4. Add lab hooks for controlled malformed behavior.
+5. Add profile config for strict/lab/account/media overrides.
 
 ## Risks
 
@@ -117,7 +123,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - Recordings/transcripts are sensitive; design redaction/retention before real deployments.
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
-- SIP transaction/dialog/register primitives, real UDP transport, strict INVITE/ACK/BYE flow, CANCEL runtime, and REGISTER over-UDP orchestration exist, but T21 remains incomplete until transaction retransmission timers are implemented.
+- T21 basic native SIP signaling is complete, but lab hooks, profile config, technical softphone, media wiring, and advanced runtime behavior remain pending.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
 
 ## Open Questions

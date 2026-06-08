@@ -35,3 +35,4 @@
 | D31 | 2026-06-08 | Native strict call runtime starts with SIP signaling before media. | T21 is signaling-focused; SDP/RTP media wiring can build on the confirmed dialog/call state later. |
 | D32 | 2026-06-08 | CANCEL runtime models pending INVITE separately from confirmed calls. | CANCEL terminates an INVITE transaction before dialog confirmation, so it should not reuse `NativeSipCall`. |
 | D33 | 2026-06-08 | Native REGISTER orchestration reuses `RegisterClientFlow` and only accepts password at retry time. | Keeps UDP runtime aligned with the no-password-storage Digest decision. |
+| D34 | 2026-06-08 | Native retransmission timers are configurable policy objects. | Tests can run fast while strict runtime keeps real async timer behavior. |

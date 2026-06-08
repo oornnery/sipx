@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.8.4 - 2026-06-08
+
+- Added configurable transaction retransmission policy for native SIP runtime.
+- Added async retransmission tasks for REGISTER, INVITE, CANCEL, BYE, and final INVITE responses until matching response/ACK arrives.
+- Added retransmission timeline events and cleanup on timeout/error paths.
+- Added loopback UDP test that delays REGISTER response and verifies retransmission before 200 OK.
+- Marked SPEC T21 complete after validation of INVITE/ACK/BYE/CANCEL/REGISTER over real UDP plus timers.
+
 ## 0.8.3 - 2026-06-08
 
 - Added real UDP REGISTER orchestration on `NativeSipBackend` for register and unregister flows.

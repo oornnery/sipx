@@ -140,6 +140,17 @@
 | 2026-06-08 | `ruff format --check .` | pass | 55 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after REGISTER orchestration block. |
+| 2026-06-08 | `python -m pytest tests/test_native_sip_backend.py` | fail | Timer code referenced `asyncio` without importing it; recorded as SPEC §B B3 and fixed. |
+| 2026-06-08 | `python -m pytest tests/test_native_sip_backend.py` | pass | 9 native SIP loopback tests passed after `asyncio` import fix. |
+| 2026-06-08 | `python -m pytest` | pass | 60 tests passed for retransmission timers before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for retransmission timers before formatting. |
+| 2026-06-08 | `ruff format --check .` | fail | `sipx/backends/native.py` needed formatting. |
+| 2026-06-08 | `ruff format sipx/backends/native.py` | pass | 1 file reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 60 tests passed after retransmission timer formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after retransmission timer formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 55 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after retransmission timer block. |
 
 ## Validation Policy
 
