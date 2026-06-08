@@ -6,6 +6,7 @@ from sipx import (
     HeaderMap,
     NativeSipBackend,
     NativeSipCallState,
+    NativeSipLabHooks,
     NativeSipRetransmissionPolicy,
     RegisterClientState,
     SipRequest,
@@ -13,6 +14,7 @@ from sipx import (
     SipUdpError,
     SipUri,
     Timeline,
+    create_invite_request,
     create_register_request,
     create_response_for_request,
 )
@@ -115,6 +117,173 @@ async def _reject_raw_send_in_strict_mode() -> None:
             await backend.send_raw(b"not sip\r\n\r\n", backend.local_address)
     finally:
         await backend.stop()
+
+
+def test_native_sip_backend_rejects_lab_hooks_in_strict_mode() -> None:
+    with pytest.raises(ValueError, match="lab_hooks require lab mode"):
+        NativeSipBackend(lab_hooks=NativeSipLabHooks())
+
+
+def test_native_sip_backend_lab_hook_mutates_outbound_headers() -> None:
+    asyncio.run(_lab_hook_mutates_outbound_headers())
+
+
+async def _lab_hook_mutates_outbound_headers() -> None:
+    def add_lab_header(message, remote):
+        message.headers.add("X-Sipx-Lab", "header-hook")
+        return message
+
+    sender = NativeSipBackend(
+        mode="lab",
+        lab_hooks=NativeSipLabHooks(before_send_message=add_lab_header),
+    )
+    receiver = NativeSipBackend()
+    try:
+        await sender.start()
+        await receiver.start()
+
+        await sender.send_request(register_request(), receiver.local_address)
+        event = await receiver.receive_event(timeout=1.0)
+
+        request = event.message
+        assert isinstance(request, SipRequest)
+        assert request.headers.get("X-Sipx-Lab") == "header-hook"
+    finally:
+        await sender.stop()
+        await receiver.stop()
+
+
+def test_native_sip_backend_lab_hook_mutates_sdp_body() -> None:
+    asyncio.run(_lab_hook_mutates_sdp_body())
+
+
+async def _lab_hook_mutates_sdp_body() -> None:
+    def add_sdp_attribute(message, body: bytes) -> bytes:
+        return body + b"a=sipx-lab:yes\r\n"
+
+    sender = NativeSipBackend(
+        mode="lab",
+        lab_hooks=NativeSipLabHooks(before_sdp_body=add_sdp_attribute),
+    )
+    receiver = NativeSipBackend()
+    try:
+        await sender.start()
+        await receiver.start()
+        request = create_invite_request(
+            target=SipUri.parse("sip:bob@example.com"),
+            caller=SipUri.parse("sip:alice@example.com"),
+            contact=SipUri.parse(f"sip:alice@127.0.0.1:{sender.local_address[1]}"),
+            call_id="sdp-hook-1",
+            branch="z9hG4bK-sdp-hook",
+            from_tag="alice-tag",
+            body=b"v=0\r\ns=sipx\r\n",
+            content_type="application/sdp",
+        )
+
+        await sender.send_request(request, receiver.local_address)
+        event = await receiver.receive_event(timeout=1.0)
+
+        received = event.message
+        assert isinstance(received, SipRequest)
+        assert received.body.endswith(b"a=sipx-lab:yes\r\n")
+        assert received.headers.get_int("Content-Length") == len(received.body)
+    finally:
+        await sender.stop()
+        await receiver.stop()
+
+
+def test_native_sip_backend_lab_hook_can_send_malformed_bytes() -> None:
+    asyncio.run(_lab_hook_can_send_malformed_bytes())
+
+
+async def _lab_hook_can_send_malformed_bytes() -> None:
+    def send_malformed(message, remote):
+        return b"OPTIONS sip:bob@example.com SIP/2.0\r\nContent-Length: 10\r\n\r\nx"
+
+    sender = NativeSipBackend(
+        mode="lab",
+        lab_hooks=NativeSipLabHooks(before_send_message=send_malformed),
+    )
+    receiver = NativeSipBackend()
+    try:
+        await sender.start()
+        await receiver.start()
+
+        await sender.send_request(register_request(), receiver.local_address)
+        event = await receiver.receive_event(timeout=1.0)
+
+        assert event.is_error
+        assert event.message is None
+        assert "body length" in (event.error or "")
+    finally:
+        await sender.stop()
+        await receiver.stop()
+
+
+def test_native_sip_backend_lab_hook_observes_received_events() -> None:
+    asyncio.run(_lab_hook_observes_received_events())
+
+
+async def _lab_hook_observes_received_events() -> None:
+    seen: list[tuple[str, int, str]] = []
+
+    def observe(event):
+        method = event.message.method if isinstance(event.message, SipRequest) else ""
+        seen.append((event.remote[0], event.remote[1], method))
+        return event
+
+    timeline = Timeline(run_id="receive-hook")
+    sender = NativeSipBackend()
+    receiver = NativeSipBackend(
+        mode="lab",
+        timeline=timeline,
+        lab_hooks=NativeSipLabHooks(after_receive_event=observe),
+    )
+    try:
+        await sender.start()
+        await receiver.start()
+
+        await sender.send_request(register_request(), receiver.local_address)
+        event = await receiver.receive_event(timeout=1.0)
+
+        assert isinstance(event.message, SipRequest)
+        assert seen == [(sender.local_address[0], sender.local_address[1], "REGISTER")]
+    finally:
+        await sender.stop()
+        await receiver.stop()
+
+    assert any(event.name == "request_received" for event in timeline.events)
+
+
+def test_native_sip_backend_lab_hook_can_drop_received_events() -> None:
+    asyncio.run(_lab_hook_can_drop_received_events())
+
+
+async def _lab_hook_can_drop_received_events() -> None:
+    dropped: list[str] = []
+
+    def drop(event):
+        method = event.message.method if isinstance(event.message, SipRequest) else ""
+        dropped.append(method)
+        return None
+
+    sender = NativeSipBackend()
+    receiver = NativeSipBackend(
+        mode="lab",
+        lab_hooks=NativeSipLabHooks(after_receive_event=drop),
+    )
+    try:
+        await sender.start()
+        await receiver.start()
+
+        await sender.send_request(register_request(), receiver.local_address)
+        with pytest.raises(SipUdpError, match="timed out"):
+            await receiver.receive_event(timeout=0.2)
+
+        assert dropped == ["REGISTER"]
+    finally:
+        await sender.stop()
+        await receiver.stop()
 
 
 def test_native_sip_backend_receive_timeout_raises_typed_error() -> None:
@@ -400,6 +569,48 @@ async def _retransmit_register_until_response() -> None:
         assert state == RegisterClientState.REGISTERED
         assert received_count == 2
         assert any(event.name == "retransmitted" for event in client_timeline.events)
+    finally:
+        await client.stop()
+        await registrar.stop()
+
+
+def test_native_sip_backend_lab_hook_overrides_retransmission_intervals() -> None:
+    asyncio.run(_lab_hook_overrides_retransmission_intervals())
+
+
+async def _lab_hook_overrides_retransmission_intervals() -> None:
+    defaults_seen: list[tuple[float, ...]] = []
+
+    def fast_intervals(message, remote, default_intervals):
+        defaults_seen.append(default_intervals)
+        return (0.01,)
+
+    client = NativeSipBackend(
+        mode="lab",
+        actor_id="client",
+        lab_hooks=NativeSipLabHooks(retransmission_intervals=fast_intervals),
+    )
+    registrar = NativeSipBackend(actor_id="registrar")
+    try:
+        await client.start()
+        await registrar.start()
+        registrar_task = asyncio.create_task(_delayed_register_responder(registrar))
+
+        state = await client.register_account(
+            remote=registrar.local_address,
+            registrar=SipUri.parse("sip:example.com"),
+            aor=SipUri.parse("sip:alice@example.com"),
+            contact=SipUri.parse(f"sip:alice@127.0.0.1:{client.local_address[1]}"),
+            call_id="lab-timer-register-1",
+            branch="z9hG4bK-lab-timer-register",
+            from_tag="from-tag",
+            timeout=1.0,
+        )
+        received_count = await registrar_task
+
+        assert state == RegisterClientState.REGISTERED
+        assert received_count == 2
+        assert defaults_seen
     finally:
         await client.stop()
         await registrar.stop()

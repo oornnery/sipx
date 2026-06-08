@@ -7,6 +7,7 @@ from sipx.backends.native import (
     NativeSipBackend,
     NativeSipCall,
     NativeSipCallState,
+    NativeSipLabHooks,
     NativeSipRetransmissionPolicy,
 )
 from sipx.core.timeline import Timeline
@@ -49,6 +50,7 @@ class NativeSoftphoneConfig:
     actor_id: str = "softphone"
     timeout: float = 1.0
     retransmission_policy: NativeSipRetransmissionPolicy | None = None
+    lab_hooks: NativeSipLabHooks | None = None
 
     def __post_init__(self) -> None:
         if self.mode not in {"strict", "lab"}:
@@ -76,6 +78,7 @@ class NativeSoftphone:
             timeline=self.timeline,
             actor_id=config.actor_id,
             retransmission_policy=config.retransmission_policy,
+            lab_hooks=config.lab_hooks,
         )
         if self.backend.mode != config.mode:
             raise NativeSoftphoneError("backend mode does not match softphone config")

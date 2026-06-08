@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.9.4` adds the headless native technical softphone engine and completes SPEC T22.
+Implement `sipx` in verified commit blocks. Block `0.9.5` adds lab-only native SIP hooks and completes SPEC T23.
 
 ## Sources Read
 
@@ -136,6 +136,13 @@ Implement `sipx` in verified commit blocks. Block `0.9.4` adds the headless nati
 - Added strict/lab mode passthrough in softphone config while leaving profile loading for T29.
 - Added loopback UDP tests for softphone register/unregister, outbound call/hangup, and inbound answer.
 - Marked SPEC task T22 complete after validation.
+- Bumped `pyproject.toml` version from `0.9.4` to `0.9.5`.
+- Added `NativeSipLabHooks` with before-send, before-SDP-body, after-receive, and retransmission interval hooks.
+- Routed native SIP request/response/retransmission sends through lab hooks while rejecting hooks in strict mode.
+- Added lab hook support for malformed raw bytes and receive event observation/filtering with timeout preservation.
+- Added `NativeSoftphoneConfig.lab_hooks` passthrough to `NativeSipBackend`.
+- Added focused loopback tests for header mutation, SDP mutation, malformed send, receive hooks, timer override, and softphone hook passthrough.
+- Marked SPEC task T23 complete after validation.
 
 ## Active Decision
 
@@ -145,9 +152,9 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Add lab hooks for controlled malformed behavior for SPEC T23.
-2. Add recorder/export scenario from timeline + user actions for SPEC T24.
-3. Add reports with timeline, SIP, RTP, transcript, and verdict for SPEC T25.
+1. Add recorder/export scenario from timeline + user actions for SPEC T24.
+2. Add reports with timeline, SIP, RTP, transcript, and verdict for SPEC T25.
+3. Add profile config for strict/lab/account/media overrides for SPEC T29.
 4. Add richer fake media events and example mock scenario.
 5. Decide artifact retention policy before real recordings/transcripts.
 
@@ -159,7 +166,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - Recordings/transcripts are sensitive; design redaction/retention before real deployments.
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
-- T21 and T22 native SIP signaling and headless softphone are complete, but lab hooks, profile config, media wiring, and advanced runtime behavior remain pending.
+- T21-T23 native SIP signaling, headless softphone, and lab hooks are complete, but profile config, media wiring, and advanced runtime behavior remain pending.
 - T9-T11 and T15 Asterisk ARI control-plane, timeline mapping, WebSocket media MVP, and inbound Stasis example are complete; real Asterisk integration is still guarded/pending.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
 

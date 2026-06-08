@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 0.9.5 - 2026-06-08
+
+- Added lab-only `NativeSipLabHooks` for before-send, before-SDP-body, after-receive, and retransmission interval overrides.
+- Routed native SIP request, response, and retransmission sends through the lab hook pipeline while rejecting hooks in strict mode.
+- Added support for lab hooks to emit malformed raw SIP bytes and to observe or drop received wire events without extending receive timeouts.
+- Added `NativeSoftphoneConfig.lab_hooks` passthrough to the underlying `NativeSipBackend`.
+- Added focused loopback tests for header mutation, SDP mutation, malformed send, receive observation/filtering, timer override, and softphone hook passthrough.
+- Marked SPEC T23 complete after validation.
+
 ## 0.9.4 - 2026-06-08
 
 - Added headless `NativeSoftphone` engine on top of `NativeSipBackend`.

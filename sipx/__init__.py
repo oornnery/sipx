@@ -40,6 +40,7 @@ from sipx.backends import (
     NativeSipCallState,
     NativeSipIncomingInvite,
     NativeSipInviteAttempt,
+    NativeSipLabHooks,
     NativeSipRegisterError,
     NativeSipRetransmissionPolicy,
 )
@@ -164,6 +165,7 @@ __all__ = [
     "NativeSipCallState",
     "NativeSipIncomingInvite",
     "NativeSipInviteAttempt",
+    "NativeSipLabHooks",
     "NativeSipRegisterError",
     "NativeSipRetransmissionPolicy",
     "NativeSoftphone",

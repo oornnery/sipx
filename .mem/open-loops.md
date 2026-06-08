@@ -14,4 +14,4 @@
 | O10 | Type-check environment? | install/sync `ty`, use existing executable, or defer type gate | Before claiming full validation gate. |
 | O11 | Slow AI media behavior? | silence, comfort tone, waiting prompt, configurable policy | Before real STT/TTS/LLM runtime. |
 | O12 | Advanced RTP depth? | jitter buffer, RTCP, impairment, payload validation | After basic RTP/DTMF primitives. |
-| O13 | Next native SIP layer after T21? | lab hooks, profile config, technical softphone, or media wiring | Before T22/T23 implementation order. |
+| O13 | Next native SIP/softphone layer after T23? | profile config, scenario recorder/export, or media wiring | Before choosing work outside SPEC order. |

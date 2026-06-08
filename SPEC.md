@@ -116,7 +116,7 @@ T19|x|implement RTP packet parse/serialize + seq/timestamp/SSRC stats|V7,V8,V12
 T20|x|implement DTMF RFC4733 encoder/decoder + event model|V11,T19
 T21|x|implement basic UAC/UAS INVITE/ACK/BYE/CANCEL/REGISTER|C4,V7,V15
 T22|x|implement headless technical softphone on `NativeSipBackend`|G1,C4,V15,V17
-T23|.|add lab hooks for headers/SDP/timers/malformed SIP|V15,V20,T22
+T23|x|add lab hooks for headers/SDP/timers/malformed SIP|V15,V20,T22
 T24|.|add recorder/export scenario from timeline + user actions|V16,V19,I.artifact
 T25|.|add HTML/text reports with timeline, SIP, RTP, transcript, verdict|V4,V16
 T26|.|add fuzz/property tests for SIP/SDP/RTP/DTMF parsers|V8,T16,T18,T19,T20

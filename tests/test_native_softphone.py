@@ -5,6 +5,7 @@ import pytest
 from sipx import (
     NativeSipBackend,
     NativeSipCallState,
+    NativeSipLabHooks,
     NativeSoftphone,
     NativeSoftphoneAccount,
     NativeSoftphoneConfig,
@@ -30,6 +31,23 @@ def test_native_softphone_requires_start_before_contact() -> None:
 
     with pytest.raises(NativeSoftphoneError, match="started"):
         _ = softphone.contact
+
+
+def test_native_softphone_config_passes_lab_hooks_to_backend() -> None:
+    hooks = NativeSipLabHooks()
+    softphone = NativeSoftphone(
+        NativeSoftphoneConfig(
+            account=NativeSoftphoneAccount(
+                aor="sip:alice@example.com",
+                registrar="sip:example.com",
+            ),
+            remote=("127.0.0.1", 5060),
+            mode="lab",
+            lab_hooks=hooks,
+        )
+    )
+
+    assert softphone.backend.lab_hooks is hooks
 
 
 def test_native_softphone_registers_and_unregisters_over_udp() -> None:

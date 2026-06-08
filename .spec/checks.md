@@ -197,6 +197,13 @@
 | 2026-06-08 | `python -m pytest` | pass | 77 tests passed after softphone state/design updates. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after softphone state/design updates. |
+| 2026-06-08 | `python -m pytest tests/test_native_sip_backend.py` | pass | 16 loopback UDP tests passed for native SIP lab hooks. |
+| 2026-06-08 | `python -m pytest tests/test_native_softphone.py` | pass | 5 loopback UDP tests passed with softphone lab hook passthrough. |
+| 2026-06-08 | `ruff check .` | pass | All lint checks passed for lab hook block. |
+| 2026-06-08 | `ruff format --check .` | pass | 63 files already formatted after native backend formatting. |
+| 2026-06-08 | `python -m pytest` | pass | 85 tests passed after lab hook state/design updates. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after lab hook block. |
 
 ## Validation Policy
 

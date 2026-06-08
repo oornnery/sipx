@@ -521,6 +521,14 @@ Modes:
 | `strict` | RFC-oriented, reliable, real interop, calls that should behave like a normal endpoint. |
 | `lab` | Controlled protocol mutation, delayed messages, malformed headers, custom SDP, fault injection. |
 
+Lab hook shape:
+
+- `NativeSipLabHooks.before_send_message` may mutate or replace outbound SIP messages, or return raw bytes for malformed SIP.
+- `NativeSipLabHooks.before_sdp_body` may rewrite SDP bodies before serialization.
+- `NativeSipLabHooks.after_receive_event` may observe, replace, or drop received wire events.
+- `NativeSipLabHooks.retransmission_intervals` may override transaction timer intervals.
+- Hooks are rejected in `strict` mode and are available only in `lab` mode.
+
 ## Protocol Normative Base
 
 | Layer | Standard |
@@ -1555,6 +1563,7 @@ Interfaces can come later:
 - Inspect SIP messages in real time.
 - Change headers in lab mode.
 - Customize SDP in lab mode.
+- Pass native SIP lab hooks through softphone config in lab mode.
 - Send DTMF through RFC4733, SIP INFO, or in-band when supported.
 - Play audio, TTS, silence, tones, noise, or files.
 - Receive RTP, record, transcribe, and measure quality.

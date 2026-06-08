@@ -75,6 +75,19 @@ class NativeSipRetransmissionPolicy:
         return tuple(values)
 
 
+@dataclass(frozen=True, slots=True)
+class NativeSipLabHooks:
+    before_send_message: (
+        Callable[[SipMessage, UdpAddress], SipMessage | bytes | None] | None
+    ) = None
+    before_sdp_body: Callable[[SipMessage, bytes], bytes | None] | None = None
+    after_receive_event: Callable[[SipWireEvent], SipWireEvent | None] | None = None
+    retransmission_intervals: (
+        Callable[[SipMessage, UdpAddress, tuple[float, ...]], tuple[float, ...] | None]
+        | None
+    ) = None
+
+
 @dataclass(slots=True)
 class NativeSipCall:
     call_id: str
@@ -124,9 +137,12 @@ class NativeSipBackend:
         actor_id: str | None = None,
         max_message_size: int = DEFAULT_MAX_MESSAGE_SIZE,
         retransmission_policy: NativeSipRetransmissionPolicy | None = None,
+        lab_hooks: NativeSipLabHooks | None = None,
     ) -> None:
         if mode not in {"strict", "lab"}:
             raise ValueError("mode must be strict or lab")
+        if mode != "lab" and lab_hooks is not None:
+            raise ValueError("lab_hooks require lab mode")
         self.mode = mode
         self.timeline = timeline
         self.actor_id = actor_id
@@ -138,6 +154,7 @@ class NativeSipBackend:
             local_port=local_port,
             max_message_size=max_message_size,
         )
+        self.lab_hooks = lab_hooks
 
     @property
     def local_address(self) -> UdpAddress:
@@ -184,7 +201,7 @@ class NativeSipBackend:
     async def send_request(
         self, request: SipRequest, remote: UdpAddress
     ) -> SipWireEvent:
-        event = self.endpoint.send_message(request, remote)
+        event = self._send_message(request, remote)
         self._record_event(event)
         return event
 
@@ -193,7 +210,7 @@ class NativeSipBackend:
         response: SipResponse,
         remote: UdpAddress,
     ) -> SipWireEvent:
-        event = self.endpoint.send_message(response, remote)
+        event = self._send_message(response, remote)
         self._record_event(event)
         return event
 
@@ -205,9 +222,17 @@ class NativeSipBackend:
         return event
 
     async def receive_event(self, *, timeout: float | None = None) -> SipWireEvent:
-        event = await self.endpoint.receive_event(timeout=timeout)
-        self._record_event(event)
-        return event
+        deadline = time.monotonic() + timeout if timeout is not None else None
+        while True:
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining <= 0:
+                raise SipUdpError("timed out waiting for SIP datagram")
+            event = await self.endpoint.receive_event(timeout=remaining)
+            event = self._apply_after_receive_hook(event)
+            if event is None:
+                continue
+            self._record_event(event)
+            return event
 
     async def register_account(
         self,
@@ -703,12 +728,50 @@ class NativeSipBackend:
     def _record_event(self, event: SipWireEvent) -> None:
         self._record(sip_wire_event_name(event), data=_event_data(event))
 
+    def _send_message(self, message: SipMessage, remote: UdpAddress) -> SipWireEvent:
+        outbound = self._apply_before_send_hooks(message, remote)
+        if isinstance(outbound, bytes):
+            return self.endpoint.send_raw(outbound, remote)
+        return self.endpoint.send_message(outbound, remote)
+
+    def _apply_before_send_hooks(
+        self,
+        message: SipMessage,
+        remote: UdpAddress,
+    ) -> SipMessage | bytes:
+        hooks = self.lab_hooks
+        if hooks is None:
+            return message
+
+        outbound: SipMessage | bytes = _copy_message(message)
+        if hooks.before_send_message is not None:
+            hooked = hooks.before_send_message(outbound, remote)
+            if hooked is not None:
+                outbound = hooked
+        if isinstance(outbound, bytes):
+            return outbound
+
+        if hooks.before_sdp_body is not None and _is_sdp(outbound):
+            body = hooks.before_sdp_body(outbound, outbound.body)
+            if body is not None:
+                outbound.body = body
+        return outbound
+
+    def _apply_after_receive_hook(
+        self,
+        event: SipWireEvent,
+    ) -> SipWireEvent | None:
+        hooks = self.lab_hooks
+        if hooks is None or hooks.after_receive_event is None:
+            return event
+        return hooks.after_receive_event(event)
+
     async def _send_with_retransmissions(
         self,
         message: SipMessage,
         remote: UdpAddress,
     ) -> _RetransmissionHandle | None:
-        event = self.endpoint.send_message(message, remote)
+        event = self._send_message(message, remote)
         self._record_event(event)
         return self._start_retransmission(message, remote)
 
@@ -717,13 +780,29 @@ class NativeSipBackend:
         message: SipMessage,
         remote: UdpAddress,
     ) -> _RetransmissionHandle | None:
-        if self.retransmission_policy.max_attempts == 0:
+        intervals = self._retransmission_intervals(message, remote)
+        if not intervals:
             return None
         stop = asyncio.Event()
         task = asyncio.create_task(
-            self._retransmit_until_stopped(message, remote, stop)
+            self._retransmit_until_stopped(message, remote, stop, intervals)
         )
         return _RetransmissionHandle(stop=stop, task=task)
+
+    def _retransmission_intervals(
+        self,
+        message: SipMessage,
+        remote: UdpAddress,
+    ) -> tuple[float, ...]:
+        intervals = self.retransmission_policy.intervals()
+        hooks = self.lab_hooks
+        if hooks is not None and hooks.retransmission_intervals is not None:
+            hooked = hooks.retransmission_intervals(message, remote, intervals)
+            if hooked is not None:
+                intervals = hooked
+        if any(interval <= 0 for interval in intervals):
+            raise ValueError("retransmission intervals must be positive")
+        return intervals
 
     async def _stop_retransmission(
         self,
@@ -739,17 +818,15 @@ class NativeSipBackend:
         message: SipMessage,
         remote: UdpAddress,
         stop: asyncio.Event,
+        intervals: tuple[float, ...],
     ) -> None:
-        for attempt, interval in enumerate(
-            self.retransmission_policy.intervals(),
-            start=1,
-        ):
+        for attempt, interval in enumerate(intervals, start=1):
             try:
                 await asyncio.wait_for(stop.wait(), timeout=interval)
                 return
             except TimeoutError:
                 pass
-            event = self.endpoint.send_message(message, remote)
+            event = self._send_message(message, remote)
             self._record_event(event)
             self._record(
                 "retransmitted",
@@ -819,6 +896,32 @@ def _message_type(message: SipMessage) -> str:
     if isinstance(message, SipResponse):
         return str(message.status_code)
     return type(message).__name__
+
+
+def _copy_message(message: SipMessage) -> SipMessage:
+    if isinstance(message, SipRequest):
+        return SipRequest(
+            method=message.method,
+            uri=message.uri,
+            headers=message.headers.copy(),
+            body=message.body,
+            version=message.version,
+        )
+    return SipResponse(
+        status_code=message.status_code,
+        reason=message.reason,
+        headers=message.headers.copy(),
+        body=message.body,
+        version=message.version,
+    )
+
+
+def _is_sdp(message: SipMessage) -> bool:
+    content_type = message.headers.get("Content-Type") or ""
+    return (
+        bool(message.body)
+        and content_type.split(";", maxsplit=1)[0].strip().lower() == "application/sdp"
+    )
 
 
 def _request_matches(

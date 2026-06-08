@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, and headless native technical softphone engine.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, headless native technical softphone engine, and lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes.
 
 ## Milestone 0 - Project Grounding
 
@@ -97,7 +97,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement CANCEL runtime over UDP.
 - [x] Implement REGISTER runtime orchestration over UDP.
 - [x] Implement transaction retransmission timers for strict runtime.
-- [ ] Implement lab mode hooks for controlled malformed behavior.
+- [x] Implement lab mode hooks for controlled malformed behavior.
 
 ## Milestone 6 - Technical Softphone
 
@@ -107,7 +107,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement outbound call and inbound call handlers.
 - [ ] Implement live SIP inspector events.
 - [ ] Implement strict/lab profiles.
-- [ ] Implement lab hooks for SIP headers, SDP, timers, and malformed behavior.
+- [x] Implement lab hooks for SIP headers, SDP, timers, and malformed behavior.
 - [ ] Implement call recording and transcript collection.
 - [ ] Implement scenario recorder/exporter.
 - [ ] Implement replay from timeline/artifacts.
@@ -298,13 +298,23 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added focused loopback UDP tests for register/unregister, outbound call/hangup, and inbound answer.
 - [x] Marked `SPEC.md` T22 complete after validation.
 
+## Block 0.9.5 Done
+
+- [x] Bumped package version to `0.9.5`.
+- [x] Added lab-only `NativeSipLabHooks` for before-send, before-SDP-body, after-receive, and retransmission interval overrides.
+- [x] Added malformed raw-byte send support through before-send lab hooks while keeping strict mode hook-free.
+- [x] Added receive hook observation/filtering with timeout preservation.
+- [x] Added `NativeSoftphoneConfig.lab_hooks` passthrough to `NativeSipBackend`.
+- [x] Added focused loopback tests for header mutation, SDP mutation, malformed send, receive hooks, timer override, and softphone hook passthrough.
+- [x] Marked `SPEC.md` T23 complete after validation.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
 - [ ] Next Asterisk media path after WebSocket MVP remains open: AudioSocket or ExternalMedia RTP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] Lab hooks, profile config, technical softphone, and advanced media/runtime behavior remain pending after T21.
+- [ ] Profile config, recorder/export, and advanced media/runtime behavior remain pending after T23.
 
 ## Open Questions
 
