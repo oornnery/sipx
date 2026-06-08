@@ -2,7 +2,7 @@
 
 ## Summary
 
-Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.9.0` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, INVITE/non-INVITE client transactions, REGISTER helper/flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, and the first Asterisk ARI control-plane client/event backend. SPEC T21 and T9 are complete.
+Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.9.1` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, INVITE/non-INVITE client transactions, REGISTER helper/flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI control-plane client/event backend, and Asterisk channel/bridge/playback/hangup/DTMF timeline mapping. SPEC T21, T9, and T10 are complete.
 
 ## Read First
 
@@ -35,13 +35,13 @@ Build `sipx` as a Python Voice/SIP Harness:
 
 ## Recommended Next Task
 
-Continue after block `0.9.0`:
+Continue after block `0.9.1`:
 
-1. Implement Asterisk ARI channel/bridge/playback/hangup/DTMF timeline mapping for SPEC T10.
-2. Choose first Asterisk media path before SPEC T11.
-3. Add richer mock media events and an example scenario.
-4. Decide artifact retention policy before real recordings/transcripts.
-5. Add lab hooks for controlled malformed behavior.
+1. Choose first Asterisk media path before SPEC T11.
+2. Add richer mock media events and an example scenario.
+3. Decide artifact retention policy before real recordings/transcripts.
+4. Add lab hooks for controlled malformed behavior.
+5. Add profile config for strict/lab/account/media overrides.
 
 ## Do Not Do Yet
 
@@ -52,8 +52,8 @@ Continue after block `0.9.0`:
 
 ## Latest Validation
 
-- `python -m pytest`: pass, 65 tests.
-- `python -m pytest tests/test_asterisk_backend.py`: pass, 5 no-Asterisk ARI client/event tests during block `0.9.0`.
+- `python -m pytest`: pass, 67 tests.
+- `python -m pytest tests/test_asterisk_backend.py`: pass, 7 no-Asterisk ARI tests during block `0.9.1`.
 - `python -m pytest tests/test_native_sip_backend.py`: pass, 9 loopback UDP tests during block `0.8.4`.
 - `ruff check .`: pass.
 - `ruff format --check .`: pass, 57 files already formatted.

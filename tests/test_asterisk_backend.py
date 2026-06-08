@@ -4,6 +4,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -142,6 +143,181 @@ async def _record_ari_websocket_events_to_timeline() -> None:
         "application": "sipx",
         "timestamp": "2026-06-08T00:00:00.000+0000",
         "channel_id": "chan-1",
+    }
+    assert timeline.events[1].name == "stasis_started"
+    assert timeline.events[1].data["channel_id"] == "chan-1"
+
+
+def test_asterisk_backend_maps_control_methods_to_timeline() -> None:
+    asyncio.run(_map_control_methods_to_timeline())
+
+
+async def _map_control_methods_to_timeline() -> None:
+    calls: list[tuple[str, str, dict[str, list[str]], bytes | None]] = []
+
+    async def transport(
+        method: str,
+        url: str,
+        body: bytes | None,
+        headers: Mapping[str, str],
+        timeout: float,
+    ) -> AsteriskAriHttpResponse:
+        parsed = urlsplit(url)
+        calls.append((method, parsed.path, parse_qs(parsed.query), body))
+        if method == "POST" and parsed.path == "/ari/channels":
+            return AsteriskAriHttpResponse(
+                status_code=200,
+                body=b'{"id":"chan-1","name":"PJSIP/alice","state":"Ring"}',
+            )
+        if method == "POST" and parsed.path == "/ari/channels/chan-1/play":
+            return AsteriskAriHttpResponse(
+                status_code=200,
+                body=b'{"id":"play-1","target_uri":"channel:chan-1","media_uri":"sound:demo"}',
+            )
+        if method == "POST" and parsed.path == "/ari/bridges":
+            return AsteriskAriHttpResponse(
+                status_code=200,
+                body=b'{"id":"bridge-1","bridge_type":"mixing"}',
+            )
+        return AsteriskAriHttpResponse(status_code=204)
+
+    config = AsteriskAriConfig(app="sipx")
+    client = AsteriskAriClient(config, transport=transport)
+    timeline = Timeline(run_id="ari-control")
+    backend = AsteriskBackend(client=client, timeline=timeline, actor_id="pbx")
+
+    channel = await backend.originate(
+        "PJSIP/alice",
+        app_args="scenario-1",
+        variables={"TRACE_ID": "run-1"},
+        channel_id="chan-1",
+    )
+    await backend.answer_channel(channel.id)
+    await backend.send_dtmf(channel.id, "12#")
+    playback = await backend.play_channel(
+        channel.id, "sound:demo", playback_id="play-1"
+    )
+    bridge = await backend.create_bridge(bridge_id="bridge-1")
+    await backend.add_channel_to_bridge(bridge.id, channel.id)
+    await backend.remove_channel_from_bridge(bridge.id, channel.id)
+    await backend.hangup_channel(channel.id, reason="normal")
+
+    assert channel.id == "chan-1"
+    assert channel.state == "Ring"
+    assert playback.id == "play-1"
+    assert bridge.id == "bridge-1"
+    assert calls[0] == (
+        "POST",
+        "/ari/channels",
+        {
+            "endpoint": ["PJSIP/alice"],
+            "app": ["sipx"],
+            "appArgs": ["scenario-1"],
+            "channelId": ["chan-1"],
+        },
+        b'{"variables": {"TRACE_ID": "run-1"}}',
+    )
+    assert calls[2][2] == {"dtmf": ["12#"]}
+    assert calls[-1] == (
+        "DELETE",
+        "/ari/channels/chan-1",
+        {"reason": ["normal"]},
+        None,
+    )
+
+    names = [event.name for event in timeline.events]
+    assert names == [
+        "ari_request",
+        "channel_originated",
+        "ari_request",
+        "channel_answered",
+        "ari_request",
+        "dtmf_sent",
+        "ari_request",
+        "playback_started",
+        "ari_request",
+        "bridge_created",
+        "ari_request",
+        "bridge_channel_added",
+        "ari_request",
+        "bridge_channel_removed",
+        "ari_request",
+        "channel_hungup",
+    ]
+    assert timeline.events[1].data == {
+        "channel_id": "chan-1",
+        "name": "PJSIP/alice",
+        "state": "Ring",
+    }
+    assert timeline.events[5].data == {"channel_id": "chan-1", "digits": "12#"}
+
+
+def test_asterisk_backend_maps_known_ari_events_to_timeline() -> None:
+    asyncio.run(_map_known_ari_events_to_timeline())
+
+
+async def _map_known_ari_events_to_timeline() -> None:
+    async def source():
+        yield {
+            "type": "ChannelDtmfReceived",
+            "application": "sipx",
+            "channel": {"id": "chan-1"},
+            "digit": "5",
+            "duration_ms": 160,
+        }
+        yield {
+            "type": "PlaybackFinished",
+            "application": "sipx",
+            "playback": {
+                "id": "play-1",
+                "target_uri": "channel:chan-1",
+                "media_uri": "sound:demo",
+            },
+        }
+        yield {
+            "type": "ChannelDestroyed",
+            "application": "sipx",
+            "channel": {"id": "chan-1"},
+            "cause": 16,
+            "cause_txt": "Normal Clearing",
+        }
+
+    timeline = Timeline(run_id="ari-events")
+    backend = AsteriskBackend(timeline=timeline, actor_id="pbx")
+
+    events = [event async for event in backend.events(source())]
+
+    assert [event.type for event in events] == [
+        "ChannelDtmfReceived",
+        "PlaybackFinished",
+        "ChannelDestroyed",
+    ]
+    mapped = [event for event in timeline.events if event.name != "ari_event"]
+    assert [event.name for event in mapped] == [
+        "dtmf_received",
+        "playback_finished",
+        "channel_destroyed",
+    ]
+    assert mapped[0].data == {
+        "type": "ChannelDtmfReceived",
+        "application": "sipx",
+        "channel_id": "chan-1",
+        "digit": "5",
+        "duration_ms": 160,
+    }
+    assert mapped[1].data == {
+        "type": "PlaybackFinished",
+        "application": "sipx",
+        "playback_id": "play-1",
+        "target_uri": "channel:chan-1",
+        "media_uri": "sound:demo",
+    }
+    assert mapped[2].data == {
+        "type": "ChannelDestroyed",
+        "application": "sipx",
+        "channel_id": "chan-1",
+        "cause": 16,
+        "cause_txt": "Normal Clearing",
     }
 
 

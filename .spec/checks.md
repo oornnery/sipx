@@ -161,6 +161,16 @@
 | 2026-06-08 | `ruff format --check .` | pass | 57 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after Asterisk ARI client/event block. |
+| 2026-06-08 | `python -m pytest tests/test_asterisk_backend.py` | pass | 7 no-Asterisk tests passed for ARI control/timeline mapping before full validation. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for Asterisk ARI control/timeline mapping before formatting. |
+| 2026-06-08 | `ruff format --check .` | fail | `sipx/backends/asterisk.py` and `tests/test_asterisk_backend.py` needed formatting for T10 changes. |
+| 2026-06-08 | `ruff format sipx/backends/asterisk.py tests/test_asterisk_backend.py` | pass | 2 files reformatted. |
+| 2026-06-08 | `python -m pytest tests/test_asterisk_backend.py` | pass | 7 no-Asterisk tests passed after formatting. |
+| 2026-06-08 | `python -m pytest` | pass | 67 tests passed after Asterisk ARI control/timeline mapping block. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after Asterisk ARI control/timeline mapping block. |
+| 2026-06-08 | `ruff format --check .` | pass | 57 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after Asterisk ARI control/timeline mapping block. |
 
 ## Validation Policy
 

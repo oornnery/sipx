@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, and an Asterisk ARI control-plane client/event skeleton.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, and Asterisk channel/bridge/playback/hangup/DTMF timeline mapping.
 
 ## Milestone 0 - Project Grounding
 
@@ -56,9 +56,9 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [ ] Choose first media path: WebSocket media, AudioSocket, or ExternalMedia RTP.
 - [x] Create async ARI REST client.
 - [x] Create ARI WebSocket event consumer.
-- [ ] Map ARI events to timeline events.
-- [ ] Implement originate, answer, hangup, playback, send DTMF.
-- [ ] Implement bridge creation and channel membership.
+- [x] Map ARI events to timeline events.
+- [x] Implement originate, answer, hangup, playback, send DTMF.
+- [x] Implement bridge creation and channel membership.
 - [ ] Implement recording collection.
 - [ ] Add minimal `Stasis(sipx)` example config.
 - [ ] Add integration tests guarded by env vars and local Asterisk availability.
@@ -258,6 +258,15 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added ARI WebSocket event consumer with local text-frame reader and injectable event source.
 - [x] Added focused no-Asterisk tests for URL/auth generation, REST behavior, errors, event timeline recording, and local WebSocket event ingestion.
 - [x] Marked `SPEC.md` T9 complete after validation.
+
+## Block 0.9.1 Done
+
+- [x] Bumped package version to `0.9.1`.
+- [x] Added `AsteriskChannel`, `AsteriskBridge`, and `AsteriskPlayback` resource models.
+- [x] Added ARI control methods for originate, answer, hangup, playback, DTMF, bridge creation, and bridge channel membership.
+- [x] Added mapped timeline events for known ARI channel, bridge, playback, hangup, DTMF, and Stasis event types.
+- [x] Added focused no-Asterisk tests for control method request mapping and known event timeline mapping.
+- [x] Marked `SPEC.md` T10 complete after validation.
 
 ## Blocked Or Pending
 

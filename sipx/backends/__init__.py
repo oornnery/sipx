@@ -5,6 +5,9 @@ from sipx.backends.asterisk import (
     AsteriskAriEvent,
     AsteriskAriHttpResponse,
     AsteriskBackend,
+    AsteriskBridge,
+    AsteriskChannel,
+    AsteriskPlayback,
 )
 from sipx.backends.mock import MockBackend
 from sipx.backends.native import (
@@ -25,6 +28,9 @@ __all__ = [
     "AsteriskAriEvent",
     "AsteriskAriHttpResponse",
     "AsteriskBackend",
+    "AsteriskBridge",
+    "AsteriskChannel",
+    "AsteriskPlayback",
     "MockBackend",
     "NativeSipBackend",
     "NativeSipCall",

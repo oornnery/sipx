@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.9.1 - 2026-06-08
+
+- Added typed Asterisk ARI resource models for channels, bridges, and playbacks.
+- Added Asterisk control methods for originate, answer, hangup, playback, DTMF, bridge creation, and bridge channel membership.
+- Added timeline mapping for ARI requests, control results, and known channel/bridge/playback/DTMF events.
+- Added no-Asterisk tests for control method request mapping and known ARI event timeline mapping.
+- Marked SPEC T10 complete after validation.
+
 ## 0.9.0 - 2026-06-08
 
 - Added `AsteriskBackend` control-plane skeleton with declared ARI capability.

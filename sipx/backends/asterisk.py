@@ -121,6 +121,77 @@ class AsteriskAriEvent:
         return data
 
 
+@dataclass(frozen=True, slots=True)
+class AsteriskChannel:
+    id: str
+    raw: Mapping[str, Any]
+    name: str | None = None
+    state: str | None = None
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> AsteriskChannel:
+        return cls(
+            id=_required_id(payload, "channel"),
+            raw=dict(payload),
+            name=_string_or_none(payload.get("name")),
+            state=_string_or_none(payload.get("state")),
+        )
+
+    def to_timeline_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {"channel_id": self.id}
+        if self.name is not None:
+            data["name"] = self.name
+        if self.state is not None:
+            data["state"] = self.state
+        return data
+
+
+@dataclass(frozen=True, slots=True)
+class AsteriskBridge:
+    id: str
+    raw: Mapping[str, Any]
+    bridge_type: str | None = None
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> AsteriskBridge:
+        return cls(
+            id=_required_id(payload, "bridge"),
+            raw=dict(payload),
+            bridge_type=_string_or_none(payload.get("bridge_type")),
+        )
+
+    def to_timeline_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {"bridge_id": self.id}
+        if self.bridge_type is not None:
+            data["bridge_type"] = self.bridge_type
+        return data
+
+
+@dataclass(frozen=True, slots=True)
+class AsteriskPlayback:
+    id: str
+    raw: Mapping[str, Any]
+    target_uri: str | None = None
+    media_uri: str | None = None
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> AsteriskPlayback:
+        return cls(
+            id=_required_id(payload, "playback"),
+            raw=dict(payload),
+            target_uri=_string_or_none(payload.get("target_uri")),
+            media_uri=_string_or_none(payload.get("media_uri")),
+        )
+
+    def to_timeline_data(self) -> dict[str, Any]:
+        data: dict[str, Any] = {"playback_id": self.id}
+        if self.target_uri is not None:
+            data["target_uri"] = self.target_uri
+        if self.media_uri is not None:
+            data["media_uri"] = self.media_uri
+        return data
+
+
 HttpTransport = Callable[
     [str, str, bytes | None, Mapping[str, str], float],
     AsteriskAriHttpResponse | Awaitable[AsteriskAriHttpResponse],
@@ -270,19 +341,146 @@ class AsteriskBackend:
             )
         return response
 
+    async def originate(
+        self,
+        endpoint: str,
+        *,
+        app_args: str | None = None,
+        variables: Mapping[str, object] | None = None,
+        channel_id: str | None = None,
+    ) -> AsteriskChannel:
+        query: dict[str, object] = {"endpoint": endpoint, "app": self.config.app}
+        if app_args:
+            query["appArgs"] = app_args
+        if channel_id:
+            query["channelId"] = channel_id
+        payload = await self.request(
+            "POST",
+            "channels",
+            query=query,
+            json_body={"variables": dict(variables)} if variables else None,
+        )
+        channel = AsteriskChannel.from_payload(_require_mapping(payload, "channel"))
+        self._record_timeline("channel_originated", channel.to_timeline_data())
+        return channel
+
+    async def answer_channel(self, channel_id: str) -> None:
+        await self.request("POST", f"channels/{channel_id}/answer")
+        self._record_timeline("channel_answered", {"channel_id": channel_id})
+
+    async def hangup_channel(
+        self, channel_id: str, *, reason: str | None = None
+    ) -> None:
+        query = {"reason": reason} if reason else None
+        await self.request("DELETE", f"channels/{channel_id}", query=query)
+        data = {"channel_id": channel_id}
+        if reason:
+            data["reason"] = reason
+        self._record_timeline("channel_hungup", data)
+
+    async def play_channel(
+        self,
+        channel_id: str,
+        media: str,
+        *,
+        playback_id: str | None = None,
+    ) -> AsteriskPlayback:
+        query: dict[str, object] = {"media": media}
+        if playback_id:
+            query["playbackId"] = playback_id
+        payload = await self.request("POST", f"channels/{channel_id}/play", query=query)
+        playback = AsteriskPlayback.from_payload(_require_mapping(payload, "playback"))
+        data = playback.to_timeline_data()
+        data["channel_id"] = channel_id
+        self._record_timeline("playback_started", data)
+        return playback
+
+    async def send_dtmf(self, channel_id: str, digits: str) -> None:
+        if not digits:
+            raise ValueError("digits are required")
+        await self.request(
+            "POST", f"channels/{channel_id}/dtmf", query={"dtmf": digits}
+        )
+        self._record_timeline(
+            "dtmf_sent",
+            {"channel_id": channel_id, "digits": digits},
+        )
+
+    async def create_bridge(
+        self,
+        *,
+        bridge_type: str = "mixing",
+        bridge_id: str | None = None,
+    ) -> AsteriskBridge:
+        query: dict[str, object] = {"type": bridge_type}
+        if bridge_id:
+            query["bridgeId"] = bridge_id
+        payload = await self.request("POST", "bridges", query=query)
+        bridge = AsteriskBridge.from_payload(_require_mapping(payload, "bridge"))
+        self._record_timeline("bridge_created", bridge.to_timeline_data())
+        return bridge
+
+    async def add_channel_to_bridge(self, bridge_id: str, channel_id: str) -> None:
+        await self.request(
+            "POST",
+            f"bridges/{bridge_id}/addChannel",
+            query={"channel": channel_id},
+        )
+        self._record_timeline(
+            "bridge_channel_added",
+            {"bridge_id": bridge_id, "channel_id": channel_id},
+        )
+
+    async def remove_channel_from_bridge(self, bridge_id: str, channel_id: str) -> None:
+        await self.request(
+            "POST",
+            f"bridges/{bridge_id}/removeChannel",
+            query={"channel": channel_id},
+        )
+        self._record_timeline(
+            "bridge_channel_removed",
+            {"bridge_id": bridge_id, "channel_id": channel_id},
+        )
+
     async def events(
         self,
         source: AsyncIterable[str | bytes | Mapping[str, Any]] | None = None,
     ) -> AsyncIterator[AsteriskAriEvent]:
         async for event in self.client.iter_events(source):
-            if self.timeline is not None:
-                self.timeline.record(
-                    "asterisk",
-                    "ari_event",
-                    actor_id=self.actor_id,
-                    data=event.to_timeline_data(),
-                )
+            self._record_timeline("ari_event", event.to_timeline_data())
+            self._record_mapped_ari_event(event)
             yield event
+
+    def _record_mapped_ari_event(self, event: AsteriskAriEvent) -> None:
+        name = _ARI_EVENT_TIMELINE_NAMES.get(event.type)
+        if name is None:
+            return
+        self._record_timeline(name, _ari_event_timeline_data(event))
+
+    def _record_timeline(self, name: str, data: Mapping[str, Any]) -> None:
+        if self.timeline is None:
+            return
+        self.timeline.record(
+            "asterisk",
+            name,
+            actor_id=self.actor_id,
+            data=dict(data),
+        )
+
+
+_ARI_EVENT_TIMELINE_NAMES = {
+    "BridgeCreated": "bridge_created",
+    "BridgeDestroyed": "bridge_destroyed",
+    "ChannelDestroyed": "channel_destroyed",
+    "ChannelDtmfReceived": "dtmf_received",
+    "ChannelEnteredBridge": "bridge_channel_entered",
+    "ChannelLeftBridge": "bridge_channel_left",
+    "ChannelStateChange": "channel_state_changed",
+    "PlaybackFinished": "playback_finished",
+    "PlaybackStarted": "playback_started",
+    "StasisEnd": "stasis_ended",
+    "StasisStart": "stasis_started",
+}
 
 
 def _build_ari_url(
@@ -480,6 +678,43 @@ def _decode_event_payload(payload: str | bytes | Mapping[str, Any]) -> dict[str,
     if not isinstance(data, dict):
         raise AsteriskAriError("ARI event payload must be a JSON object")
     return data
+
+
+def _ari_event_timeline_data(event: AsteriskAriEvent) -> dict[str, Any]:
+    data = event.to_timeline_data()
+    raw = event.raw
+    _copy_nested(data, raw, "playback", "id", "playback_id")
+    _copy_nested(data, raw, "playback", "target_uri", "target_uri")
+    _copy_nested(data, raw, "playback", "media_uri", "media_uri")
+    for key in ("digit", "duration_ms", "state", "cause", "cause_txt"):
+        if key in raw:
+            data[key] = raw[key]
+    return data
+
+
+def _copy_nested(
+    data: dict[str, Any],
+    raw: Mapping[str, Any],
+    parent_key: str,
+    source_key: str,
+    target_key: str,
+) -> None:
+    parent = raw.get(parent_key)
+    if isinstance(parent, Mapping) and parent.get(source_key) is not None:
+        data[target_key] = parent[source_key]
+
+
+def _require_mapping(payload: object, name: str) -> Mapping[str, Any]:
+    if not isinstance(payload, Mapping):
+        raise AsteriskAriError(f"ARI {name} response must be a JSON object")
+    return payload
+
+
+def _required_id(payload: Mapping[str, Any], name: str) -> str:
+    value = payload.get("id")
+    if not value:
+        raise AsteriskAriError(f"ARI {name} response is missing id")
+    return str(value)
 
 
 def _nested_id(value: object) -> str | None:
