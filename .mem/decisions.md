@@ -24,3 +24,4 @@
 | D20 | 2026-06-08 | `Harness()` defaults to `MockBackend`. | Enables no-network unit tests and CLI skeleton before Asterisk or native SIP backends exist. |
 | D21 | 2026-06-08 | Artifact writes use default central redaction. | Secret redaction must be automatic before logs/transcripts/recordings grow. |
 | D22 | 2026-06-08 | Media layer starts with protocols and value objects, not provider adapters. | Keeps STT/TTS/LLM providers out of the media clock and avoids premature dependency choices. |
+| D23 | 2026-06-08 | Native SIP starts with sans-I/O parse/serialize primitives. | Keeps protocol correctness testable before sockets, timers, transactions, or backend runtime. |

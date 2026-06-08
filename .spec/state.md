@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.3.0` delivered media primitives, STT/TTS protocols, barge-in policy, and central redaction.
+Implement `sipx` in verified commit blocks. Block `0.4.0` delivered sans-I/O SIP URI, headers, parser, serializer, and Content-Length validation.
 
 ## Sources Read
 
@@ -36,6 +36,10 @@ Implement `sipx` in verified commit blocks. Block `0.3.0` delivered media primit
 - Added tests for media frame validation, barge-in behavior, transcript confidence validation, redaction, and artifact redaction.
 - Recorded `SPEC.md` §B B2 for a redaction regex replacement bug; V13 already covered the invariant.
 - Marked SPEC tasks T12 and T27 complete after verification.
+- Bumped `pyproject.toml` version from `0.3.0` to `0.4.0`.
+- Added `sipx.sip` package with `SipUri`, `HeaderMap`, `SipRequest`, `SipResponse`, `SipParseError`, and `parse_sip_message`.
+- Added SIP parser tests for URI round-trip, compact header expansion, request/response parsing, Content-Length mismatch, oversized messages, and serializer Content-Length rewrite.
+- Marked SPEC tasks T16 and T17 complete after verification.
 
 ## Active Decision
 
@@ -45,10 +49,10 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Add richer fake media events and example mock scenario.
-2. Add silence/placeholder behavior for slow AI paths.
-3. Choose first Asterisk media path.
-4. Decide first shipped product focus: IVR QA, contact center, or technical SIP tester.
+1. Implement SDP model/parser/offer-answer for audio PCMU/PCMA/telephone-event.
+2. Implement RTP packet parsing/stats and DTMF RFC4733 primitives.
+3. Add richer fake media events and example mock scenario.
+4. Choose first Asterisk media path.
 5. Decide artifact retention policy before real recordings/transcripts.
 
 ## Risks
@@ -59,6 +63,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - Recordings/transcripts are sensitive; design redaction/retention before real deployments.
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
+- SIP parser exists, but transaction/dialog state machines are not implemented yet.
 
 ## Open Questions
 

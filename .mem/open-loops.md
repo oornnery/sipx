@@ -9,7 +9,7 @@
 | O5 | Asterisk test environment? | Docker, local package, external lab PBX | Before integration tests. |
 | O6 | License? | MIT/Apache/proprietary/other | Before public distribution and Asterisk positioning. |
 | O7 | Config format? | `harness.toml`, YAML scenarios, Python-only first | Before scenario runner UX. |
-| O8 | Native SIP scope for v0.1? | parser only, UAC only, UAC+UAS, REGISTER included | Before backend implementation. |
+| O8 | Native SIP next scope? | transaction/dialog first, SDP/RTP first, or UAC/UAS runtime first | Parser primitives are done; decide next native SIP layer. |
 | O9 | PJSIP backend priority? | before native lab mode, after native lab mode, never unless demanded | Before optional backend work. |
 | O10 | Type-check environment? | install/sync `ty`, use existing executable, or defer type gate | Before claiming full validation gate. |
 | O11 | Slow AI media behavior? | silence, comfort tone, waiting prompt, configurable policy | Before real STT/TTS/LLM runtime. |

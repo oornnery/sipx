@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, and central redaction.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, and sans-I/O SIP parser primitives.
 
 ## Milestone 0 - Project Grounding
 
@@ -77,8 +77,8 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 
 ## Milestone 5 - NativeSipBackend MVP
 
-- [ ] Implement SIP URI and header models.
-- [ ] Implement SIP parser/serializer with bounds and typed errors.
+- [x] Implement SIP URI and header models.
+- [x] Implement SIP parser/serializer with bounds and typed errors.
 - [ ] Implement transaction skeleton for INVITE and non-INVITE.
 - [ ] Implement dialog model with Call-ID, tags, CSeq, route set.
 - [ ] Implement SDP model/parser/serializer for audio.
@@ -133,12 +133,21 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added media and redaction tests.
 - [x] Marked `SPEC.md` T12 and T27 complete after verification.
 
+## Block 0.4.0 Done
+
+- [x] Bumped package version to `0.4.0`.
+- [x] Added sans-I/O SIP URI, HeaderMap, parser, serializer, and typed parse errors.
+- [x] Added Content-Length and max-size validation.
+- [x] Added SIP parser/serializer tests.
+- [x] Marked `SPEC.md` T16 and T17 complete after verification.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
 - [ ] Asterisk media path decision remains open before AsteriskBackend MVP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
+- [ ] SIP transaction/dialog/SDP/RTP work remains pending after parser primitives.
 
 ## Open Questions
 

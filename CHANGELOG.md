@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.4.0 - 2026-06-08
+
+- Added sans-I/O SIP URI, header map, message parser, and serializer primitives.
+- Added typed `SipParseError` and parser bounds via `max_size`.
+- Added Content-Length validation and serializer rewrite behavior.
+- Added tests for SIP URI round-trip, compact header expansion, request/response parsing, Content-Length mismatch, oversized messages, and serialization.
+
 ## 0.3.0 - 2026-06-08
 
 - Added media primitives: `AudioFrame`, `MediaPort`, STT/TTS protocols, `TranscriptEvent`, and barge-in policy.

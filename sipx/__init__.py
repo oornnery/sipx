@@ -31,6 +31,15 @@ from sipx.media import (
     TtsEngine,
 )
 from sipx.security import Redactor, default_redactor
+from sipx.sip import (
+    HeaderMap,
+    SipMessage,
+    SipParseError,
+    SipRequest,
+    SipResponse,
+    SipUri,
+    parse_sip_message,
+)
 
 __all__ = [
     "Actor",
@@ -46,10 +55,16 @@ __all__ = [
     "ExpectationFailure",
     "ExpectationResult",
     "Harness",
+    "HeaderMap",
     "Metrics",
     "MediaPort",
     "Redactor",
     "Scenario",
+    "SipMessage",
+    "SipParseError",
+    "SipRequest",
+    "SipResponse",
+    "SipUri",
     "SttEngine",
     "SttStream",
     "Timeline",
@@ -60,5 +75,6 @@ __all__ = [
     "Verdict",
     "expect",
     "default_redactor",
+    "parse_sip_message",
     "scenario",
 ]
