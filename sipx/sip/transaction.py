@@ -19,9 +19,16 @@ class ClientTransactionState(StrEnum):
     TERMINATED = "terminated"
 
 
+class ServerTransactionState(StrEnum):
+    PROCEEDING = "proceeding"
+    COMPLETED = "completed"
+    CONFIRMED = "confirmed"
+    TERMINATED = "terminated"
+
+
 @dataclass(frozen=True, slots=True)
 class TransactionEvent:
-    state: ClientTransactionState
+    state: ClientTransactionState | ServerTransactionState
     name: str
     status_code: int | None = None
 
@@ -132,6 +139,77 @@ class NonInviteClientTransaction:
         self.events.append(TransactionEvent(state=self.state, name="terminated"))
 
 
+class InviteServerTransaction:
+    def __init__(self, request: SipRequest) -> None:
+        if request.method != "INVITE":
+            raise SipTransactionError("InviteServerTransaction requires INVITE")
+        self.request = request
+        self.branch = _branch_id(_required_header(request, "Via"))
+        self.request_cseq = _cseq_number(_required_header(request, "CSeq"))
+        self.state = ServerTransactionState.PROCEEDING
+        self.responses: list[SipResponse] = []
+        self.events: list[TransactionEvent] = [
+            TransactionEvent(state=self.state, name="request_received")
+        ]
+
+    @property
+    def final_response(self) -> SipResponse | None:
+        for response in reversed(self.responses):
+            if response.status_code >= 200:
+                return response
+        return None
+
+    def send_response(self, response: SipResponse) -> ServerTransactionState:
+        _validate_response_matches_request(
+            response,
+            branch=self.branch,
+            cseq_number=self.request_cseq,
+            cseq_method="INVITE",
+        )
+        self.responses.append(response)
+        if 100 <= response.status_code < 200:
+            self.state = ServerTransactionState.PROCEEDING
+            event_name = "provisional_response"
+        elif 200 <= response.status_code < 300:
+            self.state = ServerTransactionState.TERMINATED
+            event_name = "success_response"
+        elif 300 <= response.status_code < 700:
+            self.state = ServerTransactionState.COMPLETED
+            event_name = "failure_response"
+        else:
+            raise SipTransactionError(
+                f"invalid SIP response code: {response.status_code}"
+            )
+        self.events.append(
+            TransactionEvent(
+                state=self.state,
+                name=event_name,
+                status_code=response.status_code,
+            )
+        )
+        return self.state
+
+    def receive_ack(self, request: SipRequest) -> ServerTransactionState:
+        if request.method != "ACK":
+            raise SipTransactionError("INVITE server transaction requires ACK")
+        if self.state is not ServerTransactionState.COMPLETED:
+            raise SipTransactionError(
+                "ACK is only transaction-scoped after failure final"
+            )
+        if _branch_id(_required_header(request, "Via")) != self.branch:
+            raise SipTransactionError("ACK branch does not match transaction")
+        cseq_number, cseq_method = _cseq_parts(_required_header(request, "CSeq"))
+        if cseq_number != self.request_cseq or cseq_method != "ACK":
+            raise SipTransactionError("ACK CSeq does not match transaction")
+        self.state = ServerTransactionState.CONFIRMED
+        self.events.append(TransactionEvent(state=self.state, name="ack_received"))
+        return self.state
+
+    def terminate(self) -> None:
+        self.state = ServerTransactionState.TERMINATED
+        self.events.append(TransactionEvent(state=self.state, name="terminated"))
+
+
 def _related_request(
     request: SipRequest,
     method: str,
@@ -164,8 +242,30 @@ def _branch_id(via: str) -> str:
 
 
 def _cseq_number(value: str) -> int:
-    number, _, _method = value.partition(" ")
+    number, _method = _cseq_parts(value)
+    return number
+
+
+def _cseq_parts(value: str) -> tuple[int, str]:
+    number, _, method = value.partition(" ")
     try:
-        return int(number)
+        parsed = int(number)
     except ValueError as exc:
         raise SipTransactionError(f"invalid CSeq header: {value!r}") from exc
+    return parsed, method.strip().upper()
+
+
+def _validate_response_matches_request(
+    response: SipResponse,
+    *,
+    branch: str,
+    cseq_number: int,
+    cseq_method: str,
+) -> None:
+    if _branch_id(_required_header(response, "Via")) != branch:
+        raise SipTransactionError("response branch does not match transaction")
+    response_cseq_number, response_cseq_method = _cseq_parts(
+        _required_header(response, "CSeq")
+    )
+    if response_cseq_number != cseq_number or response_cseq_method != cseq_method:
+        raise SipTransactionError("response CSeq does not match transaction")

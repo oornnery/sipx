@@ -16,11 +16,13 @@ from sipx.sip.message import (
 from sipx.sip.transaction import (
     ClientTransactionState,
     InviteClientTransaction,
+    InviteServerTransaction,
     NonInviteClientTransaction,
+    ServerTransactionState,
     SipTransactionError,
     TransactionEvent,
 )
-from sipx.sip.requests import create_register_request
+from sipx.sip.requests import create_bye_request, create_register_request
 from sipx.sip.uri import SipUri
 
 __all__ = [
@@ -31,7 +33,9 @@ __all__ = [
     "DigestChallenge",
     "HeaderMap",
     "InviteClientTransaction",
+    "InviteServerTransaction",
     "NonInviteClientTransaction",
+    "ServerTransactionState",
     "SipAuthError",
     "SipDialogError",
     "SipMessage",
@@ -42,6 +46,7 @@ __all__ = [
     "SipUri",
     "TransactionEvent",
     "build_digest_authorization",
+    "create_bye_request",
     "create_register_request",
     "header_tag",
     "parse_digest_challenge",

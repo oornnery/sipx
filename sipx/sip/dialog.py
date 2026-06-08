@@ -66,6 +66,37 @@ class Dialog:
             else DialogState.EARLY,
         )
 
+    @classmethod
+    def from_uas_invite_request(
+        cls,
+        request: SipRequest,
+        *,
+        local_tag: str,
+    ) -> Dialog:
+        if request.method != "INVITE":
+            raise SipDialogError("dialog creation requires INVITE request")
+        if not local_tag:
+            raise SipDialogError("local tag is required")
+
+        call_id = _required_header(request, "Call-ID")
+        from_header = _required_header(request, "From")
+        to_header = _required_header(request, "To")
+        remote_tag = _required_tag(from_header, "From")
+        local_uri = _with_tag(to_header, local_tag)
+
+        return cls(
+            dialog_id=DialogId(
+                call_id=call_id,
+                local_tag=header_tag(local_uri) or local_tag,
+                remote_tag=remote_tag,
+            ),
+            local_uri=local_uri,
+            remote_uri=from_header,
+            local_sequence=0,
+            remote_sequence=_cseq_number(_required_header(request, "CSeq")),
+            state=DialogState.EARLY,
+        )
+
     def confirm(self) -> None:
         if self.state is not DialogState.TERMINATED:
             self.state = DialogState.CONFIRMED
@@ -98,6 +129,12 @@ def _required_tag(header_value: str, header_name: str) -> str:
     if not tag:
         raise SipDialogError(f"missing tag parameter in {header_name} header")
     return tag
+
+
+def _with_tag(header_value: str, tag: str) -> str:
+    if header_tag(header_value):
+        return header_value
+    return f"{header_value};tag={tag}"
 
 
 def _cseq_number(value: str) -> int:

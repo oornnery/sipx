@@ -29,3 +29,4 @@
 | D25 | 2026-06-08 | RTP/DTMF starts sans-I/O before media runtime. | Packet correctness and RFC4733 event behavior should be deterministic before sockets/jitter/audio clocks. |
 | D26 | 2026-06-08 | SIP transactions/dialogs start sans-I/O and partial. | T21 is broad; client INVITE and dialog state should be verified before adding UAS, REGISTER, auth, sockets, and timers. |
 | D27 | 2026-06-08 | SIP Digest helper implements protocol MD5 only. | SIP Digest requires MD5 response generation; code uses `usedforsecurity=False` and does not store secrets. |
+| D28 | 2026-06-08 | Continue T21 as small sans-I/O sub-blocks before native runtime. | Dialog, transaction, auth, and request correctness are easier to validate before sockets/timers and strict runtime integration. |

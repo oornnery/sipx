@@ -14,4 +14,4 @@
 | O10 | Type-check environment? | install/sync `ty`, use existing executable, or defer type gate | Before claiming full validation gate. |
 | O11 | Slow AI media behavior? | silence, comfort tone, waiting prompt, configurable policy | Before real STT/TTS/LLM runtime. |
 | O12 | Advanced RTP depth? | jitter buffer, RTCP, impairment, payload validation | After basic RTP/DTMF primitives. |
-| O13 | T21 completion order? | UAS first, BYE/dialog termination first, complete REGISTER client first, or sockets/timers first | Before marking T21 complete. |
+| O13 | T21 remaining completion order? | complete REGISTER client first, sockets/timers first, or strict call runtime first | Before marking T21 complete. |

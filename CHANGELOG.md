@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.7.2 - 2026-06-08
+
+- Added UAS-side INVITE dialog creation from inbound requests.
+- Added INVITE server transaction skeleton with provisional, success final, failure final, and failure ACK handling.
+- Added BYE request creation helper using dialog identity and local CSeq progression.
+- Added tests for UAS dialogs, INVITE server transaction state, ACK branch validation, BYE request creation, and dialog termination.
+- Kept full T21 open: complete REGISTER client flow, sockets/timers, strict runtime, and integrated call flows remain pending.
+
 ## 0.7.1 - 2026-06-08
 
 - Added non-INVITE client transaction skeleton.

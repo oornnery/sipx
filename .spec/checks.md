@@ -84,6 +84,16 @@
 | 2026-06-08 | `ruff check .` | pass | All checks passed after auth/register formatting. |
 | 2026-06-08 | `ruff format --check .` | pass | 52 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `python -m pytest tests/test_sip_transaction_dialog.py` | pass | 11 tests passed for UAS INVITE and BYE block before full validation. |
+| 2026-06-08 | `python -m pytest` | pass | 46 tests passed for UAS INVITE and BYE block before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for UAS INVITE and BYE block before formatting. |
+| 2026-06-08 | `ruff format --check .` | fail | `sipx/sip/transaction.py` and `tests/test_sip_transaction_dialog.py` needed formatting. |
+| 2026-06-08 | `ruff format sipx/sip/transaction.py tests/test_sip_transaction_dialog.py` | pass | 2 files reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 46 tests passed after UAS INVITE and BYE formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after UAS INVITE and BYE formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 52 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors in unstaged diff after formatting. |
 
 ## Validation Policy
 
