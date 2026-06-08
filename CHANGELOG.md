@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.7.3 - 2026-06-08
+
+- Added sans-I/O REGISTER client flow with `ready`, `challenged`, `registered`, `unregistered`, and `failed` states.
+- Added Digest challenge handling for 401/407 REGISTER responses and authenticated retry generation without storing passwords.
+- Added unregister request creation via `Expires: 0`.
+- Added tests for initial REGISTER, Digest auth retry, success/failure states, unregister, and missing challenge errors.
+- Kept full T21 open: native sockets/timers, strict runtime, and integrated call flows remain pending.
+
 ## 0.7.2 - 2026-06-08
 
 - Added UAS-side INVITE dialog creation from inbound requests.

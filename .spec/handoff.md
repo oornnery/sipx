@@ -2,7 +2,7 @@
 
 ## Summary
 
-Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.7.2` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, INVITE/non-INVITE client transactions, REGISTER helper, Digest auth helper, UAS INVITE skeleton, and BYE helper.
+Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` through `0.7.3` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, redaction, SIP parser primitives, SDP audio offer/answer, RTP packet stats, RFC4733 DTMF, SIP dialog skeletons, INVITE/non-INVITE client transactions, REGISTER helper/flow, Digest auth helper, UAS INVITE skeleton, and BYE helper.
 
 ## Read First
 
@@ -35,10 +35,10 @@ Build `sipx` as a Python Voice/SIP Harness:
 
 ## Recommended Next Task
 
-Continue after block `0.7.2`:
+Continue after block `0.7.3`:
 
-1. Add complete REGISTER client flow.
-2. Add native SIP sockets/timers runtime shell.
+1. Add native SIP sockets/timers runtime shell.
+2. Add strict UAC/UAS call runtime integration around existing sans-I/O primitives.
 3. Add richer mock media events and an example scenario.
 4. Choose first Asterisk media path.
 
@@ -51,8 +51,8 @@ Continue after block `0.7.2`:
 
 ## Latest Validation
 
-- `python -m pytest`: pass, 46 tests.
-- `python -m pytest tests/test_sip_transaction_dialog.py`: pass, 11 tests during block `0.7.2`.
+- `python -m pytest`: pass, 51 tests.
+- `python -m pytest tests/test_sip_auth_requests.py`: pass, 8 tests during block `0.7.3`.
 - `ruff check .`: pass.
-- `ruff format --check .`: pass, 52 files already formatted.
+- `ruff format --check .`: pass, 53 files already formatted.
 - `python -m ty check`: blocked, active interpreter has no `ty` module.

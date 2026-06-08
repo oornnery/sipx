@@ -13,6 +13,12 @@ from sipx.sip.message import (
     SipResponse,
     parse_sip_message,
 )
+from sipx.sip.register import (
+    RegisterChallenge,
+    RegisterClientError,
+    RegisterClientFlow,
+    RegisterClientState,
+)
 from sipx.sip.transaction import (
     ClientTransactionState,
     InviteClientTransaction,
@@ -35,6 +41,10 @@ __all__ = [
     "InviteClientTransaction",
     "InviteServerTransaction",
     "NonInviteClientTransaction",
+    "RegisterChallenge",
+    "RegisterClientError",
+    "RegisterClientFlow",
+    "RegisterClientState",
     "ServerTransactionState",
     "SipAuthError",
     "SipDialogError",

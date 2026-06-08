@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.7.2` adds UAS-side INVITE dialog/transaction primitives and BYE request creation.
+Implement `sipx` in verified commit blocks. Block `0.7.3` adds sans-I/O REGISTER client flow with Digest challenge retry and unregister.
 
 ## Sources Read
 
@@ -65,6 +65,12 @@ Implement `sipx` in verified commit blocks. Block `0.7.2` adds UAS-side INVITE d
 - Added BYE request helper using dialog identity and local CSeq progression.
 - Added tests for UAS dialogs, INVITE server transaction state, ACK branch validation, BYE request creation, and dialog termination.
 - Kept SPEC task T21 pending because complete REGISTER client flow, sockets/timers, strict runtime, and integrated call flows are not complete.
+- Bumped `pyproject.toml` version from `0.7.2` to `0.7.3`.
+- Added sans-I/O REGISTER client flow states.
+- Added Digest challenge handling for 401/407 REGISTER responses and authenticated retry generation without storing passwords.
+- Added unregister request creation via `Expires: 0`.
+- Added tests for initial REGISTER, Digest auth retry, success/failure states, unregister, and missing challenge errors.
+- Kept SPEC task T21 pending because native sockets/timers, strict runtime, and integrated call flows are not complete.
 
 ## Active Decision
 
@@ -74,8 +80,8 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Add complete REGISTER client flow.
-2. Add native SIP sockets/timers runtime shell.
+1. Add native SIP sockets/timers runtime shell.
+2. Add strict UAC/UAS call runtime integration around existing sans-I/O primitives.
 3. Add richer fake media events and example mock scenario.
 4. Choose first Asterisk media path.
 5. Decide artifact retention policy before real recordings/transcripts.
@@ -88,7 +94,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - Recordings/transcripts are sensitive; design redaction/retention before real deployments.
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
-- SIP transaction/dialog skeletons exist, but T21 remains incomplete until complete REGISTER client flow, sockets/timers, strict runtime, and integrated call flows are implemented.
+- SIP transaction/dialog/register skeletons exist, but T21 remains incomplete until sockets/timers, strict runtime, and integrated call flows are implemented.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
 
 ## Open Questions

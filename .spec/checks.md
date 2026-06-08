@@ -94,6 +94,16 @@
 | 2026-06-08 | `ruff format --check .` | pass | 52 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors in unstaged diff after formatting. |
+| 2026-06-08 | `python -m pytest tests/test_sip_auth_requests.py` | pass | 8 tests passed for REGISTER client flow before full validation. |
+| 2026-06-08 | `python -m pytest` | pass | 51 tests passed for REGISTER client flow before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for REGISTER client flow before formatting. |
+| 2026-06-08 | `ruff format --check .` | fail | `sipx/sip/register.py` needed formatting. |
+| 2026-06-08 | `ruff format sipx/sip/register.py` | pass | 1 file reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 51 tests passed after REGISTER client flow formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after REGISTER client flow formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 53 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors in unstaged diff after REGISTER formatting. |
 
 ## Validation Policy
 
