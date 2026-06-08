@@ -20,6 +20,7 @@ from sipx.core import (
     expect,
     scenario,
 )
+from sipx.backends import MockBackend, NativeSipBackend
 from sipx.media import (
     AudioFrame,
     BargeInPolicy,
@@ -71,14 +72,20 @@ from sipx.sip import (
     SipRequest,
     SipResponse,
     SipTransactionError,
+    SipUdpEndpoint,
+    SipUdpError,
     SipUri,
+    SipWireDirection,
+    SipWireEvent,
     TransactionEvent,
+    UdpAddress,
     build_digest_authorization,
     create_bye_request,
     create_register_request,
     header_tag,
     parse_digest_challenge,
     parse_sip_message,
+    sip_wire_event_name,
 )
 
 __all__ = [
@@ -107,6 +114,8 @@ __all__ = [
     "InviteServerTransaction",
     "Metrics",
     "MediaPort",
+    "MockBackend",
+    "NativeSipBackend",
     "NonInviteClientTransaction",
     "RegisterChallenge",
     "RegisterClientError",
@@ -129,7 +138,11 @@ __all__ = [
     "SipRequest",
     "SipResponse",
     "SipTransactionError",
+    "SipUdpEndpoint",
+    "SipUdpError",
     "SipUri",
+    "SipWireDirection",
+    "SipWireEvent",
     "SttEngine",
     "SttStream",
     "Timeline",
@@ -137,6 +150,7 @@ __all__ = [
     "TransactionEvent",
     "TranscriptEvent",
     "TtsEngine",
+    "UdpAddress",
     "UnsupportedExpectation",
     "Verdict",
     "build_digest_authorization",
@@ -152,5 +166,6 @@ __all__ = [
     "parse_digest_challenge",
     "parse_sdp",
     "parse_sip_message",
+    "sip_wire_event_name",
     "scenario",
 ]

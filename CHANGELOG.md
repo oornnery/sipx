@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.8.0 - 2026-06-08
+
+- Added real async UDP SIP transport with typed RX/TX wire events, size limits, receive timeouts, and fail-closed parse errors.
+- Added `NativeSipBackend` with real UDP `start`/`stop`, `send_request`, `send_response`, strict-mode raw-send rejection, lab-mode raw datagrams, and SIP timeline recording.
+- Exported native SIP backend and UDP wire primitives from public package modules.
+- Added loopback UDP tests for request/response exchange, timeline events, malformed datagrams, strict raw-send rejection, and receive timeout handling.
+- Kept full T21 open: integrated strict UAC/UAS call flows and transaction retransmission timers remain pending.
+
 ## 0.7.3 - 2026-06-08
 
 - Added sans-I/O REGISTER client flow with `ready`, `challenged`, `registered`, `unregistered`, and `failed` states.

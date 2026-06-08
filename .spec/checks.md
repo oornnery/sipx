@@ -104,6 +104,16 @@
 | 2026-06-08 | `ruff format --check .` | pass | 53 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors in unstaged diff after REGISTER formatting. |
+| 2026-06-08 | `python -m pytest tests/test_native_sip_backend.py` | pass | 4 loopback UDP tests passed for real Native SIP runtime before full validation. |
+| 2026-06-08 | `python -m pytest` | pass | 55 tests passed for real Native SIP runtime before lint/format fixes. |
+| 2026-06-08 | `ruff check .` | fail | Unused `SipMessage` import in `sipx/backends/native.py`; no product invariant change needed. |
+| 2026-06-08 | `ruff format --check .` | fail | `sipx/backends/native.py` and `sipx/sip/transport.py` needed formatting. |
+| 2026-06-08 | `ruff format sipx/backends/native.py sipx/sip/transport.py` | pass | 2 files reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 55 tests passed after real Native SIP runtime formatting/lint fix. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after native runtime lint fix. |
+| 2026-06-08 | `ruff format --check .` | pass | 55 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after native runtime block. |
 
 ## Validation Policy
 

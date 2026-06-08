@@ -31,3 +31,4 @@
 | D27 | 2026-06-08 | SIP Digest helper implements protocol MD5 only. | SIP Digest requires MD5 response generation; code uses `usedforsecurity=False` and does not store secrets. |
 | D28 | 2026-06-08 | Continue T21 as small sans-I/O sub-blocks before native runtime. | Dialog, transaction, auth, and request correctness are easier to validate before sockets/timers and strict runtime integration. |
 | D29 | 2026-06-08 | REGISTER client flow accepts password only at auth retry generation time. | Keeps Digest response generation possible without storing secrets in flow state. |
+| D30 | 2026-06-08 | NativeSipBackend uses real UDP sockets for SIP wire runtime. | Technical softphone and raw SIP validation need real transport behavior; loopback tests validate without external infrastructure. |

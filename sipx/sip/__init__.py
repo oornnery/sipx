@@ -28,6 +28,14 @@ from sipx.sip.transaction import (
     SipTransactionError,
     TransactionEvent,
 )
+from sipx.sip.transport import (
+    SipUdpEndpoint,
+    SipUdpError,
+    SipWireDirection,
+    SipWireEvent,
+    UdpAddress,
+    sip_wire_event_name,
+)
 from sipx.sip.requests import create_bye_request, create_register_request
 from sipx.sip.uri import SipUri
 
@@ -53,12 +61,18 @@ __all__ = [
     "SipRequest",
     "SipResponse",
     "SipTransactionError",
+    "SipUdpEndpoint",
+    "SipUdpError",
     "SipUri",
+    "SipWireDirection",
+    "SipWireEvent",
     "TransactionEvent",
+    "UdpAddress",
     "build_digest_authorization",
     "create_bye_request",
     "create_register_request",
     "header_tag",
     "parse_digest_challenge",
     "parse_sip_message",
+    "sip_wire_event_name",
 ]
