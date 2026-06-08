@@ -44,3 +44,4 @@
 | D40 | 2026-06-08 | Native SIP protocol manipulation uses lab-only `NativeSipLabHooks`. | Keeps strict mode RFC-oriented while giving technical softphones and protocol tests controlled hooks for headers, SDP, timers, malformed bytes, and received events. |
 | D41 | 2026-06-08 | Asterisk integration tests are opt-in behind `SIPX_ASTERISK_INTEGRATION=1`. | Normal CI must stay no-secret/no-Docker; local lab can still validate ARI and Native SIP against Asterisk. |
 | D42 | 2026-06-08 | `PjsipBackend` remains optional future backend after native lab and Asterisk paths. | PJSIP is better for robust endpoint interop but worse for malformed wire-level control than `NativeSipBackend`. |
+| D43 | 2026-06-08 | Use hatchling build metadata for package-manager CLI execution. | `uv run sipx` needs an installable project so the configured console script wins over direct local package execution. |

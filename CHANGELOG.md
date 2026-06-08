@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.0.1 - 2026-06-08
+
+- Added package build metadata so `uv run sipx` installs and runs the configured console script from the repo root.
+- Added a regression test for the `sipx` console script build metadata.
+- Recorded SPEC B4 and invariant V24 for package-manager CLI execution.
+
 ## 1.0.0 - 2026-06-08
 
 - Added `ScenarioRecorder`, `ScenarioAction`, timeline JSONL replay loading, and CLI `sipx scenario export` for Python/YAML exports.

@@ -1,6 +1,14 @@
 from pathlib import Path
+import tomllib
 
 from sipx.cli.main import main
+
+
+def test_pyproject_defines_installable_sipx_console_script() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+
+    assert pyproject["project"]["scripts"]["sipx"] == "sipx.cli.main:main"
+    assert pyproject["build-system"]["build-backend"] == "hatchling.build"
 
 
 def test_cli_runs_python_scenario_file(tmp_path: Path, capsys) -> None:

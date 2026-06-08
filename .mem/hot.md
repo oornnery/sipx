@@ -36,7 +36,7 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.0.0`.
+- Current implementation version: `1.0.1`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
@@ -80,3 +80,5 @@
 - `MixedScenario` binds native, Asterisk, and mock actors onto one shared harness timeline.
 - `docker/asterisk` provides an Asterisk 22 lab for opt-in ARI and Native SIP integration tests.
 - SPEC T24-T26 and T28-T31 are complete; remaining work is beyond current SPEC table: license, type-check env, richer media/runtime, recordings/transcripts, UI.
+- `uv run sipx --help` works after adding hatchling build metadata and committing `uv.lock`.
+- `python -m ty check` is still blocked on the system interpreter; `uv run ty check` runs but reports 29 existing typing diagnostics.

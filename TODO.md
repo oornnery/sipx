@@ -123,7 +123,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 
 - [x] `ruff format --check .`
 - [x] `ruff check .`
-- [ ] `ty check` blocked: `ty` is not installed in the active Python environment.
+- [ ] `python -m ty check` blocked on the system interpreter; `uv run ty check` currently reports typing diagnostics.
 - [x] `pytest`
 - [x] Parser fuzz/property tests once SIP/SDP/RTP parsers exist.
 - [x] Asterisk integration tests only when explicit local config is present.
@@ -321,9 +321,17 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Documented optional future `PjsipBackend` tradeoffs.
 - [x] Marked `SPEC.md` T24-T26 and T28-T31 complete after validation.
 
+## Block 1.0.1 Done
+
+- [x] Bumped package version to `1.0.1`.
+- [x] Added hatchling build metadata so `uv run sipx` installs and runs the configured console script.
+- [x] Added CLI regression test for package build metadata and `sipx` console script declaration.
+- [x] Added `uv.lock` for reproducible `uv` execution.
+- [x] Recorded `SPEC.md` B4 and V24 for package-manager CLI execution.
+
 ## Blocked Or Pending
 
-- [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
+- [ ] `python -m ty check` needs the system interpreter environment synced, or validation should standardize on `uv run ty check` after fixing current typing diagnostics.
 - [ ] Next Asterisk media path after WebSocket MVP remains open: AudioSocket or ExternalMedia RTP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.

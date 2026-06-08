@@ -89,6 +89,7 @@ V20: lab hooks ! available before send/after receive/before SDP for protocol man
 V21: profiles ! separate strict real interop from lab fault-injection behavior.
 V22: mixed scenario ! support native actors + Asterisk actors + remote targets in one timeline.
 V23: implementation work ! rely on maintained current-structure docs; `IDEA.md` and `/docs` must not be required for context.
+V24: `cmd: sipx` ! runnable via package-manager console script from repo root.
 
 ## §T
 
@@ -134,3 +135,4 @@ id|date|cause|fix
 B1|2026-06-08|tests used `pytest.mark.asyncio` but active `pytest` lacked async plugin|tests use `asyncio.run`; no new §V, product spec unchanged
 B2|2026-06-08|redaction regex replacement assumed every secret pattern had capture group|fix replacement helper; covered by V13
 B3|2026-06-08|retransmission timer code used `asyncio` without module import|focused runtime tests caught it; no new §V, mechanical import failure
+B4|2026-06-08|`uv run sipx` had no installable build backend, so uv ran `sipx/__main__.py` directly and imports failed|V24

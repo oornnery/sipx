@@ -11,7 +11,7 @@
 | O7 | Config format? | `harness.toml` profiles exist; YAML scenarios still optional | Before richer scenario runner UX. |
 | O8 | Native SIP next scope? | media wiring, live inspector, advanced dialogs | After current SPEC completion. |
 | O9 | PJSIP backend priority? | after native lab mode and Asterisk lab; only if interop demand appears | Before optional backend work. |
-| O10 | Type-check environment? | install/sync `ty`, use existing executable, or defer type gate | Before claiming full validation gate. |
+| O10 | Type-check gate? | fix `uv run ty check` diagnostics, sync system `python -m ty`, or defer hard gate | Before claiming full type-check validation. |
 | O11 | Slow AI media behavior? | silence, comfort tone, waiting prompt, configurable policy | Before real STT/TTS/LLM runtime. |
 | O12 | Advanced RTP depth? | jitter buffer, RTCP, impairment, payload validation | After basic RTP/DTMF primitives. |
 | O13 | Next native SIP/softphone layer after 1.0.0? | media wiring, live inspector, recordings/transcripts | Before choosing work outside current SPEC table. |

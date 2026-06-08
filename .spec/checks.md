@@ -215,6 +215,14 @@
 | 2026-06-08 | final `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors before commit. |
 | 2026-06-08 | `docker compose -f docker/asterisk/docker-compose.yml config` | blocked | `docker` command is unavailable in this WSL environment. |
+| 2026-06-08 | `uv run sipx --help` | pass | Project builds with hatchling and console script resolves from repo root. |
+| 2026-06-08 | `python -m pytest tests/test_cli.py` | pass | 4 CLI tests passed, including build metadata regression. |
+| 2026-06-08 | `python -m pytest` | pass | 100 passed, 2 skipped after CLI packaging fix. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after CLI packaging fix. |
+| 2026-06-08 | `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; system interpreter blocker unchanged. |
+| 2026-06-08 | `uv run ty check` | fail | 29 existing typing diagnostics surfaced now that uv can run `ty`; not part of CLI packaging fix. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after CLI packaging fix. |
 
 ## Validation Policy
 
