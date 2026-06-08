@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.8.0` adds real async UDP Native SIP transport/backend with loopback validation.
+Implement `sipx` in verified commit blocks. Block `0.8.1` adds strict UAC/UAS INVITE/ACK/BYE call runtime over real UDP.
 
 ## Sources Read
 
@@ -76,6 +76,12 @@ Implement `sipx` in verified commit blocks. Block `0.8.0` adds real async UDP Na
 - Added `NativeSipBackend` with real UDP start/stop, request/response send, lab-mode raw datagrams, strict-mode raw-send rejection, and timeline recording.
 - Added loopback UDP tests for request/response exchange, malformed datagrams, strict raw-send rejection, and receive timeout handling.
 - Kept SPEC task T21 pending because integrated strict UAC/UAS call flows and transaction retransmission timers are not complete.
+- Bumped `pyproject.toml` version from `0.8.0` to `0.8.1`.
+- Added INVITE, ACK, and generic response construction helpers.
+- Added strict UAC/UAS call runtime on `NativeSipBackend` for INVITE, provisional/final response, ACK, BYE, and BYE 200 OK over real UDP.
+- Added `NativeSipCall`, call states, and call timeline events.
+- Added loopback UDP test for INVITE -> 180/200 -> ACK -> BYE/200.
+- Kept SPEC task T21 pending because CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers are not complete.
 
 ## Active Decision
 
@@ -85,11 +91,11 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Add strict UAC/UAS call runtime integration around existing sans-I/O primitives.
-2. Add transaction retransmission timers for strict runtime.
-3. Add richer fake media events and example mock scenario.
-4. Choose first Asterisk media path.
-5. Decide artifact retention policy before real recordings/transcripts.
+1. Add CANCEL runtime over UDP.
+2. Add REGISTER over-UDP orchestration.
+3. Add transaction retransmission timers for strict runtime.
+4. Add richer fake media events and example mock scenario.
+5. Choose first Asterisk media path.
 
 ## Risks
 
@@ -99,7 +105,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - Recordings/transcripts are sensitive; design redaction/retention before real deployments.
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
-- SIP transaction/dialog/register primitives and real UDP transport exist, but T21 remains incomplete until strict runtime, integrated call flows, and transaction retransmission timers are implemented.
+- SIP transaction/dialog/register primitives, real UDP transport, and strict INVITE/ACK/BYE flow exist, but T21 remains incomplete until CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers are implemented.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
 
 ## Open Questions

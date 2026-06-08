@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.8.1 - 2026-06-08
+
+- Added strict UAC/UAS call runtime on `NativeSipBackend` for real UDP INVITE, provisional/final response, ACK, BYE, and BYE 200 OK flows.
+- Added INVITE, ACK, and SIP response construction helpers.
+- Added `NativeSipCall`, call states, and call timeline events for invite, confirmed, terminated, and failed states.
+- Added loopback UDP call-flow test for INVITE -> 180/200 -> ACK -> BYE/200.
+- Kept full T21 open: CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers remain pending.
+
 ## 0.8.0 - 2026-06-08
 
 - Added real async UDP SIP transport with typed RX/TX wire events, size limits, receive timeouts, and fail-closed parse errors.

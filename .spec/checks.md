@@ -114,6 +114,16 @@
 | 2026-06-08 | `ruff format --check .` | pass | 55 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after native runtime block. |
+| 2026-06-08 | `python -m pytest tests/test_native_sip_backend.py` | pass | 5 loopback UDP tests passed for strict INVITE/ACK/BYE call runtime before full validation. |
+| 2026-06-08 | `python -m pytest` | pass | 56 tests passed for strict call runtime before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for strict call runtime before formatting. |
+| 2026-06-08 | `ruff format --check .` | fail | `tests/test_native_sip_backend.py` needed formatting. |
+| 2026-06-08 | `ruff format tests/test_native_sip_backend.py` | pass | 1 file reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 56 tests passed after strict call runtime formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after strict call runtime formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 55 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after strict call runtime block. |
 
 ## Validation Policy
 

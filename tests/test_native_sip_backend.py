@@ -5,6 +5,7 @@ import pytest
 from sipx import (
     HeaderMap,
     NativeSipBackend,
+    NativeSipCallState,
     SipRequest,
     SipResponse,
     SipUdpError,
@@ -125,3 +126,72 @@ async def _receive_timeout() -> None:
             await backend.receive_event(timeout=0.01)
     finally:
         await backend.stop()
+
+
+def test_native_sip_backend_runs_strict_invite_ack_bye_call_flow() -> None:
+    asyncio.run(_strict_call_flow())
+
+
+async def _strict_call_flow() -> None:
+    caller_timeline = Timeline(run_id="strict-caller")
+    callee_timeline = Timeline(run_id="strict-callee")
+    caller = NativeSipBackend(timeline=caller_timeline, actor_id="caller")
+    callee = NativeSipBackend(timeline=callee_timeline, actor_id="callee")
+    try:
+        await caller.start()
+        await callee.start()
+        caller_contact = SipUri.parse(f"sip:alice@127.0.0.1:{caller.local_address[1]}")
+        callee_contact = SipUri.parse(f"sip:bob@127.0.0.1:{callee.local_address[1]}")
+
+        accept_task = asyncio.create_task(
+            callee.accept_call(
+                local_tag="callee-tag",
+                contact=callee_contact,
+                timeout=1.0,
+            )
+        )
+        caller_call = await caller.initiate_call(
+            remote=callee.local_address,
+            target=SipUri.parse("sip:bob@example.com"),
+            caller=SipUri.parse("sip:alice@example.com"),
+            contact=caller_contact,
+            call_id="call-1",
+            branch="z9hG4bK-invite",
+            from_tag="caller-tag",
+            ack_branch="z9hG4bK-ack",
+            timeout=1.0,
+        )
+        callee_call = await accept_task
+
+        assert caller_call.state == NativeSipCallState.CONFIRMED
+        assert callee_call.state == NativeSipCallState.CONFIRMED
+        assert caller_call.dialog.dialog_id.local_tag == "caller-tag"
+        assert caller_call.dialog.dialog_id.remote_tag == "callee-tag"
+        assert callee_call.dialog.dialog_id.local_tag == "callee-tag"
+        assert callee_call.dialog.dialog_id.remote_tag == "caller-tag"
+
+        answer_bye_task = asyncio.create_task(
+            callee.answer_bye(callee_call, timeout=1.0)
+        )
+        bye_response = await caller.hangup_call(
+            caller_call,
+            branch="z9hG4bK-bye",
+            timeout=1.0,
+        )
+        await answer_bye_task
+
+        assert bye_response.status_code == 200
+        assert caller_call.state == NativeSipCallState.TERMINATED
+        assert callee_call.state == NativeSipCallState.TERMINATED
+    finally:
+        await caller.stop()
+        await callee.stop()
+
+    caller_call_events = [
+        event.name for event in caller_timeline.events if event.category == "call"
+    ]
+    callee_call_events = [
+        event.name for event in callee_timeline.events if event.category == "call"
+    ]
+    assert caller_call_events == ["invite_sent", "confirmed", "terminated"]
+    assert callee_call_events == ["invite_received", "confirmed", "terminated"]

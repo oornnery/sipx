@@ -36,7 +36,13 @@ from sipx.sip.transport import (
     UdpAddress,
     sip_wire_event_name,
 )
-from sipx.sip.requests import create_bye_request, create_register_request
+from sipx.sip.requests import (
+    create_ack_request,
+    create_bye_request,
+    create_invite_request,
+    create_register_request,
+    create_response_for_request,
+)
 from sipx.sip.uri import SipUri
 
 __all__ = [
@@ -69,8 +75,11 @@ __all__ = [
     "TransactionEvent",
     "UdpAddress",
     "build_digest_authorization",
+    "create_ack_request",
     "create_bye_request",
+    "create_invite_request",
     "create_register_request",
+    "create_response_for_request",
     "header_tag",
     "parse_digest_challenge",
     "parse_sip_message",

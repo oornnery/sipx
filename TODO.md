@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, and real UDP Native SIP transport/backend.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, and strict UAC/UAS INVITE/ACK/BYE call flow.
 
 ## Milestone 0 - Project Grounding
 
@@ -93,7 +93,9 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement RTP packet parse/serialize and sequence stats.
 - [x] Implement DTMF RFC4733 events.
 - [x] Implement real async UDP SIP transport and NativeSipBackend send/receive runtime.
-- [ ] Implement strict mode UAC/UAS basic calls.
+- [x] Implement strict mode UAC/UAS basic INVITE/ACK/BYE calls over UDP.
+- [ ] Implement CANCEL runtime over UDP.
+- [ ] Implement REGISTER runtime orchestration over UDP.
 - [ ] Implement transaction retransmission timers for strict runtime.
 - [ ] Implement lab mode hooks for controlled malformed behavior.
 
@@ -211,6 +213,15 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added loopback UDP tests for request/response exchange, malformed datagrams, strict raw-send rejection, and receive timeout handling.
 - [ ] Kept `SPEC.md` T21 pending because integrated strict UAC/UAS call flows and transaction retransmission timers are not complete.
 
+## Block 0.8.1 Done
+
+- [x] Bumped package version to `0.8.1`.
+- [x] Added INVITE, ACK, and generic response construction helpers.
+- [x] Added strict UAC/UAS call runtime on `NativeSipBackend` for INVITE, provisional/final response, ACK, BYE, and BYE 200 OK over real UDP.
+- [x] Added `NativeSipCall`, call states, and call timeline events.
+- [x] Added loopback UDP test for INVITE -> 180/200 -> ACK -> BYE/200.
+- [ ] Kept `SPEC.md` T21 pending because CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers are not complete.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
@@ -218,7 +229,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
 - [ ] Full SIP transaction/dialog runtime remains pending after SIP/SDP/RTP/DTMF primitives.
-- [ ] Integrated strict runtime, UAC/UAS call flows, and transaction retransmission timers are still required before T21 can be marked complete.
+- [ ] CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers are still required before T21 can be marked complete.
 
 ## Open Questions
 
