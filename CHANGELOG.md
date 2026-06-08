@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.8.3 - 2026-06-08
+
+- Added real UDP REGISTER orchestration on `NativeSipBackend` for register and unregister flows.
+- Added Digest challenge retry over UDP without storing passwords in the backend flow.
+- Added REGISTER call timeline events for registered and unregistered states.
+- Added loopback UDP REGISTER tests for 401 Digest retry and `Expires: 0` unregister.
+- Kept full T21 open: transaction retransmission timers remain pending.
+
 ## 0.8.2 - 2026-06-08
 
 - Added real UDP CANCEL runtime for pending INVITE attempts.

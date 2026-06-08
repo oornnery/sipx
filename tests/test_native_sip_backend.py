@@ -6,12 +6,14 @@ from sipx import (
     HeaderMap,
     NativeSipBackend,
     NativeSipCallState,
+    RegisterClientState,
     SipRequest,
     SipResponse,
     SipUdpError,
     SipUri,
     Timeline,
     create_register_request,
+    create_response_for_request,
 )
 
 
@@ -248,3 +250,114 @@ async def _cancel_pending_invite() -> None:
     ]
     assert caller_call_events == ["invite_sent", "cancelled"]
     assert callee_call_events == ["invite_received", "cancelled"]
+
+
+def test_native_sip_backend_registers_with_digest_over_udp() -> None:
+    asyncio.run(_register_with_digest())
+
+
+async def _register_with_digest() -> None:
+    client = NativeSipBackend(actor_id="client")
+    registrar = NativeSipBackend(actor_id="registrar")
+    try:
+        await client.start()
+        await registrar.start()
+        registrar_task = asyncio.create_task(_digest_register_responder(registrar))
+
+        state = await client.register_account(
+            remote=registrar.local_address,
+            registrar=SipUri.parse("sip:example.com"),
+            aor=SipUri.parse("sip:alice@example.com"),
+            contact=SipUri.parse(f"sip:alice@127.0.0.1:{client.local_address[1]}"),
+            call_id="register-call-1",
+            branch="z9hG4bK-register",
+            from_tag="from-tag",
+            username="alice",
+            password="secret-password",
+            auth_branch="z9hG4bK-register-auth",
+            cnonce="cnonce-1",
+            timeout=1.0,
+        )
+        authorization = await registrar_task
+
+        assert state == RegisterClientState.REGISTERED
+        assert 'username="alice"' in authorization
+        assert 'nonce="nonce-1"' in authorization
+        assert "secret-password" not in authorization
+    finally:
+        await client.stop()
+        await registrar.stop()
+
+
+async def _digest_register_responder(registrar: NativeSipBackend) -> str:
+    first = await registrar.receive_event(timeout=1.0)
+    first_request = first.message
+    assert isinstance(first_request, SipRequest)
+    assert first_request.method == "REGISTER"
+    challenge = create_response_for_request(
+        request=first_request,
+        status_code=401,
+        reason="Unauthorized",
+    )
+    challenge.headers.add(
+        "WWW-Authenticate",
+        'Digest realm="example.com", nonce="nonce-1", qop="auth"',
+    )
+    await registrar.send_response(challenge, first.remote)
+
+    second = await registrar.receive_event(timeout=1.0)
+    second_request = second.message
+    assert isinstance(second_request, SipRequest)
+    authorization = second_request.headers.get("Authorization") or ""
+    ok = create_response_for_request(
+        request=second_request,
+        status_code=200,
+        reason="OK",
+    )
+    await registrar.send_response(ok, second.remote)
+    return authorization
+
+
+def test_native_sip_backend_unregisters_over_udp() -> None:
+    asyncio.run(_unregister_over_udp())
+
+
+async def _unregister_over_udp() -> None:
+    client = NativeSipBackend(actor_id="client")
+    registrar = NativeSipBackend(actor_id="registrar")
+    try:
+        await client.start()
+        await registrar.start()
+        registrar_task = asyncio.create_task(_unregister_responder(registrar))
+
+        state = await client.unregister_account(
+            remote=registrar.local_address,
+            registrar=SipUri.parse("sip:example.com"),
+            aor=SipUri.parse("sip:alice@example.com"),
+            contact=SipUri.parse(f"sip:alice@127.0.0.1:{client.local_address[1]}"),
+            call_id="unregister-call-1",
+            branch="z9hG4bK-unregister",
+            from_tag="from-tag",
+            timeout=1.0,
+        )
+        expires = await registrar_task
+
+        assert state == RegisterClientState.UNREGISTERED
+        assert expires == "0"
+    finally:
+        await client.stop()
+        await registrar.stop()
+
+
+async def _unregister_responder(registrar: NativeSipBackend) -> str:
+    event = await registrar.receive_event(timeout=1.0)
+    request = event.message
+    assert isinstance(request, SipRequest)
+    assert request.method == "REGISTER"
+    response = create_response_for_request(
+        request=request,
+        status_code=200,
+        reason="OK",
+    )
+    await registrar.send_response(response, event.remote)
+    return request.headers.get("Expires") or ""

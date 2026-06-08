@@ -15,6 +15,7 @@ from sipx.sip.requests import (
     create_invite_request,
     create_response_for_request,
 )
+from sipx.sip.register import RegisterClientFlow, RegisterClientState
 from sipx.sip.transaction import (
     InviteClientTransaction,
     InviteServerTransaction,
@@ -31,6 +32,10 @@ from sipx.sip.uri import SipUri
 
 
 class NativeSipCallError(RuntimeError):
+    pass
+
+
+class NativeSipRegisterError(RuntimeError):
     pass
 
 
@@ -164,6 +169,112 @@ class NativeSipBackend:
         event = await self.endpoint.receive_event(timeout=timeout)
         self._record_event(event)
         return event
+
+    async def register_account(
+        self,
+        *,
+        remote: UdpAddress,
+        registrar: SipUri,
+        aor: SipUri,
+        contact: SipUri,
+        call_id: str,
+        branch: str,
+        from_tag: str,
+        expires: int = 3600,
+        timeout: float = 1.0,
+        username: str | None = None,
+        password: str | None = None,
+        auth_branch: str | None = None,
+        cnonce: str = "sipx",
+    ) -> RegisterClientState:
+        flow = RegisterClientFlow(
+            registrar=registrar,
+            aor=aor,
+            contact=contact,
+            call_id=call_id,
+            from_tag=from_tag,
+            expires=expires,
+        )
+        request = flow.create_register(branch=branch)
+        transaction = NonInviteClientTransaction(request)
+        await self.send_request(request, remote)
+
+        while True:
+            event = await self._receive_matching(
+                timeout=timeout,
+                predicate=lambda item: _response_matches(
+                    item,
+                    call_id=call_id,
+                    cseq_method="REGISTER",
+                ),
+            )
+            response = event.message
+            if not isinstance(response, SipResponse):
+                continue
+            transaction.receive_response(response)
+            state = flow.receive_response(response)
+            if state is RegisterClientState.CHALLENGED:
+                if username is None or password is None:
+                    raise NativeSipRegisterError(
+                        "REGISTER challenge requires credentials"
+                    )
+                request = flow.create_authenticated_register(
+                    branch=auth_branch or f"{branch}-auth",
+                    username=username,
+                    password=password,
+                    cnonce=cnonce,
+                )
+                transaction = NonInviteClientTransaction(request)
+                await self.send_request(request, remote)
+                continue
+            if state in {
+                RegisterClientState.REGISTERED,
+                RegisterClientState.UNREGISTERED,
+            }:
+                self._record_call(
+                    "registered"
+                    if state is RegisterClientState.REGISTERED
+                    else "unregistered",
+                    call_id=call_id,
+                    data={"aor": str(aor), "registrar": str(registrar)},
+                )
+                return state
+            if state is RegisterClientState.FAILED:
+                raise NativeSipRegisterError(
+                    f"REGISTER failed with {response.status_code} {response.reason}"
+                )
+
+    async def unregister_account(
+        self,
+        *,
+        remote: UdpAddress,
+        registrar: SipUri,
+        aor: SipUri,
+        contact: SipUri,
+        call_id: str,
+        branch: str,
+        from_tag: str,
+        timeout: float = 1.0,
+        username: str | None = None,
+        password: str | None = None,
+        auth_branch: str | None = None,
+        cnonce: str = "sipx",
+    ) -> RegisterClientState:
+        return await self.register_account(
+            remote=remote,
+            registrar=registrar,
+            aor=aor,
+            contact=contact,
+            call_id=call_id,
+            branch=branch,
+            from_tag=from_tag,
+            expires=0,
+            timeout=timeout,
+            username=username,
+            password=password,
+            auth_branch=auth_branch,
+            cnonce=cnonce,
+        )
 
     async def initiate_call(
         self,

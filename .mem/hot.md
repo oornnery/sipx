@@ -36,7 +36,7 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `0.8.2`.
+- Current implementation version: `0.8.3`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
@@ -59,4 +59,5 @@
 - `NativeSipBackend` now has real UDP start/stop, send_request, send_response, lab raw datagrams, strict raw-send rejection, typed receive events, and timeline recording.
 - `NativeSipBackend` now has strict real UDP INVITE/ACK/BYE call flow with `NativeSipCall` states and call timeline events.
 - `NativeSipBackend` now has real UDP CANCEL runtime for pending INVITE attempts.
-- SPEC T21 remains pending; REGISTER over-UDP orchestration and transaction retransmission timers are not complete.
+- `NativeSipBackend` now has real UDP REGISTER/unregister orchestration with Digest challenge retry and no backend password storage.
+- SPEC T21 remains pending; transaction retransmission timers are not complete.

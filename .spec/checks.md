@@ -130,6 +130,16 @@
 | 2026-06-08 | `ruff format --check .` | pass | 55 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after CANCEL runtime block. |
+| 2026-06-08 | `python -m pytest tests/test_native_sip_backend.py` | pass | 8 loopback UDP tests passed for REGISTER orchestration before full validation. |
+| 2026-06-08 | `python -m pytest` | pass | 59 tests passed for REGISTER orchestration before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for REGISTER orchestration before formatting. |
+| 2026-06-08 | `ruff format --check .` | fail | `sipx/backends/native.py` needed formatting. |
+| 2026-06-08 | `ruff format sipx/backends/native.py` | pass | 1 file reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 59 tests passed after REGISTER orchestration formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after REGISTER orchestration formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 55 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after REGISTER orchestration block. |
 
 ## Validation Policy
 
