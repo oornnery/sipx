@@ -40,3 +40,4 @@
 | D36 | 2026-06-08 | Asterisk control method mapping remains at ARI resource level first. | T10 needs timeline evidence for channels/bridges/playback/hangup/DTMF before higher-level call facades and media port decisions. |
 | D37 | 2026-06-08 | WebSocket media is the Asterisk MVP media path. | Best project-wide tradeoff: simpler bidirectional media and flow control now, while preserving AudioSocket and ExternalMedia RTP as later paths. |
 | D38 | 2026-06-08 | Inbound Stasis example lives in `sipx.examples`, not separate docs. | Current structure remains source of truth while keeping the example executable and testable without real Asterisk. |
+| D39 | 2026-06-08 | Native technical softphone starts as a headless engine wrapper over `NativeSipBackend`. | T22 needs programmable register/call/answer behavior now; CLI/TUI/GUI and profile loading remain later clients/features. |

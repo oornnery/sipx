@@ -36,7 +36,7 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `0.9.3`.
+- Current implementation version: `0.9.4`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
@@ -70,3 +70,5 @@
 - SPEC T11 is complete: WebSocket media is the chosen Asterisk media MVP path; AudioSocket and ExternalMedia RTP are explicit future paths.
 - `sipx.examples.asterisk_stasis` now has an inbound `Stasis(sipx)` example with minimal config snippets and no-Asterisk tests.
 - SPEC T15 is complete: inbound Stasis example answers, bridges, creates WebSocket media, optionally plays greeting, and records timeline evidence.
+- `sipx.softphone.NativeSoftphone` now provides a headless technical softphone engine on `NativeSipBackend`.
+- SPEC T22 is complete: native softphone can start/stop, register/unregister, place calls, answer inbound calls, and hang up in loopback tests.

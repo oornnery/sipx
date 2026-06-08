@@ -54,6 +54,12 @@ from sipx.media import (
     TtsEngine,
 )
 from sipx.security import Redactor, default_redactor
+from sipx.softphone import (
+    NativeSoftphone,
+    NativeSoftphoneAccount,
+    NativeSoftphoneConfig,
+    NativeSoftphoneError,
+)
 from sipx.rtp import (
     DtmfEvent,
     RtpPacket,
@@ -160,6 +166,10 @@ __all__ = [
     "NativeSipInviteAttempt",
     "NativeSipRegisterError",
     "NativeSipRetransmissionPolicy",
+    "NativeSoftphone",
+    "NativeSoftphoneAccount",
+    "NativeSoftphoneConfig",
+    "NativeSoftphoneError",
     "NonInviteClientTransaction",
     "RegisterChallenge",
     "RegisterClientError",

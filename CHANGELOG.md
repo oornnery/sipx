@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.9.4 - 2026-06-08
+
+- Added headless `NativeSoftphone` engine on top of `NativeSipBackend`.
+- Added native softphone account/config models with strict/lab mode passthrough.
+- Added start/stop, register/unregister, outbound call, inbound answer, and hangup methods.
+- Added loopback UDP tests for softphone register/unregister, outbound call/hangup, and inbound answer.
+- Marked SPEC T22 complete after validation.
+
 ## 0.9.3 - 2026-06-08
 
 - Added an executable inbound `Stasis(sipx)` example under `sipx.examples.asterisk_stasis`.

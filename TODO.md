@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, and an inbound `Stasis(sipx)` example app.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, and headless native technical softphone engine.
 
 ## Milestone 0 - Project Grounding
 
@@ -101,9 +101,10 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 
 ## Milestone 6 - Technical Softphone
 
-- [ ] Implement account/profile config.
-- [ ] Implement register/unregister.
-- [ ] Implement outbound call and inbound call handlers.
+- [x] Implement headless account config.
+- [ ] Implement profile config.
+- [x] Implement register/unregister.
+- [x] Implement outbound call and inbound call handlers.
 - [ ] Implement live SIP inspector events.
 - [ ] Implement strict/lab profiles.
 - [ ] Implement lab hooks for SIP headers, SDP, timers, and malformed behavior.
@@ -287,6 +288,15 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added inbound handler that answers the channel, creates a bridge, creates WebSocket media, bridges both channels, and optionally plays a greeting.
 - [x] Added focused no-Asterisk tests for config snippets, media-event filtering, ARI request sequencing, and timeline evidence.
 - [x] Marked `SPEC.md` T15 complete after validation.
+
+## Block 0.9.4 Done
+
+- [x] Bumped package version to `0.9.4`.
+- [x] Added `NativeSoftphone`, `NativeSoftphoneAccount`, `NativeSoftphoneConfig`, and `NativeSoftphoneError`.
+- [x] Added headless start/stop, register/unregister, outbound call, inbound answer, and hangup methods over `NativeSipBackend`.
+- [x] Added strict/lab mode passthrough in softphone config while keeping profile loading pending for T29.
+- [x] Added focused loopback UDP tests for register/unregister, outbound call/hangup, and inbound answer.
+- [x] Marked `SPEC.md` T22 complete after validation.
 
 ## Blocked Or Pending
 

@@ -24,6 +24,8 @@ The Harness is the product.
 | Technical Softphone | Native SIP/RTP endpoint for engineers, automation, inspection, negative tests, scenario recording. |
 | Asterisk Integration Backend | Asterisk as PBX/media/contact-center engine controlled by Python. |
 
+The headless native technical softphone engine lives in `sipx.softphone.NativeSoftphone`.
+
 ## Main Use Cases
 
 | Use case | Required behavior |

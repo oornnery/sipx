@@ -187,6 +187,16 @@
 | 2026-06-08 | `python -m pytest` | pass | 73 tests passed after Stasis example state/design updates. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after Stasis example state/design updates. |
+| 2026-06-08 | `python -m pytest tests/test_native_softphone.py` | pass | 4 loopback UDP tests passed for headless native softphone before formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed for headless native softphone before formatting. |
+| 2026-06-08 | `ruff format --check .` | fail | `sipx/softphone/native.py` and `tests/test_native_softphone.py` needed formatting. |
+| 2026-06-08 | `ruff format sipx/softphone/native.py tests/test_native_softphone.py` | pass | 2 files reformatted. |
+| 2026-06-08 | `python -m pytest tests/test_native_softphone.py` | pass | 4 loopback UDP tests passed after formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after softphone formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 63 files already formatted. |
+| 2026-06-08 | `python -m pytest` | pass | 77 tests passed after softphone state/design updates. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after softphone state/design updates. |
 
 ## Validation Policy
 
