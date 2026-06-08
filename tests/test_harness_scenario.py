@@ -23,9 +23,11 @@ def test_harness_runs_scenario_and_writes_minimum_artifacts(tmp_path: Path) -> N
         verdict_json = json.loads((tmp_path / "run-1" / "verdict.json").read_text())
         assert verdict_json["status"] == "passed"
         assert {artifact["kind"] for artifact in verdict_json["artifacts"]} == {
+            "report",
             "timeline",
             "verdict",
         }
+        assert (tmp_path / "run-1" / "report.html").exists()
 
     asyncio.run(run())
 

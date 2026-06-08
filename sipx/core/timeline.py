@@ -77,6 +77,22 @@ class Timeline:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(self.to_jsonl(), encoding="utf-8")
 
+    @classmethod
+    def from_jsonl(cls, content: str) -> Timeline:
+        events = [
+            TimelineEvent.from_dict(json.loads(line))
+            for line in content.splitlines()
+            if line.strip()
+        ]
+        run_id = events[0].run_id if events else None
+        timeline = cls(run_id=run_id)
+        timeline.extend(events)
+        return timeline
+
+    @classmethod
+    def read_jsonl(cls, path: str | Path) -> Timeline:
+        return cls.from_jsonl(Path(path).read_text(encoding="utf-8"))
+
     def _next_ts(self, ts_ns: int | None) -> int:
         timestamp = self._clock_ns() if ts_ns is None else ts_ns
         if timestamp <= self._last_ts_ns:

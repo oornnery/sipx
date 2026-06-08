@@ -204,6 +204,17 @@
 | 2026-06-08 | `python -m pytest` | pass | 85 tests passed after lab hook state/design updates. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after lab hook block. |
+| 2026-06-08 | `python -m pytest tests/test_recorder_reports_profiles.py tests/test_protocol_fuzz.py tests/test_cli.py tests/test_harness_scenario.py tests/test_asterisk_integration.py` | pass | 17 passed, 2 skipped for recorder/report/profile/mixed/fuzz and guarded Asterisk integration. |
+| 2026-06-08 | `python -m pytest` | pass | 99 passed, 2 skipped after 1.0.0 roadmap completion. |
+| 2026-06-08 | `ruff check .` | pass | All lint checks passed after 1.0.0 roadmap completion. |
+| 2026-06-08 | `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after 1.0.0 roadmap completion. |
+| 2026-06-08 | final `python -m pytest` | pass | 99 passed, 2 skipped. Asterisk integration tests are skipped unless `SIPX_ASTERISK_INTEGRATION=1`. |
+| 2026-06-08 | final `ruff check .` | pass | All checks passed. |
+| 2026-06-08 | final `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | final `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; blocker unchanged. |
+| 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors before commit. |
+| 2026-06-08 | `docker compose -f docker/asterisk/docker-compose.yml config` | blocked | `docker` command is unavailable in this WSL environment. |
 
 ## Validation Policy
 

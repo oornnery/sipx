@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, headless native technical softphone engine, and lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, and lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes.
 
 ## Milestone 0 - Project Grounding
 
@@ -61,7 +61,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement bridge creation and channel membership.
 - [ ] Implement recording collection.
 - [x] Add minimal `Stasis(sipx)` example config.
-- [ ] Add integration tests guarded by env vars and local Asterisk availability.
+- [x] Add integration tests guarded by env vars and local Asterisk availability.
 
 ## Milestone 4 - Media And AI Runtime
 
@@ -102,20 +102,20 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 ## Milestone 6 - Technical Softphone
 
 - [x] Implement headless account config.
-- [ ] Implement profile config.
+- [x] Implement profile config.
 - [x] Implement register/unregister.
 - [x] Implement outbound call and inbound call handlers.
 - [ ] Implement live SIP inspector events.
-- [ ] Implement strict/lab profiles.
+- [x] Implement strict/lab profiles.
 - [x] Implement lab hooks for SIP headers, SDP, timers, and malformed behavior.
 - [ ] Implement call recording and transcript collection.
-- [ ] Implement scenario recorder/exporter.
-- [ ] Implement replay from timeline/artifacts.
-- [ ] Add mixed scenario example with native caller, Asterisk actor, and native agent.
+- [x] Implement scenario recorder/exporter.
+- [x] Implement replay from timeline/artifacts.
+- [x] Add mixed scenario example with native caller, Asterisk actor, and native agent.
 
 ## Milestone 7 - Optional Backends And UI
 
-- [ ] Document `PjsipBackend` as optional future backend.
+- [x] Document `PjsipBackend` as optional future backend.
 - [ ] Keep GUI/TUI out until headless engine and CLI are stable.
 - [ ] Prototype technical softphone UI only as client of the engine.
 
@@ -125,8 +125,8 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] `ruff check .`
 - [ ] `ty check` blocked: `ty` is not installed in the active Python environment.
 - [x] `pytest`
-- [ ] Parser fuzz/property tests once SIP/SDP/RTP parsers exist.
-- [ ] Asterisk integration tests only when explicit local config is present.
+- [x] Parser fuzz/property tests once SIP/SDP/RTP parsers exist.
+- [x] Asterisk integration tests only when explicit local config is present.
 
 ## Block 0.2.0 Done
 
@@ -177,7 +177,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added INVITE client transaction state handling.
 - [x] Added ACK/CANCEL helper request creation for INVITE transactions.
 - [x] Added SIP transaction/dialog tests.
-- [ ] Kept `SPEC.md` T21 pending because UAS, non-INVITE, REGISTER, Digest auth, sockets/timers, and strict runtime are not complete.
+- [x] Historical note: kept `SPEC.md` T21 pending because UAS, non-INVITE, REGISTER, Digest auth, sockets/timers, and strict runtime were not complete.
 
 ## Block 0.7.1 Done
 
@@ -186,7 +186,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added REGISTER request helper.
 - [x] Added Digest challenge parser and authorization helper.
 - [x] Added SIP auth/register tests.
-- [ ] Kept `SPEC.md` T21 pending because UAS behavior, BYE flow, sockets/timers, strict runtime, and complete REGISTER client flow are not complete.
+- [x] Historical note: kept `SPEC.md` T21 pending because UAS behavior, BYE flow, sockets/timers, strict runtime, and complete REGISTER client flow were not complete.
 
 ## Block 0.7.2 Done
 
@@ -195,7 +195,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added INVITE server transaction skeleton with failure ACK handling.
 - [x] Added BYE request helper using dialog identity and local CSeq progression.
 - [x] Added SIP transaction/dialog tests for server-side INVITE and BYE behavior.
-- [ ] Kept `SPEC.md` T21 pending because complete REGISTER client flow, sockets/timers, strict runtime, and integrated call flows are not complete.
+- [x] Historical note: kept `SPEC.md` T21 pending because complete REGISTER client flow, sockets/timers, strict runtime, and integrated call flows were not complete.
 
 ## Block 0.7.3 Done
 
@@ -204,7 +204,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added Digest challenge processing for 401/407 and authenticated REGISTER retry generation without password storage.
 - [x] Added unregister request creation via `Expires: 0`.
 - [x] Added SIP auth/register tests for REGISTER flow success, failure, auth retry, unregister, and missing challenge errors.
-- [ ] Kept `SPEC.md` T21 pending because native sockets/timers, strict runtime, and integrated call flows are not complete.
+- [x] Historical note: kept `SPEC.md` T21 pending because native sockets/timers, strict runtime, and integrated call flows were not complete.
 
 ## Block 0.8.0 Done
 
@@ -212,7 +212,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added real async UDP SIP endpoint with typed wire events, parser integration, size limits, receive timeouts, and fail-closed parse-error events.
 - [x] Added `NativeSipBackend` with real UDP start/stop, request/response send, lab-mode raw datagrams, strict-mode raw-send rejection, and timeline recording.
 - [x] Added loopback UDP tests for request/response exchange, malformed datagrams, strict raw-send rejection, and receive timeout handling.
-- [ ] Kept `SPEC.md` T21 pending because integrated strict UAC/UAS call flows and transaction retransmission timers are not complete.
+- [x] Historical note: kept `SPEC.md` T21 pending because integrated strict UAC/UAS call flows and transaction retransmission timers were not complete.
 
 ## Block 0.8.1 Done
 
@@ -221,7 +221,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added strict UAC/UAS call runtime on `NativeSipBackend` for INVITE, provisional/final response, ACK, BYE, and BYE 200 OK over real UDP.
 - [x] Added `NativeSipCall`, call states, and call timeline events.
 - [x] Added loopback UDP test for INVITE -> 180/200 -> ACK -> BYE/200.
-- [ ] Kept `SPEC.md` T21 pending because CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers are not complete.
+- [x] Historical note: kept `SPEC.md` T21 pending because CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers were not complete.
 
 ## Block 0.8.2 Done
 
@@ -230,7 +230,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added `start_invite`, `receive_invite`, `cancel_invite`, and `answer_cancel` methods on `NativeSipBackend`.
 - [x] Added real UDP CANCEL flow with 200 OK to CANCEL, 487 Request Terminated to INVITE, and ACK of the terminated INVITE.
 - [x] Added loopback UDP CANCEL test for INVITE -> CANCEL -> 200/487 -> ACK.
-- [ ] Kept `SPEC.md` T21 pending because REGISTER over-UDP orchestration and transaction retransmission timers are not complete.
+- [x] Historical note: kept `SPEC.md` T21 pending because REGISTER over-UDP orchestration and transaction retransmission timers were not complete.
 
 ## Block 0.8.3 Done
 
@@ -239,7 +239,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added Digest 401/407 retry path over UDP without backend password storage.
 - [x] Added REGISTER timeline events for registered and unregistered states.
 - [x] Added loopback UDP tests for Digest REGISTER and unregister `Expires: 0`.
-- [ ] Kept `SPEC.md` T21 pending because transaction retransmission timers are not complete.
+- [x] Historical note: kept `SPEC.md` T21 pending because transaction retransmission timers were not complete.
 
 ## Block 0.8.4 Done
 
@@ -308,13 +308,26 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added focused loopback tests for header mutation, SDP mutation, malformed send, receive hooks, timer override, and softphone hook passthrough.
 - [x] Marked `SPEC.md` T23 complete after validation.
 
+## Block 1.0.0 Done
+
+- [x] Bumped package version to `1.0.0`.
+- [x] Added `ScenarioRecorder`, scenario export artifacts, and CLI `sipx scenario export`.
+- [x] Added `sipx replay` and timeline JSONL loading.
+- [x] Added automatic `report.txt` and `report.html` artifacts for scenario runs.
+- [x] Added `Profile` config with strict/lab/account/SIP/media overrides loaded from `harness.toml`.
+- [x] Added `MixedScenario` and `MixedActorSpec` for native/Asterisk/mock actor binding on one timeline.
+- [x] Added parser fuzz/regression tests for SIP, SDP, RTP, and DTMF malformed inputs.
+- [x] Added Docker Asterisk 22 lab and opt-in ARI/Native SIP integration tests.
+- [x] Documented optional future `PjsipBackend` tradeoffs.
+- [x] Marked `SPEC.md` T24-T26 and T28-T31 complete after validation.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
 - [ ] Next Asterisk media path after WebSocket MVP remains open: AudioSocket or ExternalMedia RTP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] Profile config, recorder/export, and advanced media/runtime behavior remain pending after T23.
+- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and environment type-checking remain pending after 1.0.0.
 
 ## Open Questions
 

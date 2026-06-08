@@ -1647,6 +1647,31 @@ Usage:
 phone = await h.softphone(profile="lab_weird_sdp")
 ```
 
+Implemented profile shape uses `harness.toml` tables loaded by `load_profiles()`:
+
+```toml
+[profiles.normal]
+mode = "strict"
+backend = "native"
+
+[profiles.normal.account]
+aor = "sip:alice@example.com"
+registrar = "sip:example.com"
+remote_host = "127.0.0.1"
+remote_port = 5060
+
+[profiles.lab]
+mode = "lab"
+
+[profiles.lab.sip]
+headers = { X_Sipx = "yes" }
+allow_malformed = true
+retransmission_intervals = [0.1, 0.2]
+
+[profiles.lab.media]
+codecs = ["PCMU"]
+```
+
 ## Lab Hooks
 
 Hooks are essential for technical automation.
@@ -1723,6 +1748,8 @@ steps:
       within: 10s
 ```
 
+Implemented exports are intentionally simple: `ScenarioRecorder.from_timeline()` converts timeline events and user actions into Python or YAML text, and `sipx scenario export <timeline.jsonl>` writes the chosen export to stdout.
+
 ## Mixed Scenario
 
 This is a core differentiator.
@@ -1748,6 +1775,8 @@ async def test_inbound_to_agent(h: Harness):
 ```
 
 This validates SIP behavior seen by caller, ARI behavior seen by backend, real media flow, AI/STT/TTS behavior when present, and business flow.
+
+Implemented mixed support starts with `MixedScenario` and `MixedActorSpec`, which bind actors from different registered backends onto one shared harness timeline. Native/Asterisk/media orchestration can build on this binding layer.
 
 ## Package Layout
 
@@ -2021,6 +2050,8 @@ Tasks:
 - `report.html`.
 - `report.txt`.
 
+Implemented report behavior writes `timeline.jsonl`, `verdict.json`, `report.txt`, and `report.html` for each scenario run. Recording, transcript, and PCAP artifacts remain optional future evidence paths.
+
 ## Phase 7 - Advanced SIP Lab
 
 Tasks:
@@ -2057,6 +2088,17 @@ Optional backends:
 - `PjsipBackend` for robust softphone interop.
 - `SippBackend` for load/conformance workflows.
 - External SBC/proxy integrations when required.
+
+`PjsipBackend` tradeoffs:
+
+- Use it when robust softphone interoperability, mature NAT behavior, TLS/SRTP, or production endpoint compatibility matter more than malformed wire control.
+- Do not use it as the core protocol-lab backend because PJSIP normalizes messages and is not designed to emit arbitrary malformed SIP/SDP/RTP.
+- Keep it optional so the native SIP stack remains the source for strict/lab wire-level tests and technical-softphone fault injection.
+- Prefer adding `PjsipBackend` after profile config, native lab hooks, and Asterisk integration are stable.
+
+## Asterisk Docker Lab
+
+`docker/asterisk` provides a local Asterisk 22 lab with ARI, PJSIP, RTP ports, simple UAS extensions, and a Stasis target. Tests in `tests/test_asterisk_integration.py` are skipped by default and run only with `SIPX_ASTERISK_INTEGRATION=1`.
 
 ## Validation Gates
 

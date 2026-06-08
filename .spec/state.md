@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.9.5` adds lab-only native SIP hooks and completes SPEC T23.
+Implement `sipx` in verified commit blocks. Block `1.0.0` completes the remaining current SPEC tasks and adds the local Asterisk lab.
 
 ## Sources Read
 
@@ -143,6 +143,15 @@ Implement `sipx` in verified commit blocks. Block `0.9.5` adds lab-only native S
 - Added `NativeSoftphoneConfig.lab_hooks` passthrough to `NativeSipBackend`.
 - Added focused loopback tests for header mutation, SDP mutation, malformed send, receive hooks, timer override, and softphone hook passthrough.
 - Marked SPEC task T23 complete after validation.
+- Bumped `pyproject.toml` version from `0.9.5` to `1.0.0`.
+- Added `ScenarioRecorder`, `ScenarioAction`, timeline JSONL loading, Python/YAML exports, and CLI `sipx scenario export`.
+- Added CLI `sipx replay` and text/HTML report generation; scenario runs now write `timeline.jsonl`, `verdict.json`, `report.txt`, and `report.html`.
+- Added `Profile`, `ProfileAccount`, `SipOverrides`, `MediaOverrides`, and `load_profiles()` for `harness.toml` strict/lab/account/media overrides.
+- Added `MixedScenario` and `MixedActorSpec` to bind native, Asterisk, and mock actors onto one shared timeline.
+- Added parser fuzz/regression tests for malformed SIP, SDP, RTP, and DTMF inputs.
+- Added `docker/asterisk` Asterisk 22 lab with ARI/PJSIP/RTP config and opt-in ARI plus Native SIP integration tests.
+- Documented optional future `PjsipBackend` tradeoffs.
+- Marked SPEC tasks T24-T26 and T28-T31 complete after validation.
 
 ## Active Decision
 
@@ -152,11 +161,11 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Add recorder/export scenario from timeline + user actions for SPEC T24.
-2. Add reports with timeline, SIP, RTP, transcript, and verdict for SPEC T25.
-3. Add profile config for strict/lab/account/media overrides for SPEC T29.
-4. Add richer fake media events and example mock scenario.
-5. Decide artifact retention policy before real recordings/transcripts.
+1. Decide license before public distribution and Asterisk/commercial positioning.
+2. Sync the dev environment so `python -m ty check` can run.
+3. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest tests/test_asterisk_integration.py` after starting `docker/asterisk`.
+4. Add richer fake media events, recording/transcript artifacts, and retention policy.
+5. Add live SIP inspector and advanced RTP/media runtime behavior.
 
 ## Risks
 
@@ -166,11 +175,11 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - Recordings/transcripts are sensitive; design redaction/retention before real deployments.
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
-- T21-T23 native SIP signaling, headless softphone, and lab hooks are complete, but profile config, media wiring, and advanced runtime behavior remain pending.
-- T9-T11 and T15 Asterisk ARI control-plane, timeline mapping, WebSocket media MVP, and inbound Stasis example are complete; real Asterisk integration is still guarded/pending.
+- T21-T23 native SIP signaling, headless softphone, and lab hooks are complete; advanced media wiring and runtime behavior remain pending.
+- T9-T11, T15, and T28 Asterisk ARI control-plane, timeline mapping, WebSocket media MVP, inbound Stasis example, and Docker lab are complete; real Asterisk integration tests are guarded by env and not run by default.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
 
 ## Open Questions
 
-- Next Asterisk media backend after WebSocket MVP: AudioSocket or ExternalMedia RTP?
-- Target first user: IVR QA, contact center, or technical SIP tester?
+- License choice before public release is still open.
+- Next advanced media/runtime priority is still open: recordings/transcripts, jitter/RTCP/impairment, or AI slow-path behavior.

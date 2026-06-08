@@ -1,0 +1,14 @@
+services:
+  asterisk:
+    build:
+      context: .
+    container_name: sipx-asterisk
+    ports:
+      - "5060:5060/udp"
+      - "8088:8088/tcp"
+      - "10000-10020:10000-10020/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "asterisk -rx 'core show version' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20

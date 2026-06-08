@@ -36,12 +36,12 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `0.9.5`.
+- Current implementation version: `1.0.0`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
-- Minimum scenario artifacts now written: `timeline.jsonl` and `verdict.json`.
-- Minimal CLI exists: `sipx scenario run <file>` loads a Python file containing a `Scenario`.
+- Minimum scenario artifacts now written: `timeline.jsonl`, `verdict.json`, `report.txt`, and `report.html`.
+- CLI exists: `sipx scenario run <file>`, `sipx scenario export <timeline.jsonl>`, and `sipx replay <timeline.jsonl>`.
 - Tests currently run with plain `pytest`; async tests use `asyncio.run` because active `pytest` lacks `pytest-asyncio` plugin.
 - `ty` is declared as a dev dependency but unavailable in the active interpreter used during block `0.2.0`.
 - Media primitives now exist: `AudioFrame`, `MediaPort`, `TranscriptEvent`, STT/TTS protocols, `BargeInPolicy`.
@@ -75,3 +75,8 @@
 - `NativeSipBackend` now has lab-only `NativeSipLabHooks` for before-send message mutation/raw bytes, before-SDP-body mutation, after-receive observation/filtering, and retransmission interval overrides.
 - `NativeSoftphoneConfig` now passes lab hooks to the underlying native backend.
 - SPEC T23 is complete: lab hooks cover headers, SDP, timers, malformed SIP bytes, and receive events while strict mode rejects hooks.
+- `ScenarioRecorder` exports timeline/user actions to Python or YAML; `Timeline.read_jsonl()` supports replay/export input.
+- `Profile` config loads strict/lab/account/SIP/media overrides from `harness.toml`.
+- `MixedScenario` binds native, Asterisk, and mock actors onto one shared harness timeline.
+- `docker/asterisk` provides an Asterisk 22 lab for opt-in ARI and Native SIP integration tests.
+- SPEC T24-T26 and T28-T31 are complete; remaining work is beyond current SPEC table: license, type-check env, richer media/runtime, recordings/transcripts, UI.

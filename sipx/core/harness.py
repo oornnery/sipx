@@ -9,6 +9,7 @@ from sipx.core.artifacts import ArtifactKind, ArtifactStore
 from sipx.core.capabilities import UnsupportedExpectation
 from sipx.core.expect import ExpectationFailure
 from sipx.core.metrics import Metrics
+from sipx.core.reports import write_report_artifacts
 from sipx.core.timeline import Timeline
 from sipx.core.verdict import Verdict
 
@@ -98,11 +99,12 @@ class Harness:
             "verdict.json", kind=ArtifactKind.VERDICT
         )
         verdict.artifacts.append(verdict_artifact)
-        verdict_artifact.path.parent.mkdir(parents=True, exist_ok=True)
-        verdict_artifact.path.write_text(
-            verdict.to_json(),
-            encoding="utf-8",
+        verdict.artifacts.extend(
+            write_report_artifacts(self.artifacts, self.timeline, verdict)
         )
+
+        verdict_artifact.path.parent.mkdir(parents=True, exist_ok=True)
+        verdict_artifact.path.write_text(verdict.to_json(), encoding="utf-8")
         return verdict
 
     async def run_scenario(self, scenario: Any) -> Verdict:

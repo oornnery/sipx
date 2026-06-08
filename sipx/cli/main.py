@@ -6,7 +6,14 @@ import runpy
 from collections.abc import Sequence
 from pathlib import Path
 
-from sipx.core import Harness, Scenario, Verdict
+from sipx.core import (
+    Harness,
+    Scenario,
+    ScenarioRecorder,
+    Timeline,
+    Verdict,
+    render_text_report,
+)
 
 
 def load_scenario(path: str | Path) -> Scenario:
@@ -46,6 +53,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory where run artifacts are written.",
     )
 
+    export_parser = scenario_subcommands.add_parser("export")
+    export_parser.add_argument("timeline")
+    export_parser.add_argument("--name", default="recorded_scenario")
+    export_parser.add_argument(
+        "--format",
+        choices=("python", "yaml"),
+        default="python",
+    )
+
+    replay_parser = subcommands.add_parser("replay")
+    replay_parser.add_argument("timeline")
+
     return parser
 
 
@@ -60,6 +79,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         reason = f": {verdict.reason}" if verdict.reason else ""
         print(f"{verdict.status}{reason}")
         return 0 if verdict.status == "passed" else 1
+
+    if args.command == "scenario" and args.scenario_command == "export":
+        recorder = ScenarioRecorder.from_timeline(
+            Timeline.read_jsonl(args.timeline),
+            name=args.name,
+        )
+        output = (
+            recorder.export_python()
+            if args.format == "python"
+            else recorder.export_yaml()
+        )
+        print(output, end="")
+        return 0
+
+    if args.command == "replay":
+        timeline = Timeline.read_jsonl(args.timeline)
+        print(render_text_report(timeline, Verdict.passed(reason="replay")), end="")
+        return 0
 
     parser.error("unsupported command")
     return 2

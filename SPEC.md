@@ -117,14 +117,14 @@ T20|x|implement DTMF RFC4733 encoder/decoder + event model|V11,T19
 T21|x|implement basic UAC/UAS INVITE/ACK/BYE/CANCEL/REGISTER|C4,V7,V15
 T22|x|implement headless technical softphone on `NativeSipBackend`|G1,C4,V15,V17
 T23|x|add lab hooks for headers/SDP/timers/malformed SIP|V15,V20,T22
-T24|.|add recorder/export scenario from timeline + user actions|V16,V19,I.artifact
-T25|.|add HTML/text reports with timeline, SIP, RTP, transcript, verdict|V4,V16
-T26|.|add fuzz/property tests for SIP/SDP/RTP/DTMF parsers|V8,T16,T18,T19,T20
+T24|x|add recorder/export scenario from timeline + user actions|V16,V19,I.artifact
+T25|x|add HTML/text reports with timeline, SIP, RTP, transcript, verdict|V4,V16
+T26|x|add fuzz/property tests for SIP/SDP/RTP/DTMF parsers|V8,T16,T18,T19,T20
 T27|x|add central redaction for logs/artifacts|V13
-T28|.|add interop lab with Asterisk 22 LTS and basic scenarios|C3,V14
-T29|.|add profile config for strict/lab/account/media overrides|V15,V21,I.api
-T30|.|add mixed scenario support: native caller + Asterisk backend + native agent|V22,I.api
-T31|.|document optional future `PjsipBackend` tradeoffs|C15,I.backend
+T28|x|add interop lab with Asterisk 22 LTS and basic scenarios|C3,V14
+T29|x|add profile config for strict/lab/account/media overrides|V15,V21,I.api
+T30|x|add mixed scenario support: native caller + Asterisk backend + native agent|V22,I.api
+T31|x|document optional future `PjsipBackend` tradeoffs|C15,I.backend
 T32|x|consolidate detailed implementation context into current structure, not `/docs`|C17,V23
 
 ## §B

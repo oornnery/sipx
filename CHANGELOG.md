@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 1.0.0 - 2026-06-08
+
+- Added `ScenarioRecorder`, `ScenarioAction`, timeline JSONL replay loading, and CLI `sipx scenario export` for Python/YAML exports.
+- Added text and HTML report generation; scenario runs now write `report.txt` and `report.html` alongside timeline and verdict artifacts.
+- Added `Profile`, account/SIP/media override config, and `harness.toml` profile loading for strict and lab behavior separation.
+- Added `MixedScenario` actor binding for native, Asterisk, and mock actors on one shared timeline.
+- Added parser fuzz/regression tests for SIP, SDP, RTP, and RFC4733 DTMF rejection paths.
+- Added `docker/asterisk` Asterisk 22 lab with ARI/PJSIP/RTP config and opt-in integration tests for ARI and Native SIP calling Asterisk as UAS.
+- Documented optional future `PjsipBackend` tradeoffs.
+- Marked SPEC T24-T26 and T28-T31 complete after validation.
+
 ## 0.9.5 - 2026-06-08
 
 - Added lab-only `NativeSipLabHooks` for before-send, before-SDP-body, after-receive, and retransmission interval overrides.

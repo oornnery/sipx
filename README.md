@@ -12,7 +12,7 @@ The Harness is the product.
 
 ## Status
 
-This repository is at planning and architecture stage. The maintained English files in the current project structure are the implementation source of truth. `IDEA.md` is historical source material only and should not be required to implement the project.
+This repository has an initial working harness implementation. The maintained English files in the current project structure are the implementation source of truth. `IDEA.md` is historical source material only and should not be required to implement the project.
 
 The implementation should follow:
 
@@ -228,6 +228,29 @@ pytest
 ```
 
 Integration tests that require Asterisk must be explicitly configured and must not depend on real secrets committed to the repository.
+
+Useful CLI commands:
+
+```bash
+sipx scenario run path/to/scenario.py --artifacts-dir artifacts
+sipx scenario export artifacts/<run_id>/timeline.jsonl --format python
+sipx replay artifacts/<run_id>/timeline.jsonl
+```
+
+## Asterisk Lab
+
+The repo includes a local Asterisk 22 lab under `docker/asterisk` for backend and Native SIP integration work.
+
+```bash
+docker compose -f docker/asterisk/docker-compose.yml up --build
+SIPX_ASTERISK_INTEGRATION=1 python -m pytest tests/test_asterisk_integration.py
+```
+
+Default lab-only endpoints:
+
+- ARI: `http://127.0.0.1:8088/ari`, user `sipx`, password `sipx`.
+- SIP UDP: `127.0.0.1:5060`.
+- Native SIP UAS tests: `sip:1000@127.0.0.1:5060` and `sip:1001@127.0.0.1:5060`.
 
 ## Security Notes
 
