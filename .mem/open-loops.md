@@ -11,3 +11,4 @@
 | O7 | Config format? | `harness.toml`, YAML scenarios, Python-only first | Before scenario runner UX. |
 | O8 | Native SIP scope for v0.1? | parser only, UAC only, UAC+UAS, REGISTER included | Before backend implementation. |
 | O9 | PJSIP backend priority? | before native lab mode, after native lab mode, never unless demanded | Before optional backend work. |
+| O10 | Type-check environment? | install/sync `ty`, use existing executable, or defer type gate | Before claiming full validation gate. |

@@ -26,6 +26,16 @@
 | 2026-06-08 | final current-structure Portuguese-term scan | pass except `example.com` | Maintained docs are English; matches are SIP example domains and prior check notes. |
 | 2026-06-08 | final current-structure trailing whitespace scan | pass/no output | `README.md`, `SPEC.md`, `DESIGN.md`, `TODO.md`, `.spec/*`, `.mem/*`. |
 | 2026-06-08 | final `git diff --check` | pass/no output | Consolidation complete. |
+| 2026-06-08 | `python -m pytest` | fail | Active `pytest` lacked async plugin for `pytest.mark.asyncio`; recorded as `SPEC.md` §B B1 and changed tests to `asyncio.run`. |
+| 2026-06-08 | `ruff check .` | fail | Unused import in `sipx/cli/main.py`; removed. |
+| 2026-06-08 | `python -m pytest` | pass | 8 tests passed after async test adjustment. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after import fix. |
+| 2026-06-08 | `ruff format --check .` | fail | 4 files needed formatting; fixed with `ruff format .`. |
+| 2026-06-08 | `ruff format .` | pass | 4 files reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 8 tests passed after formatting. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after formatting. |
+| 2026-06-08 | `ruff format --check .` | pass | 22 files already formatted. |
+| 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; active environment is missing the declared dev tool. |
 
 ## Validation Policy
 

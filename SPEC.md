@@ -95,19 +95,19 @@ V23: implementation work ! rely on maintained current-structure docs; `IDEA.md` 
 id|status|task|cites
 ---|---|---|---
 T1|x|update README/metadata: `sipx` identity, Python >=3.14, harness positioning|G1,C1,C13
-T2|.|create base package `sipx.core`: events, timeline, verdict, artifacts, metrics|V1,V3,V4,V16
-T3|.|define `BackendCapability` + `UnsupportedExpectation` error|V2,V6
-T4|.|implement `Harness`, `Actor`, `Scenario` async skeleton|V1,I.api
-T5|.|implement JSONL timeline + actor/call/leg correlation|V3,I.api
-T6|.|implement result/verdict/artifact model|V4,V16
-T7|.|implement `expect()` core: within/during/not_before + rich failure|V4,V5,I.api
-T8|.|create `MockBackend` for unit tests without network|I.backend
+T2|x|create base package `sipx.core`: events, timeline, verdict, artifacts, metrics|V1,V3,V4,V16
+T3|x|define `BackendCapability` + `UnsupportedExpectation` error|V2,V6
+T4|x|implement `Harness`, `Actor`, `Scenario` async skeleton|V1,I.api
+T5|x|implement JSONL timeline + actor/call/leg correlation|V3,I.api
+T6|x|implement result/verdict/artifact model|V4,V16
+T7|x|implement `expect()` core: within/during/not_before + rich failure|V4,V5,I.api
+T8|x|create `MockBackend` for unit tests without network|I.backend
 T9|.|create `AsteriskBackend` async ARI client + WebSocket events|V14,I.backend
 T10|.|map ARI channels/bridges/playback/hangup/DTMF to timeline|V3,V14
 T11|.|add Asterisk media port: choose WebSocket/AudioSocket/ExternalMedia MVP|C3,V10,I.backend
 T12|.|define `AudioFrame`, `MediaPort`, STT/TTS protocols and barge-in policy|V10,V11,I.api
-T13|.|create scenario runner + artifacts directory layout|V4,V16,I.cmd
-T14|.|add minimal CLI `sipx scenario run`|I.cmd,T13
+T13|x|create scenario runner + artifacts directory layout|V4,V16,I.cmd
+T14|x|add minimal CLI `sipx scenario run`|I.cmd,T13
 T15|.|implement inbound Asterisk app via Stasis example|C3,V14
 T16|.|implement `NativeSipBackend` SIP parser/serializer sans-I/O|C4,V7,V8
 T17|.|implement robust URI/HeaderMap/Content-Length + tests|V8,T16
@@ -131,3 +131,4 @@ T32|x|consolidate detailed implementation context into current structure, not `/
 
 id|date|cause|fix
 ---|---|---|---
+B1|2026-06-08|tests used `pytest.mark.asyncio` but active `pytest` lacked async plugin|tests use `asyncio.run`; no new §V, product spec unchanged

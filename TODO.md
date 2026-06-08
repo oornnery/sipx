@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Turn `IDEA.md` into an executable project plan for `sipx`: a Python Voice/SIP Harness with Asterisk-backed MVP and native SIP/RTP backend for technical softphone and protocol-level validation.
+Implement `sipx` in small verified blocks. Current block delivered the harness core skeleton, mock backend, scenario artifacts, and minimal CLI; next blocks should deepen mock/scenario behavior before real Asterisk or native SIP work.
 
 ## Milestone 0 - Project Grounding
 
@@ -31,23 +31,24 @@ Turn `IDEA.md` into an executable project plan for `sipx`: a Python Voice/SIP Ha
 
 ## Milestone 1 - Harness Core
 
-- [ ] Create `sipx/core/event.py` with `TimelineEvent`.
-- [ ] Create `sipx/core/timeline.py` with monotonic event recording and JSONL export.
-- [ ] Create `sipx/core/verdict.py` with `passed|failed|error|skipped`.
-- [ ] Create `sipx/core/artifacts.py` with artifact registry and output paths.
-- [ ] Create `sipx/core/actor.py` with actor identity and backend binding.
-- [ ] Create `sipx/core/scenario.py` with async scenario runner skeleton.
-- [ ] Create `sipx/core/expect.py` with `within`, `during`, rich failure data.
-- [ ] Create `sipx/core/capabilities.py` with backend capability model.
-- [ ] Add unit tests for timeline ordering, verdict generation, and unsupported expectation behavior.
+- [x] Create `sipx/core/event.py` with `TimelineEvent`.
+- [x] Create `sipx/core/timeline.py` with monotonic event recording and JSONL export.
+- [x] Create `sipx/core/verdict.py` with `passed|failed|error|skipped`.
+- [x] Create `sipx/core/artifacts.py` with artifact registry and output paths.
+- [x] Create `sipx/core/actor.py` with actor identity and backend binding.
+- [x] Create `sipx/core/scenario.py` with async scenario runner skeleton.
+- [x] Create `sipx/core/expect.py` with `within`, `during`, `not_before`, and rich failure data.
+- [x] Create `sipx/core/capabilities.py` with backend capability model.
+- [x] Add unit tests for timeline ordering, verdict generation, and unsupported expectation behavior.
 
 ## Milestone 2 - Mock Backend And CLI
 
-- [ ] Create `MockBackend` for deterministic scenario tests without network.
-- [ ] Add fake calls, fake media events, and fake SIP events.
-- [ ] Add CLI entrypoint.
-- [ ] Implement `sipx scenario run <file>` skeleton.
-- [ ] Implement artifact output directory convention.
+- [x] Create `MockBackend` for deterministic scenario tests without network.
+- [x] Add fake calls, fake SIP final response events, DTMF events, and hangup events.
+- [x] Add CLI entrypoint.
+- [x] Implement `sipx scenario run <file>` skeleton.
+- [x] Implement artifact output directory convention.
+- [ ] Add fake media events beyond SIP/DTMF.
 - [ ] Add an example scenario using mock backend in the current documentation structure.
 
 ## Milestone 3 - AsteriskBackend MVP
@@ -106,12 +107,26 @@ Turn `IDEA.md` into an executable project plan for `sipx`: a Python Voice/SIP Ha
 
 ## Validation Gates
 
-- [ ] `ruff format --check .`
-- [ ] `ruff check .`
-- [ ] `ty check`
-- [ ] `pytest`
+- [x] `ruff format --check .`
+- [x] `ruff check .`
+- [ ] `ty check` blocked: `ty` is not installed in the active Python environment.
+- [x] `pytest`
 - [ ] Parser fuzz/property tests once SIP/SDP/RTP parsers exist.
 - [ ] Asterisk integration tests only when explicit local config is present.
+
+## Block 0.2.0 Done
+
+- [x] Bumped package version to `0.2.0`.
+- [x] Created `CHANGELOG.md`.
+- [x] Updated `AGENTS.md` with the preferred block delivery pipeline.
+- [x] Added `sipx` package exports and CLI script metadata.
+- [x] Added tests for core harness behavior and minimal CLI.
+
+## Blocked Or Pending
+
+- [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
+- [ ] Asterisk media path decision remains open before AsteriskBackend MVP.
+- [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 
 ## Open Questions
 

@@ -1,10 +1,13 @@
 [project]
 name = "sipx"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python programmable Voice/SIP harness for call automation, IVR testing, technical softphones, and media validation"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = []
+
+[project.scripts]
+sipx = "sipx.cli.main:main"
 
 [dependency-groups]
 dev = [

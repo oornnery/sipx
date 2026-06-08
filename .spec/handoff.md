@@ -2,7 +2,7 @@
 
 ## Summary
 
-Project planning environment was initialized from `IDEA.md`. No product code exists yet beyond `pyproject.toml`; `README.md` is empty.
+Project planning environment was initialized from `IDEA.md`. Block `0.2.0` added initial product code: harness core, mock backend, scenario artifacts, and minimal CLI.
 
 ## Read First
 
@@ -31,14 +31,16 @@ Build `sipx` as a Python Voice/SIP Harness:
 - Mixed scenarios should support native actors and Asterisk actors in one timeline.
 - PJSIP/PJSUA2 is optional future backend, not the native protocol-lab foundation.
 - Maintained English files in the current structure are the implementation source of truth; `IDEA.md` is historical only; no separate `/docs` tree is used.
+- Work should proceed in small commit blocks. Every block bumps version, updates `CHANGELOG.md`, `TODO.md`, `.spec/*`, and `.mem/*`, validates, then commits with explicit staged paths.
 
 ## Recommended Next Task
 
-Start with `TODO.md` Milestone 0:
+Continue after block `0.2.0`:
 
-1. Choose first Asterisk media path.
-2. Implement `sipx/core` skeleton.
-3. Add `MockBackend` and first CLI command.
+1. Add richer mock media events and an example scenario.
+2. Add redaction utilities for logs/artifacts before recordings/transcripts expand.
+3. Choose first Asterisk media path.
+4. Start AsteriskBackend only after the media path decision.
 
 ## Do Not Do Yet
 
@@ -46,3 +48,10 @@ Start with `TODO.md` Milestone 0:
 - Do not couple public API to Asterisk.
 - Do not write real Asterisk secrets/config with credentials.
 - Do not use AI semantic assertions as the only pass/fail check.
+
+## Latest Validation
+
+- `python -m pytest`: pass, 8 tests.
+- `ruff check .`: pass.
+- `ruff format --check .`: pass.
+- `python -m ty check`: blocked, active interpreter has no `ty` module.

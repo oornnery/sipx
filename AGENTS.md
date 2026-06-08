@@ -71,6 +71,19 @@ Stack-specific detail belongs in an `AGENTS.*.md` overlay or a skill reference.
 6. Update project state when scope, decisions, validation, or next steps changed
 7. Report files changed, behavior changed, validation run, and unresolved items
 
+## Project Delivery Pipeline
+
+- Implement in small commit blocks, not one giant change
+- Each implementation block must bump `pyproject.toml` version
+- Each implementation block must update or create `CHANGELOG.md`
+- Each implementation block must update `TODO.md` with done, pending, and blocked items
+- Each implementation block must update `.spec/state.md`, `.spec/checks.md`, and `.spec/handoff.md`
+- Each implementation block must update `.mem/hot.md`, `.mem/decisions.md`, or `.mem/open-loops.md` when facts, decisions, or unresolved questions changed
+- Mark `SPEC.md` §T status only after verification proves the task done
+- Commit only after validation; include the version/docs/state updates in the same block commit
+- Stage files explicitly by path; never use `git add .` or `git add -A`
+- Leave unrelated untracked or dirty files untouched unless the user explicitly says to include them
+
 ## Planning Rules
 
 Use a brief plan for new features, ambiguous work, multi-file changes, risky refactors, or debugging with unknown cause.

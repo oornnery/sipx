@@ -19,3 +19,6 @@
 | D15 | 2026-06-08 | PJSIP/PJSUA2 is optional future backend. | Useful for robust softphone interop, but weaker for malformed/wire-level lab control. |
 | D16 | 2026-06-08 | Mixed native/Asterisk scenarios are required. | Final architecture needs native actors, Asterisk actors, and remote targets in one timeline. |
 | D17 | 2026-06-08 | Maintained English files in current structure replace `IDEA.md` for implementation context. | User wants no dependency on `IDEA.md` and no separate `/docs`; all implementation details must be explicit in `README.md`, `SPEC.md`, `DESIGN.md`, `TODO.md`, `.spec/*`, and `.mem/*`. |
+| D18 | 2026-06-08 | Implementation proceeds in small committed blocks with version, changelog, TODO, spec state, and memory updates every time. | User explicitly requested this pipeline so other agents follow the same flow. |
+| D19 | 2026-06-08 | Initial tests avoid `pytest-asyncio` markers and use `asyncio.run`. | Active `pytest` did not load the async plugin; plain pytest compatibility keeps validation runnable. |
+| D20 | 2026-06-08 | `Harness()` defaults to `MockBackend`. | Enables no-network unit tests and CLI skeleton before Asterisk or native SIP backends exist. |
