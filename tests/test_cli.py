@@ -5,6 +5,7 @@ import tomllib
 import pytest
 
 from sipx.cli.main import main
+from sipx.sip import HeaderMap, SipResponse
 
 
 def test_pyproject_defines_installable_sipx_console_script() -> None:
@@ -184,6 +185,176 @@ def test_cli_register_help_shows_account_flags(capsys) -> None:
     assert exc_info.value.code == 0
     assert "--aor" in output
     assert "--registrar" in output
+    assert "examples:" in output
+
+
+def test_cli_options_sends_sip_request_without_profile(monkeypatch, capsys) -> None:
+    created = {}
+
+    class FakeNativeSipBackend:
+        def __init__(self, **kwargs) -> None:
+            created["backend_kwargs"] = kwargs
+            self.local_address = ("127.0.0.1", 45000)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def send_request(self, request, remote) -> None:
+            created["request"] = request
+            created["remote"] = remote
+
+        async def receive_event(self, *, timeout=None):
+            headers = HeaderMap()
+            headers.add("Call-ID", created["request"].headers.get("Call-ID"))
+            headers.add("CSeq", created["request"].headers.get("CSeq"))
+            return SimpleNamespace(
+                message=SipResponse(status_code=200, reason="OK", headers=headers)
+            )
+
+    monkeypatch.setattr("sipx.cli.main.NativeSipBackend", FakeNativeSipBackend)
+
+    code = main(["options", "sip:pbx.example.com", "--from", "sip:alice@example.com"])
+
+    request = created["request"]
+    assert code == 0
+    assert request.method == "OPTIONS"
+    assert str(request.uri) == "sip:pbx.example.com"
+    assert request.headers.get("From").startswith("<sip:alice@example.com>;tag=")
+    assert request.headers.get("To") == "<sip:pbx.example.com>"
+    assert created["remote"] == ("pbx.example.com", 5060)
+    assert "< 200 OK" in capsys.readouterr().out
+
+
+def test_cli_message_sends_text_body_and_headers(monkeypatch, capsys) -> None:
+    created = {}
+
+    class FakeNativeSipBackend:
+        def __init__(self, **kwargs) -> None:
+            self.local_address = ("127.0.0.1", 45001)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def send_request(self, request, remote) -> None:
+            created["request"] = request
+            created["remote"] = remote
+
+        async def receive_event(self, *, timeout=None):
+            headers = HeaderMap()
+            headers.add("Call-ID", created["request"].headers.get("Call-ID"))
+            headers.add("CSeq", created["request"].headers.get("CSeq"))
+            return SimpleNamespace(
+                message=SipResponse(status_code=202, reason="Accepted", headers=headers)
+            )
+
+    monkeypatch.setattr("sipx.cli.main.NativeSipBackend", FakeNativeSipBackend)
+
+    code = main(
+        [
+            "message",
+            "sip:bob@example.com",
+            "hello",
+            "--from",
+            "sip:alice@example.com",
+            "-H",
+            "X-Test: yes",
+        ]
+    )
+
+    request = created["request"]
+    assert code == 0
+    assert request.method == "MESSAGE"
+    assert request.body == b"hello"
+    assert request.headers.get("Content-Type") == "text/plain"
+    assert request.headers.get("X-Test") == "yes"
+    assert created["remote"] == ("example.com", 5060)
+    assert "< 202 Accepted" in capsys.readouterr().out
+
+
+def test_cli_generic_request_supports_data_and_include(monkeypatch, capsys) -> None:
+    created = {}
+
+    class FakeNativeSipBackend:
+        def __init__(self, **kwargs) -> None:
+            self.local_address = ("127.0.0.1", 45002)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def send_request(self, request, remote) -> None:
+            created["request"] = request
+
+        async def receive_event(self, *, timeout=None):
+            headers = HeaderMap()
+            headers.add("Call-ID", created["request"].headers.get("Call-ID"))
+            headers.add("CSeq", created["request"].headers.get("CSeq"))
+            headers.add("X-Reply", "yes")
+            return SimpleNamespace(
+                message=SipResponse(
+                    status_code=200,
+                    reason="OK",
+                    headers=headers,
+                    body=b"pong",
+                )
+            )
+
+    monkeypatch.setattr("sipx.cli.main.NativeSipBackend", FakeNativeSipBackend)
+
+    code = main(
+        [
+            "request",
+            "INFO",
+            "sip:bob@example.com",
+            "--from",
+            "sip:alice@example.com",
+            "-H",
+            "Content-Type: application/dtmf-relay",
+            "-d",
+            "Signal=1",
+            "--include",
+        ]
+    )
+
+    request = created["request"]
+    output = capsys.readouterr().out
+    assert code == 0
+    assert request.method == "INFO"
+    assert request.body == b"Signal=1"
+    assert "X-Reply: yes" in output
+    assert output.endswith("pong")
+
+
+def test_cli_request_requires_from_identity(monkeypatch, capsys) -> None:
+    def fail_if_network_starts(**kwargs):
+        raise AssertionError("NativeSipBackend must not be constructed")
+
+    monkeypatch.setattr("sipx.cli.main.NativeSipBackend", fail_if_network_starts)
+
+    code = main(["options", "sip:pbx.example.com"])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "requires --from/--aor" in captured.err
+
+
+def test_cli_request_help_shows_curl_like_flags(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["request", "--help"])
+
+    output = capsys.readouterr().out
+    assert exc_info.value.code == 0
+    assert "-H" in output
+    assert "--data" in output
+    assert "--body-file" in output
     assert "examples:" in output
 
 

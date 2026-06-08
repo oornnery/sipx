@@ -64,6 +64,9 @@ cmd: `sipx phone unregister [profile]` → unregister headless softphone.
 cmd: `sipx phone call <target>` → manual/automated outbound call.
 cmd: `sipx phone listen [profile]` → answer inbound call.
 cmd: `sipx register|unregister|call|listen` → top-level operational aliases.
+cmd: `sipx options <target>` → SIP OPTIONS probe over UDP.
+cmd: `sipx message <target> [text]` → SIP MESSAGE over UDP.
+cmd: `sipx request <method> <target>` → generic SIP request over UDP with headers/body flags.
 cmd: `sipx replay <timeline.jsonl>` → replay/inspection.
 ci: `.github/workflows/ci.yml` → uv sync, console-script smoke, ruff, pytest, build.
 ci: `.github/workflows/asterisk.yml` → Docker Asterisk lab + opt-in integration tests.
@@ -101,6 +104,7 @@ V24: `cmd: sipx` ! runnable via package-manager console script from repo root.
 V25: operational softphone CLI ! build `NativeSoftphoneConfig` from profile or explicit account args; tests must not require network.
 V26: GitHub workflows ! use current project metadata/commands; ⊥ old `_version.py`, old Python pin, or task-only aliases.
 V27: phone CLI network commands ! fail before network unless profile or explicit SIP identity exists; help must show required account flags/examples.
+V28: curl-like SIP CLI ! require explicit From identity, support headers/body flags, and derive remote from target/registrar/profile without silent localhost default.
 
 ## §T
 
@@ -141,6 +145,7 @@ T32|x|consolidate detailed implementation context into current structure, not `/
 T33|x|add operational softphone/profile CLI commands plus no-network CLI tests|V17,V21,V24,V25,I.cmd
 T34|x|adapt GitHub CI, Asterisk integration, draft release, and PyPI publish workflows|V24,V26,I.ci
 T35|x|backprop phone CLI missing-config UX: no silent localhost network defaults|V25,V27,I.cmd
+T36|x|add curl-like SIP `options`, `message`, and generic `request` CLI|V24,V27,V28,I.cmd
 
 ## §B
 

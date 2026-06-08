@@ -256,6 +256,16 @@
 | 2026-06-08 | `uv run ty check` | fail | 29 existing diagnostics remain; B5/V27 fix did not add a new diagnostic. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors before check/state log updates. |
 | 2026-06-08 | `uv build --out-dir /tmp/opencode/sipx-build-1.1.1-final` | pass | Built final `1.1.1` sdist and wheel outside the repo. |
+| 2026-06-08 | `uv run sipx --help` | pass | Help lists raw SIP `options`, `message`, and `request` commands. |
+| 2026-06-08 | `uv run sipx request --help` | pass | Shows `--from/--aor`, `-H/--header`, `-d/--data`, `--body-file`, `--include`, and examples. |
+| 2026-06-08 | `uv run sipx options sip:pbx.example.com` | fail-fast expected | Exits with local missing-From error before network access. |
+| 2026-06-08 | `python -m pytest tests/test_cli.py` | pass | 15 CLI tests passed after raw SIP request commands. |
+| 2026-06-08 | `python -m pytest` | pass | 111 passed, 2 skipped after raw SIP request commands. |
+| 2026-06-08 | `ruff check .` | pass | All lint checks passed after raw SIP request commands. |
+| 2026-06-08 | `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | `uv run ty check` | fail | 29 existing diagnostics remain; raw SIP CLI did not add a new diagnostic. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors before final build. |
+| 2026-06-08 | `uv build --out-dir /tmp/opencode/sipx-build-1.2.0-final` | pass | Built final `1.2.0` sdist and wheel outside the repo. |
 
 ## Validation Policy
 

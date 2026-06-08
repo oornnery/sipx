@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.2.0 - 2026-06-08
+
+- Added curl-like SIP CLI commands: `sipx options`, `sipx message`, and generic `sipx request <method> <target>`.
+- Added `--from/--aor`, `--registrar`, `--remote-host`, `--remote-port`, `-H/--header`, `-d/--data`, `--body-file`, `--content-type`, `--include`, and `--no-wait` request flags.
+- Added no-network CLI tests for SIP OPTIONS, MESSAGE, generic requests, missing identity, and request help.
+- Bumped package version to `1.2.0`.
+
 ## 1.1.1 - 2026-06-08
 
 - Fixed `sipx register` without profile or account flags so it fails before opening a SIP socket instead of timing out against localhost defaults.

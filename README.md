@@ -244,9 +244,14 @@ sipx phone listen lab --config harness.toml --duration 30
 sipx register lab --config harness.toml
 sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password secret
 sipx call sip:6000@pbx.lab --profile lab --duration 5
+sipx options sip:pbx.lab --from sip:1001@example.com -i
+sipx message sip:1002@pbx.lab 'hello' --from sip:1001@example.com
+sipx request INFO sip:1002@pbx.lab --from sip:1001@example.com -H 'Content-Type: application/dtmf-relay' -d 'Signal=1'
 ```
 
 Phone commands that touch the network require either a profile or explicit `--aor` and `--registrar` flags. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the registrar host and port.
+
+Raw SIP request commands require `--from`/`--aor` or a profile with `account.aor`. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the target URI host/port, falling back to registrar/profile remote settings when provided.
 
 GitHub automation lives under `.github/workflows`:
 

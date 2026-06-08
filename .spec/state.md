@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.1.1` backpropagates phone CLI missing-config UX and makes network commands fail fast before opening sockets.
+Implement `sipx` in verified commit blocks. Block `1.2.0` adds curl-like raw SIP CLI commands on top of `NativeSipBackend`.
 
 ## Sources Read
 
@@ -171,6 +171,11 @@ Implement `sipx` in verified commit blocks. Block `1.1.1` backpropagates phone C
 - Added fail-fast phone CLI validation: commands require a profile or explicit `--aor` and `--registrar` before opening network sockets.
 - Phone commands now derive default remote host and port from `--registrar` when `--remote-host` and `--remote-port` are omitted.
 - Added phone CLI help examples and no-network regression tests for missing config, explicit register config, and help output.
+- Bumped `pyproject.toml` version from `1.1.1` to `1.2.0`.
+- Added `sipx options <target>`, `sipx message <target> [text]`, and `sipx request <method> <target>`.
+- Added raw SIP request flags: `--from/--aor`, `--registrar`, `--remote-host`, `--remote-port`, `-H/--header`, `-d/--data`, `--body-file`, `--content-type`, `--include`, and `--no-wait`.
+- Raw SIP request commands build minimal Via/From/To/Call-ID/CSeq/Contact/Max-Forwards headers, send via `NativeSipBackend`, and match responses by Call-ID/CSeq.
+- Added no-network tests for OPTIONS, MESSAGE, generic INFO request, missing From identity, and request help output.
 
 ## Active Decision
 
@@ -203,4 +208,4 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 - License choice before public release is still open.
 - Next advanced media/runtime priority is still open: recordings/transcripts, jitter/RTCP/impairment, or AI slow-path behavior.
-- GitHub release draft policy after `1.1.1` should keep only the latest draft release before publishing.
+- GitHub release draft policy after `1.2.0` should keep only the latest draft release before publishing.

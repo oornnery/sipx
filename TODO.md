@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, GitHub CI/release workflows adapted to the new project, and fail-fast phone CLI config validation.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone/raw-SIP commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, GitHub CI/release workflows adapted to the new project, and fail-fast phone CLI config validation.
 
 ## Milestone 0 - Project Grounding
 
@@ -106,6 +106,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement register/unregister.
 - [x] Implement outbound call and inbound call handlers.
 - [x] Add operational CLI commands for profile inspection, register, unregister, call, and listen.
+- [x] Add curl-like raw SIP CLI commands for OPTIONS, MESSAGE, and generic requests.
 - [ ] Implement live SIP inspector events.
 - [x] Implement strict/lab profiles.
 - [x] Implement lab hooks for SIP headers, SDP, timers, and malformed behavior.
@@ -348,6 +349,15 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Made phone commands derive default remote host/port from `--registrar` when explicit remote flags are omitted.
 - [x] Added account-flag examples to phone command help.
 - [x] Added no-network regression tests for missing config, explicit register config, and help output.
+
+## Block 1.2.0 Done
+
+- [x] Bumped package version to `1.2.0`.
+- [x] Added `sipx options <target>`.
+- [x] Added `sipx message <target> [text]`.
+- [x] Added `sipx request <method> <target>`.
+- [x] Added raw SIP request flags for From identity, profile/config, remote routing, headers, body, content type, response headers, and no-wait send.
+- [x] Added no-network tests for raw SIP request construction and help output.
 
 ## Blocked Or Pending
 

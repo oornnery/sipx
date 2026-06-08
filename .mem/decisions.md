@@ -48,3 +48,4 @@
 | D44 | 2026-06-08 | Operational CLI stays on stdlib `argparse` for now. | Avoids new runtime dependencies while exposing existing `NativeSoftphone` and profile behavior. |
 | D45 | 2026-06-08 | GitHub workflows read version from `pyproject.toml`. | The new project uses hatchling metadata and has no old `sipx/_version.py`. |
 | D46 | 2026-06-08 | Phone CLI must not use silent localhost network defaults. | Missing account/registrar input should be a local UX error, not a SIP timeout. |
+| D47 | 2026-06-08 | Raw SIP CLI uses `NativeSipBackend` directly. | OPTIONS, MESSAGE, and generic request behavior should share the native wire path without adding new runtime dependencies. |

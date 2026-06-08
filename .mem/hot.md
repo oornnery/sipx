@@ -32,14 +32,15 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.1.1`.
+- Current implementation version: `1.2.0`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
 - Minimum scenario artifacts now written: `timeline.jsonl`, `verdict.json`, `report.txt`, and `report.html`.
-- CLI exists: `sipx scenario run <file>`, `sipx scenario export <timeline.jsonl>`, `sipx replay <timeline.jsonl>`, `sipx profile list|show`, `sipx phone register|unregister|call|listen`, and top-level `sipx register|unregister|call|listen` aliases.
+- CLI exists: `sipx scenario run <file>`, `sipx scenario export <timeline.jsonl>`, `sipx replay <timeline.jsonl>`, `sipx profile list|show`, `sipx phone register|unregister|call|listen`, top-level `sipx register|unregister|call|listen`, and raw SIP `sipx options|message|request` commands.
 - Phone CLI network commands require a profile or explicit `--aor` and `--registrar`; without config they fail before opening sockets.
 - Phone CLI derives default remote host/port from `--registrar` when `--remote-host/--remote-port` are omitted.
+- Raw SIP request CLI supports `--from/--aor`, `-H/--header`, `-d/--data`, `--body-file`, `--content-type`, `--include`, and `--no-wait`.
 - Tests currently run with plain `pytest`; async tests use `asyncio.run` because active `pytest` lacks `pytest-asyncio` plugin.
 - `ty` is declared as a dev dependency but unavailable in the active interpreter used during block `0.2.0`.
 - Media primitives now exist: `AudioFrame`, `MediaPort`, `TranscriptEvent`, STT/TTS protocols, `BargeInPolicy`.

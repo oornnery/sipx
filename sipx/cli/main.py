@@ -4,11 +4,14 @@ import argparse
 import asyncio
 import runpy
 import sys
+import time
 from collections.abc import Coroutine, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
+from sipx.backends import NativeSipBackend
 from sipx.core import (
     Harness,
     Profile,
@@ -19,7 +22,7 @@ from sipx.core import (
     load_profiles,
     render_text_report,
 )
-from sipx.sip import SipUri
+from sipx.sip import HeaderMap, SipRequest, SipResponse, SipUri
 from sipx.softphone import (
     NativeSoftphone,
     NativeSoftphoneAccount,
@@ -33,6 +36,25 @@ class PhoneCommandConfig:
     target: str | None = None
     duration: float = 0.0
     keepalive: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class SipRequestCommandConfig:
+    method: str
+    target: SipUri
+    aor: SipUri
+    remote: tuple[str, int]
+    local_host: str
+    local_port: int
+    mode: str
+    timeout: float
+    actor_id: str
+    contact_user: str | None = None
+    headers: tuple[tuple[str, str], ...] = ()
+    body: bytes = b""
+    content_type: str | None = None
+    include_headers: bool = False
+    no_wait: bool = False
 
 
 class PhoneCommandError(RuntimeError):
@@ -110,6 +132,38 @@ async def run_phone_listen(args: argparse.Namespace) -> int:
     return 0
 
 
+async def run_sip_request(args: argparse.Namespace) -> int:
+    command = _sip_request_command_config(args)
+    async with NativeSipBackend(
+        local_host=command.local_host,
+        local_port=command.local_port,
+        mode=command.mode,
+        actor_id=command.actor_id,
+    ) as backend:
+        contact = _contact_uri(
+            command.aor,
+            command.contact_user,
+            backend.local_address,
+        )
+        call_id = _id("request")
+        request = _build_cli_request(command, contact=contact, call_id=call_id)
+
+        await backend.send_request(request, command.remote)
+        print(f"> {request.method} {request.uri}")
+        if command.no_wait:
+            print("sent")
+            return 0
+
+        response = await _receive_cli_response(
+            backend,
+            call_id=call_id,
+            method=request.method,
+            timeout=command.timeout,
+        )
+        _print_response(response, include_headers=command.include_headers)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sipx",
@@ -141,6 +195,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     replay_parser = subcommands.add_parser("replay")
     replay_parser.add_argument("timeline")
+
+    _add_options_parser(_sip_request_parser(subcommands, "options"))
+    _add_message_parser(_sip_request_parser(subcommands, "message"))
+    _add_generic_request_parser(_sip_request_parser(subcommands, "request"))
 
     profile_parser = subcommands.add_parser("profile")
     profile_subcommands = profile_parser.add_subparsers(
@@ -198,6 +256,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(render_text_report(timeline, Verdict.passed(reason="replay")), end="")
         return 0
 
+    if args.command in {"options", "message", "request"}:
+        return _run_cli_command(run_sip_request(args))
+
     if args.command == "profile" and args.profile_command == "list":
         profiles = load_profiles(args.config)
         for name, profile in sorted(profiles.items()):
@@ -232,13 +293,100 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 2
 
 
+def _add_sip_request_common(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--profile", dest="profile_option", help="Profile name from --config."
+    )
+    parser.add_argument("--config", default="harness.toml", help="Profile config path.")
+    parser.add_argument(
+        "--aor",
+        "--from",
+        dest="aor",
+        help="From account URI, for example sip:1001@example.com.",
+    )
+    parser.add_argument(
+        "--registrar",
+        help="Registrar/proxy URI; used for default remote host/port.",
+    )
+    parser.add_argument(
+        "--contact-user", help="User part for the generated Contact URI."
+    )
+    parser.add_argument("--remote-host", help="SIP peer host; defaults to target host.")
+    parser.add_argument(
+        "--remote-port",
+        type=int,
+        help="SIP peer UDP port; defaults to target port, registrar port, or 5060.",
+    )
+    parser.add_argument(
+        "--local-host", default="127.0.0.1", help="Local UDP bind host."
+    )
+    parser.add_argument(
+        "--local-port",
+        type=int,
+        default=0,
+        help="Local UDP bind port; 0 picks a free port.",
+    )
+    parser.add_argument("--mode", choices=("strict", "lab"), help="Native SIP mode.")
+    parser.add_argument(
+        "--timeout", type=float, default=5.0, help="SIP response timeout in seconds."
+    )
+    parser.add_argument("--actor-id", default="sip-client", help="Timeline actor id.")
+    parser.add_argument(
+        "-H",
+        "--header",
+        action="append",
+        default=[],
+        help='Extra SIP header, for example -H "X-Test: yes".',
+    )
+    parser.add_argument(
+        "-d",
+        "--data",
+        "--body",
+        dest="body",
+        help="Request body text.",
+    )
+    parser.add_argument("--body-file", help="Read request body from a file.")
+    parser.add_argument("--content-type", help="Content-Type for request body.")
+    parser.add_argument(
+        "-i",
+        "--include",
+        action="store_true",
+        help="Print response headers before the response body.",
+    )
+    parser.add_argument(
+        "--no-wait",
+        action="store_true",
+        help="Send the request and exit without waiting for a response.",
+    )
+
+
+def _add_options_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("target")
+    _add_sip_request_common(parser)
+
+
+def _add_message_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("target")
+    parser.add_argument("text", nargs="?", help="MESSAGE body text.")
+    _add_sip_request_common(parser)
+
+
+def _add_generic_request_parser(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("method")
+    parser.add_argument("target")
+    _add_sip_request_common(parser)
+
+
 def _add_phone_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--profile", dest="profile_option", help="Profile name from --config."
     )
     parser.add_argument("--config", default="harness.toml", help="Profile config path.")
     parser.add_argument(
-        "--aor", help="Account address, for example sip:1001@example.com."
+        "--aor",
+        "--from",
+        dest="aor",
+        help="Account address, for example sip:1001@example.com.",
     )
     parser.add_argument(
         "--registrar", help="Registrar URI, for example sip:pbx.example.com:5060."
@@ -393,8 +541,205 @@ def _phone_remote(
     return host, port
 
 
+def _sip_request_command_config(args: argparse.Namespace) -> SipRequestCommandConfig:
+    profile = _load_selected_profile(args)
+    target = SipUri.parse(args.target)
+    aor = _request_aor(args, profile)
+    registrar = _optional_sip_uri(_arg_or_profile(args, profile, "registrar"))
+    method = _request_method(args).upper()
+    body = _request_body(args)
+    content_type = args.content_type or ("text/plain" if method == "MESSAGE" else None)
+    return SipRequestCommandConfig(
+        method=method,
+        target=target,
+        aor=aor,
+        remote=_request_remote(args, profile, target, registrar),
+        local_host=args.local_host,
+        local_port=args.local_port,
+        mode=str(args.mode or (profile.mode if profile else "strict")),
+        timeout=args.timeout,
+        actor_id=args.actor_id,
+        contact_user=_arg_or_profile(args, profile, "contact_user"),
+        headers=tuple(_parse_header(header) for header in args.header),
+        body=body,
+        content_type=content_type,
+        include_headers=args.include,
+        no_wait=args.no_wait,
+    )
+
+
+def _request_method(args: argparse.Namespace) -> str:
+    if args.command == "options":
+        return "OPTIONS"
+    if args.command == "message":
+        return "MESSAGE"
+    return args.method
+
+
+def _request_aor(args: argparse.Namespace, profile: Profile | None) -> SipUri:
+    value = _arg_or_profile(args, profile, "aor")
+    if not value:
+        raise PhoneCommandError(
+            "SIP request command requires --from/--aor or a profile with account.aor; "
+            "try `sipx request --help`"
+        )
+    return SipUri.parse(str(value))
+
+
+def _request_remote(
+    args: argparse.Namespace,
+    profile: Profile | None,
+    target: SipUri,
+    registrar: SipUri | None,
+) -> tuple[str, int]:
+    if args.remote_host is not None:
+        host = args.remote_host
+    elif profile is not None:
+        host = profile.account.remote_host
+    elif registrar is not None:
+        host = registrar.host
+    else:
+        host = target.host
+
+    if args.remote_port is not None:
+        port = args.remote_port
+    elif profile is not None:
+        port = profile.account.remote_port
+    elif registrar is not None and registrar.port is not None:
+        port = registrar.port
+    else:
+        port = target.port or 5060
+
+    return host, port
+
+
+def _request_body(args: argparse.Namespace) -> bytes:
+    text = getattr(args, "text", None)
+    sources = [value is not None for value in (text, args.body, args.body_file)]
+    if sum(sources) > 1:
+        raise PhoneCommandError("use only one request body source")
+    if text is not None:
+        return text.encode("utf-8")
+    if args.body is not None:
+        return args.body.encode("utf-8")
+    if args.body_file is not None:
+        return Path(args.body_file).read_bytes()
+    return b""
+
+
+def _parse_header(value: str) -> tuple[str, str]:
+    if ":" in value:
+        name, header_value = value.split(":", 1)
+    elif "=" in value:
+        name, header_value = value.split("=", 1)
+    else:
+        raise PhoneCommandError("headers must be formatted as 'Name: value'")
+    name = name.strip()
+    if not name:
+        raise PhoneCommandError("header name is required")
+    return name, header_value.strip()
+
+
+def _build_cli_request(
+    command: SipRequestCommandConfig,
+    *,
+    contact: SipUri,
+    call_id: str,
+) -> SipRequest:
+    branch = _branch(command.method.lower())
+    headers = HeaderMap()
+    headers.add("Via", f"SIP/2.0/UDP {contact.host}:{contact.port};branch={branch}")
+    headers.add("From", f"<{command.aor}>;tag={_tag('from')}")
+    headers.add("To", f"<{command.target}>")
+    headers.add("Call-ID", call_id)
+    headers.add("CSeq", f"1 {command.method}")
+    headers.add("Contact", f"<{contact}>")
+    headers.add("Max-Forwards", "70")
+    if command.body and command.content_type is not None:
+        headers.add("Content-Type", command.content_type)
+    for name, value in command.headers:
+        headers.add(name, value)
+    return SipRequest(
+        method=command.method,
+        uri=command.target,
+        headers=headers,
+        body=command.body,
+    )
+
+
+async def _receive_cli_response(
+    backend: NativeSipBackend,
+    *,
+    call_id: str,
+    method: str,
+    timeout: float,
+) -> SipResponse:
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise PhoneCommandError("timed out waiting for SIP response")
+        event = await backend.receive_event(timeout=remaining)
+        message = event.message
+        if not isinstance(message, SipResponse):
+            continue
+        if message.headers.get("Call-ID") != call_id:
+            continue
+        if _cseq_method(message.headers.get("CSeq")) != method:
+            continue
+        return message
+
+
+def _cseq_method(value: str | None) -> str | None:
+    if value is None:
+        return None
+    _number, _separator, method = value.partition(" ")
+    return method or None
+
+
+def _print_response(response: SipResponse, *, include_headers: bool) -> None:
+    reason = f" {response.reason}" if response.reason else ""
+    print(f"< {response.status_code}{reason}")
+    if include_headers:
+        for name, value in response.headers.items():
+            print(f"{name}: {value}")
+        if response.body:
+            print()
+    if response.body:
+        print(response.body.decode("utf-8", errors="replace"), end="")
+
+
+def _contact_uri(
+    aor: SipUri,
+    contact_user: str | None,
+    local_address: tuple[str, int],
+) -> SipUri:
+    return SipUri(
+        scheme="sip",
+        user=contact_user or aor.user or "sipx",
+        host=local_address[0],
+        port=local_address[1],
+    )
+
+
+def _id(prefix: str) -> str:
+    return f"{prefix}-{uuid4().hex}"
+
+
+def _branch(prefix: str) -> str:
+    return f"z9hG4bK-{prefix}-{uuid4().hex}"
+
+
+def _tag(prefix: str) -> str:
+    return f"{prefix}-{uuid4().hex}"
+
+
 def _sip_uri(value: SipUri | str) -> SipUri:
     return value if isinstance(value, SipUri) else SipUri.parse(value)
+
+
+def _optional_sip_uri(value: object) -> SipUri | None:
+    return None if value in (None, "") else SipUri.parse(str(value))
 
 
 def _arg_or_profile(
@@ -453,7 +798,45 @@ def _phone_parser(
     )
 
 
+def _sip_request_parser(
+    subcommands: argparse._SubParsersAction[argparse.ArgumentParser],
+    name: str,
+) -> argparse.ArgumentParser:
+    descriptions = {
+        "options": "Send a SIP OPTIONS request over UDP.",
+        "message": "Send a SIP MESSAGE request over UDP.",
+        "request": "Send a generic SIP request over UDP.",
+    }
+    examples = {
+        "options": (
+            "examples:\n"
+            "  sipx options sip:pbx.example.com --from sip:1001@example.com\n"
+            "  sipx options sip:pbx.example.com --profile lab -i"
+        ),
+        "message": (
+            "examples:\n"
+            "  sipx message sip:1002@example.com 'hello' --from sip:1001@example.com\n"
+            "  sipx message sip:1002@example.com --profile lab -d 'hello'"
+        ),
+        "request": (
+            "examples:\n"
+            "  sipx request OPTIONS sip:pbx.example.com --from sip:1001@example.com\n"
+            "  sipx request INFO sip:1002@example.com --profile lab -H 'Content-Type: application/dtmf-relay' -d 'Signal=1'"
+        ),
+    }
+    return subcommands.add_parser(
+        name,
+        description=descriptions[name],
+        epilog=examples[name],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+
 def _run_phone_command(coro: Coroutine[Any, Any, int]) -> int:
+    return _run_cli_command(coro)
+
+
+def _run_cli_command(coro: Coroutine[Any, Any, int]) -> int:
     try:
         return asyncio.run(coro)
     except KeyboardInterrupt:
@@ -475,5 +858,6 @@ __all__ = [
     "run_phone_listen",
     "run_phone_register",
     "run_phone_unregister",
+    "run_sip_request",
     "run_scenario_file",
 ]

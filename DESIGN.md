@@ -1584,6 +1584,9 @@ sipx phone listen lab_account --duration 30
 sipx register lab_account
 sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password secret
 sipx call sip:6000@pbx.lab --profile lab_account
+sipx options sip:pbx.lab --from sip:1001@example.com -i
+sipx message sip:1002@pbx.lab 'hello' --from sip:1001@example.com
+sipx request INFO sip:1002@pbx.lab --from sip:1001@example.com -H 'Content-Type: application/dtmf-relay' -d 'Signal=1'
 sipx scenario run ivr_second_copy.py
 sipx scenario export timeline.jsonl --format python
 sipx replay timeline.jsonl
@@ -1591,6 +1594,7 @@ sipx replay timeline.jsonl
 
 Implemented profile inspection commands are `sipx profile list` and `sipx profile show <name>`.
 Implemented phone commands fail before network access unless a profile or explicit SIP account identity is provided.
+Implemented raw SIP request commands support curl-like `-H`, `-d`, `--body-file`, `--include`, and `--no-wait` flags.
 
 ## Technical Softphone Python Shape
 
