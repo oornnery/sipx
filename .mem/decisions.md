@@ -36,3 +36,4 @@
 | D32 | 2026-06-08 | CANCEL runtime models pending INVITE separately from confirmed calls. | CANCEL terminates an INVITE transaction before dialog confirmation, so it should not reuse `NativeSipCall`. |
 | D33 | 2026-06-08 | Native REGISTER orchestration reuses `RegisterClientFlow` and only accepts password at retry time. | Keeps UDP runtime aligned with the no-password-storage Digest decision. |
 | D34 | 2026-06-08 | Native retransmission timers are configurable policy objects. | Tests can run fast while strict runtime keeps real async timer behavior. |
+| D35 | 2026-06-08 | Asterisk ARI control plane starts dependency-free with injectable transports. | Stdlib HTTP plus local WebSocket text-frame reader keeps first T9 block testable without syncing new runtime dependencies or requiring real Asterisk. |

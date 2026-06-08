@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 0.9.0 - 2026-06-08
+
+- Added `AsteriskBackend` control-plane skeleton with declared ARI capability.
+- Added async ARI REST client using stdlib HTTP transport with injectable test transport.
+- Added ARI WebSocket event parsing and a minimal text-frame WebSocket reader for local ARI events.
+- Added timeline recording for ARI requests and ARI events without persisting credentials.
+- Added no-Asterisk tests for ARI URL/auth generation, REST request behavior, error handling, timeline events, and local WebSocket event ingestion.
+- Marked SPEC T9 complete after validation.
+
 ## 0.8.4 - 2026-06-08
 
 - Added configurable transaction retransmission policy for native SIP runtime.

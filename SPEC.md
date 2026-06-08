@@ -102,7 +102,7 @@ T5|x|implement JSONL timeline + actor/call/leg correlation|V3,I.api
 T6|x|implement result/verdict/artifact model|V4,V16
 T7|x|implement `expect()` core: within/during/not_before + rich failure|V4,V5,I.api
 T8|x|create `MockBackend` for unit tests without network|I.backend
-T9|.|create `AsteriskBackend` async ARI client + WebSocket events|V14,I.backend
+T9|x|create `AsteriskBackend` async ARI client + WebSocket events|V14,I.backend
 T10|.|map ARI channels/bridges/playback/hangup/DTMF to timeline|V3,V14
 T11|.|add Asterisk media port: choose WebSocket/AudioSocket/ExternalMedia MVP|C3,V10,I.backend
 T12|x|define `AudioFrame`, `MediaPort`, STT/TTS protocols and barge-in policy|V10,V11,I.api

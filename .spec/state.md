@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.8.4` adds native SIP transaction retransmission timers and completes SPEC T21.
+Implement `sipx` in verified commit blocks. Block `0.9.0` adds the first Asterisk ARI control-plane backend/client and completes SPEC T9.
 
 ## Sources Read
 
@@ -100,6 +100,14 @@ Implement `sipx` in verified commit blocks. Block `0.8.4` adds native SIP transa
 - Added retransmission timeline events and cleanup on timeout/error paths.
 - Added loopback UDP test with delayed REGISTER response to verify retransmission before 200 OK.
 - Marked SPEC task T21 complete after validation.
+- Bumped `pyproject.toml` version from `0.8.4` to `0.9.0`.
+- Added `AsteriskBackend` control-plane skeleton with `ASTERISK_ARI`, `CALL_CONTROL`, and `TIMELINE` capabilities.
+- Added `AsteriskAriConfig`, `AsteriskAriClient`, `AsteriskAriEvent`, `AsteriskAriHttpResponse`, and `AsteriskAriError`.
+- Added async ARI REST request support using stdlib HTTP transport with injectable test transport.
+- Added ARI WebSocket event consumption with injectable event source and a local minimal text-frame reader.
+- Added timeline events for ARI requests and ARI events without recording credentials.
+- Added no-Asterisk tests for ARI URL/auth generation, REST request/error behavior, event timeline recording, and local WebSocket event ingestion.
+- Marked SPEC task T9 complete after validation.
 
 ## Active Decision
 
@@ -109,11 +117,11 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Add richer fake media events and example mock scenario.
-2. Choose first Asterisk media path.
-3. Decide artifact retention policy before real recordings/transcripts.
-4. Add lab hooks for controlled malformed behavior.
-5. Add profile config for strict/lab/account/media overrides.
+1. Implement Asterisk ARI channel/bridge/playback/hangup/DTMF timeline mapping for SPEC T10.
+2. Choose first Asterisk media path before SPEC T11.
+3. Add richer fake media events and example mock scenario.
+4. Decide artifact retention policy before real recordings/transcripts.
+5. Add lab hooks for controlled malformed behavior.
 
 ## Risks
 
@@ -124,6 +132,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
 - T21 basic native SIP signaling is complete, but lab hooks, profile config, technical softphone, media wiring, and advanced runtime behavior remain pending.
+- T9 ARI control-plane client/events are complete, but T10 high-level Asterisk channel/bridge/playback/hangup/DTMF mapping and T11 media port are still pending.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
 
 ## Open Questions

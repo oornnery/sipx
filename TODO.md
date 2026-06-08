@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, and an Asterisk ARI control-plane client/event skeleton.
 
 ## Milestone 0 - Project Grounding
 
@@ -54,8 +54,8 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 ## Milestone 3 - AsteriskBackend MVP
 
 - [ ] Choose first media path: WebSocket media, AudioSocket, or ExternalMedia RTP.
-- [ ] Create async ARI REST client.
-- [ ] Create ARI WebSocket event consumer.
+- [x] Create async ARI REST client.
+- [x] Create ARI WebSocket event consumer.
 - [ ] Map ARI events to timeline events.
 - [ ] Implement originate, answer, hangup, playback, send DTMF.
 - [ ] Implement bridge creation and channel membership.
@@ -249,10 +249,20 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added loopback UDP retransmission test with delayed REGISTER response.
 - [x] Marked `SPEC.md` T21 complete after validation.
 
+## Block 0.9.0 Done
+
+- [x] Bumped package version to `0.9.0`.
+- [x] Added `AsteriskBackend` with ARI capability declaration and timeline recording for ARI requests/events.
+- [x] Added `AsteriskAriClient`, config, response, event, and typed error models.
+- [x] Added async ARI REST request support with stdlib HTTP transport and injectable test transport.
+- [x] Added ARI WebSocket event consumer with local text-frame reader and injectable event source.
+- [x] Added focused no-Asterisk tests for URL/auth generation, REST behavior, errors, event timeline recording, and local WebSocket event ingestion.
+- [x] Marked `SPEC.md` T9 complete after validation.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
-- [ ] Asterisk media path decision remains open before AsteriskBackend MVP.
+- [ ] Asterisk media path decision remains open before Asterisk media port work.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
 - [ ] Lab hooks, profile config, technical softphone, and advanced media/runtime behavior remain pending after T21.
