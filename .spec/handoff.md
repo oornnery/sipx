@@ -2,7 +2,7 @@
 
 ## Summary
 
-Project planning environment was initialized from `IDEA.md`. Block `0.2.0` added initial product code: harness core, mock backend, scenario artifacts, and minimal CLI.
+Project planning environment was initialized from `IDEA.md`. Blocks `0.2.0` and `0.3.0` added initial product code: harness core, mock backend, scenario artifacts, minimal CLI, media primitives, and redaction.
 
 ## Read First
 
@@ -38,7 +38,7 @@ Build `sipx` as a Python Voice/SIP Harness:
 Continue after block `0.2.0`:
 
 1. Add richer mock media events and an example scenario.
-2. Add redaction utilities for logs/artifacts before recordings/transcripts expand.
+2. Add silence/placeholder behavior for slow AI paths.
 3. Choose first Asterisk media path.
 4. Start AsteriskBackend only after the media path decision.
 
@@ -51,7 +51,7 @@ Continue after block `0.2.0`:
 
 ## Latest Validation
 
-- `python -m pytest`: pass, 8 tests.
+- `python -m pytest`: pass, 15 tests.
 - `ruff check .`: pass.
 - `ruff format --check .`: pass.
 - `python -m ty check`: blocked, active interpreter has no `ty` module.

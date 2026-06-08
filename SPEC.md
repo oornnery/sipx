@@ -105,7 +105,7 @@ T8|x|create `MockBackend` for unit tests without network|I.backend
 T9|.|create `AsteriskBackend` async ARI client + WebSocket events|V14,I.backend
 T10|.|map ARI channels/bridges/playback/hangup/DTMF to timeline|V3,V14
 T11|.|add Asterisk media port: choose WebSocket/AudioSocket/ExternalMedia MVP|C3,V10,I.backend
-T12|.|define `AudioFrame`, `MediaPort`, STT/TTS protocols and barge-in policy|V10,V11,I.api
+T12|x|define `AudioFrame`, `MediaPort`, STT/TTS protocols and barge-in policy|V10,V11,I.api
 T13|x|create scenario runner + artifacts directory layout|V4,V16,I.cmd
 T14|x|add minimal CLI `sipx scenario run`|I.cmd,T13
 T15|.|implement inbound Asterisk app via Stasis example|C3,V14
@@ -120,7 +120,7 @@ T23|.|add lab hooks for headers/SDP/timers/malformed SIP|V15,V20,T22
 T24|.|add recorder/export scenario from timeline + user actions|V16,V19,I.artifact
 T25|.|add HTML/text reports with timeline, SIP, RTP, transcript, verdict|V4,V16
 T26|.|add fuzz/property tests for SIP/SDP/RTP/DTMF parsers|V8,T16,T18,T19,T20
-T27|.|add central redaction for logs/artifacts|V13
+T27|x|add central redaction for logs/artifacts|V13
 T28|.|add interop lab with Asterisk 22 LTS and basic scenarios|C3,V14
 T29|.|add profile config for strict/lab/account/media overrides|V15,V21,I.api
 T30|.|add mixed scenario support: native caller + Asterisk backend + native agent|V22,I.api
@@ -132,3 +132,4 @@ T32|x|consolidate detailed implementation context into current structure, not `/
 id|date|cause|fix
 ---|---|---|---
 B1|2026-06-08|tests used `pytest.mark.asyncio` but active `pytest` lacked async plugin|tests use `asyncio.run`; no new §V, product spec unchanged
+B2|2026-06-08|redaction regex replacement assumed every secret pattern had capture group|fix replacement helper; covered by V13

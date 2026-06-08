@@ -36,7 +36,7 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `0.2.0`.
+- Current implementation version: `0.3.0`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
@@ -44,3 +44,6 @@
 - Minimal CLI exists: `sipx scenario run <file>` loads a Python file containing a `Scenario`.
 - Tests currently run with plain `pytest`; async tests use `asyncio.run` because active `pytest` lacks `pytest-asyncio` plugin.
 - `ty` is declared as a dev dependency but unavailable in the active interpreter used during block `0.2.0`.
+- Media primitives now exist: `AudioFrame`, `MediaPort`, `TranscriptEvent`, STT/TTS protocols, `BargeInPolicy`.
+- Central redaction now exists in `sipx.security.redaction`; `ArtifactStore` redacts JSON/text writes by default.
+- SPEC T12 and T27 are complete; T9-T11 remain blocked on or adjacent to Asterisk media-path choice.

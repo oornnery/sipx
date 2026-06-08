@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.3.0 - 2026-06-08
+
+- Added media primitives: `AudioFrame`, `MediaPort`, STT/TTS protocols, `TranscriptEvent`, and barge-in policy.
+- Added central redaction utilities for sensitive mapping values and SIP/ARI/SDP text lines.
+- Connected `ArtifactStore` JSON/text writes to the default redactor.
+- Added tests for media frame validation, barge-in policy, transcript confidence validation, redaction, and artifact redaction.
+- Recorded redaction replacement bug in `SPEC.md` §B B2 and fixed it under invariant V13.
+
 ## 0.2.0 - 2026-06-08
 
 - Added the initial `sipx` Python package with public exports for `Harness`, `Actor`, `Scenario`, `expect`, `Timeline`, `Verdict`, `Artifact`, metrics, and backend capabilities.

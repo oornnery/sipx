@@ -22,3 +22,5 @@
 | D18 | 2026-06-08 | Implementation proceeds in small committed blocks with version, changelog, TODO, spec state, and memory updates every time. | User explicitly requested this pipeline so other agents follow the same flow. |
 | D19 | 2026-06-08 | Initial tests avoid `pytest-asyncio` markers and use `asyncio.run`. | Active `pytest` did not load the async plugin; plain pytest compatibility keeps validation runnable. |
 | D20 | 2026-06-08 | `Harness()` defaults to `MockBackend`. | Enables no-network unit tests and CLI skeleton before Asterisk or native SIP backends exist. |
+| D21 | 2026-06-08 | Artifact writes use default central redaction. | Secret redaction must be automatic before logs/transcripts/recordings grow. |
+| D22 | 2026-06-08 | Media layer starts with protocols and value objects, not provider adapters. | Keeps STT/TTS/LLM providers out of the media clock and avoids premature dependency choices. |

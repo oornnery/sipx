@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current block delivered the harness core skeleton, mock backend, scenario artifacts, and minimal CLI; next blocks should deepen mock/scenario behavior before real Asterisk or native SIP work.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, minimal CLI, media protocol primitives, and central redaction.
 
 ## Milestone 0 - Project Grounding
 
@@ -65,13 +65,15 @@ Implement `sipx` in small verified blocks. Current block delivered the harness c
 
 ## Milestone 4 - Media And AI Runtime
 
-- [ ] Define `AudioFrame`.
-- [ ] Define `MediaPort` protocol.
-- [ ] Define STT/TTS protocols.
-- [ ] Add barge-in policy model.
+- [x] Define `AudioFrame`.
+- [x] Define `MediaPort` protocol.
+- [x] Define STT/TTS protocols.
+- [x] Add barge-in policy model.
 - [ ] Add silence/placeholder behavior when AI is slow.
-- [ ] Add transcript events and media artifacts.
-- [ ] Add redaction for transcripts and recordings metadata.
+- [x] Add transcript events.
+- [ ] Add media artifacts beyond timeline/verdict.
+- [x] Add central redaction for artifact/log writes.
+- [ ] Add transcript/recording-specific retention and metadata policy.
 
 ## Milestone 5 - NativeSipBackend MVP
 
@@ -122,11 +124,21 @@ Implement `sipx` in small verified blocks. Current block delivered the harness c
 - [x] Added `sipx` package exports and CLI script metadata.
 - [x] Added tests for core harness behavior and minimal CLI.
 
+## Block 0.3.0 Done
+
+- [x] Bumped package version to `0.3.0`.
+- [x] Added media primitives and protocol interfaces.
+- [x] Added barge-in policy.
+- [x] Added central redaction utilities and connected them to `ArtifactStore`.
+- [x] Added media and redaction tests.
+- [x] Marked `SPEC.md` T12 and T27 complete after verification.
+
 ## Blocked Or Pending
 
 - [ ] `ty check` needs the dev environment synced so `ty` is importable/executable.
 - [ ] Asterisk media path decision remains open before AsteriskBackend MVP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
+- [ ] Silence/placeholder behavior when AI is slow remains pending.
 
 ## Open Questions
 

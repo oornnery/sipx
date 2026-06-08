@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `0.2.0` delivered the initial harness core, mock backend, scenario artifact writing, and minimal CLI.
+Implement `sipx` in verified commit blocks. Block `0.3.0` delivered media primitives, STT/TTS protocols, barge-in policy, and central redaction.
 
 ## Sources Read
 
@@ -30,6 +30,12 @@ Implement `sipx` in verified commit blocks. Block `0.2.0` delivered the initial 
 - Added minimal CLI: `sipx scenario run <file>`.
 - Added tests for timeline ordering, JSONL round-trip, capability failures, rich expectation failures, harness verdict/artifact output, and CLI scenario loading.
 - Marked SPEC tasks T2-T8 and T13-T14 complete after verification.
+- Bumped `pyproject.toml` version from `0.2.0` to `0.3.0`.
+- Added `AudioFrame`, `MediaPort`, `TranscriptEvent`, STT/TTS protocols, and `BargeInPolicy`.
+- Added central `Redactor` and connected `ArtifactStore` JSON/text writes to redaction.
+- Added tests for media frame validation, barge-in behavior, transcript confidence validation, redaction, and artifact redaction.
+- Recorded `SPEC.md` §B B2 for a redaction regex replacement bug; V13 already covered the invariant.
+- Marked SPEC tasks T12 and T27 complete after verification.
 
 ## Active Decision
 
@@ -40,10 +46,10 @@ Maintained English files in the current structure are the source of truth. `IDEA
 ## Next
 
 1. Add richer fake media events and example mock scenario.
-2. Add redaction utilities before sensitive artifacts grow.
+2. Add silence/placeholder behavior for slow AI paths.
 3. Choose first Asterisk media path.
 4. Decide first shipped product focus: IVR QA, contact center, or technical SIP tester.
-5. Decide artifact retention/redaction policy before real recordings/transcripts.
+5. Decide artifact retention policy before real recordings/transcripts.
 
 ## Risks
 
@@ -52,6 +58,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - AI semantic assertions are probabilistic; do not make them sole critical-pass criterion.
 - Recordings/transcripts are sensitive; design redaction/retention before real deployments.
 - `ty check` is configured in docs but unavailable in the active interpreter; sync the dev environment before relying on type-check gate.
+- Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
 
 ## Open Questions
 

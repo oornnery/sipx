@@ -36,6 +36,13 @@
 | 2026-06-08 | `ruff check .` | pass | All checks passed after formatting. |
 | 2026-06-08 | `ruff format --check .` | pass | 22 files already formatted. |
 | 2026-06-08 | `python -m ty check` | blocked | `/usr/sbin/python: No module named ty`; active environment is missing the declared dev tool. |
+| 2026-06-08 | `python -m pytest` | fail | Redaction text replacement assumed every regex had a capture group; recorded as `SPEC.md` §B B2 and fixed. |
+| 2026-06-08 | `ruff check .` | pass | No lint issues during block `0.3.0` before redaction fix. |
+| 2026-06-08 | `ruff format --check .` | fail | 2 files needed formatting; fixed with targeted `ruff format`. |
+| 2026-06-08 | `ruff format sipx/security/redaction.py tests/test_media.py` | pass | 2 files reformatted. |
+| 2026-06-08 | `python -m pytest` | pass | 15 tests passed after redaction fix. |
+| 2026-06-08 | `ruff check .` | pass | All checks passed after redaction fix. |
+| 2026-06-08 | `ruff format --check .` | pass | 31 files already formatted. |
 
 ## Validation Policy
 

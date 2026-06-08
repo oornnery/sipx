@@ -6,6 +6,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from sipx.security.redaction import Redactor, default_redactor
+
 
 class ArtifactKind(StrEnum):
     TIMELINE = "timeline"
@@ -34,8 +36,9 @@ class Artifact:
 
 
 class ArtifactStore:
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, redactor: Redactor | None = None) -> None:
         self.root = Path(root)
+        self.redactor = default_redactor if redactor is None else redactor
         self._artifacts: list[Artifact] = []
 
     @property
@@ -74,7 +77,7 @@ class ArtifactStore:
     ) -> Artifact:
         artifact = self.register(name, kind=kind, metadata=metadata)
         artifact.path.parent.mkdir(parents=True, exist_ok=True)
-        artifact.path.write_text(content, encoding="utf-8")
+        artifact.path.write_text(self.redactor.redact_text(content), encoding="utf-8")
         return artifact
 
     def write_json(
@@ -87,7 +90,13 @@ class ArtifactStore:
     ) -> Artifact:
         return self.write_text(
             name,
-            json.dumps(content, indent=2, sort_keys=True, default=str) + "\n",
+            json.dumps(
+                self.redactor.redact(content),
+                indent=2,
+                sort_keys=True,
+                default=str,
+            )
+            + "\n",
             kind=kind,
             metadata=metadata,
         )
