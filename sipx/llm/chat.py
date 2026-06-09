@@ -11,6 +11,9 @@ from typing import Any
 
 
 ChatCompletionTransport = Callable[[str, dict[str, str], bytes, float], bytes]
+DEFAULT_LLM_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_LLM_MODEL = "gpt-4o-mini"
+DEFAULT_LLM_TIMEOUT = 30.0
 
 
 class LLMClientError(RuntimeError):
@@ -22,9 +25,9 @@ class LLMChatClient:
     """Small OpenAI-compatible chat-completions client."""
 
     api_key: str
-    model: str = "gpt-4o-mini"
-    base_url: str = "https://api.openai.com/v1"
-    timeout: float = 30.0
+    model: str = DEFAULT_LLM_MODEL
+    base_url: str = DEFAULT_LLM_BASE_URL
+    timeout: float = DEFAULT_LLM_TIMEOUT
     transport: ChatCompletionTransport | None = None
 
     @classmethod
@@ -39,9 +42,9 @@ class LLMChatClient:
             raise ValueError(f"{prefix}_API_KEY is required")
         return cls(
             api_key=api_key,
-            base_url=os.getenv(f"{prefix}_BASE_URL", cls.base_url),
-            model=os.getenv(f"{prefix}_MODEL", cls.model),
-            timeout=float(os.getenv(f"{prefix}_TIMEOUT", str(cls.timeout))),
+            base_url=os.getenv(f"{prefix}_BASE_URL", DEFAULT_LLM_BASE_URL),
+            model=os.getenv(f"{prefix}_MODEL", DEFAULT_LLM_MODEL),
+            timeout=float(os.getenv(f"{prefix}_TIMEOUT", str(DEFAULT_LLM_TIMEOUT))),
             transport=transport,
         )
 

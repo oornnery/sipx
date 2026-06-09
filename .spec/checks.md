@@ -336,6 +336,14 @@
 | 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.6.0-final` | pass | Built final `1.6.0` sdist and wheel outside the repo. |
 | 2026-06-08 | final secret/provider-name scan | pass/no matches | No private proxy markers, inline LLM keys, SIP auth headers, or Mistral-specific names in code/tests/examples/docs/TOML/YAML. |
 | 2026-06-08 | final `docker --version` | blocked | Docker command is unavailable in this WSL environment; Asterisk integration remains opt-in and unrun. |
+| 2026-06-08 | `python -m pytest tests/test_llm.py tests/test_examples_templates.py` | pass | 8 passed, 1 skipped after LLM env default regression. |
+| 2026-06-08 | minimal LLM env default smoke | pass | `SIPX_LLM_API_KEY=test-key` builds `LLMChatClient.from_env()` with default base URL, model, and timeout. |
+| 2026-06-08 | final `python -m pytest` | pass | 125 passed, 3 skipped after `1.6.1` LLM env default fix. |
+| 2026-06-08 | final `ruff check .` | pass | All lint checks passed after `1.6.1` fix. |
+| 2026-06-08 | final `ruff format --check .` | pass | 79 files already formatted after `1.6.1` fix. |
+| 2026-06-08 | final `uv run ty check` | pass | Configured type-check gate passes after `1.6.1` fix. |
+| 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors after `1.6.1` fix. |
+| 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.6.1-final` | pass | Built final `1.6.1` sdist and wheel outside the repo. |
 
 ## Validation Policy
 

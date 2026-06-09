@@ -413,13 +413,20 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added native examples for REGISTER, OPTIONS, MESSAGE, raw INFO DTMF, call-with-DTMF, and Mizu call helpers.
 - [x] Updated README with concrete example usage.
 
+## Block 1.6.1 Done
+
+- [x] Bumped package version to `1.6.1`.
+- [x] Backpropagated LLM env default failure as `SPEC.md` B10 and V35.
+- [x] Fixed `LLMChatClient.from_env()` optional env defaults for direct example execution.
+- [x] Added regression coverage for minimal `SIPX_LLM_API_KEY` env config.
+
 ## Blocked Or Pending
 
 - [ ] `python -m ty check` still needs the system interpreter environment synced; configured validation now uses passing `uv run ty check`.
 - [ ] Next Asterisk media path after WebSocket MVP remains open: AudioSocket or ExternalMedia RTP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and system-interpreter tooling remain pending after 1.5.0.
+- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and system-interpreter tooling remain pending after 1.6.1.
 
 ## Open Questions
 

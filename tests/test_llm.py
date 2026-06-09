@@ -66,6 +66,21 @@ def test_llm_client_builds_from_generic_env(monkeypatch) -> None:
     assert client.timeout == 7.5
 
 
+def test_llm_client_from_env_uses_defaults_when_optional_env_missing(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SIPX_LLM_API_KEY", "test-key")
+    monkeypatch.delenv("SIPX_LLM_BASE_URL", raising=False)
+    monkeypatch.delenv("SIPX_LLM_MODEL", raising=False)
+    monkeypatch.delenv("SIPX_LLM_TIMEOUT", raising=False)
+
+    client = LLMChatClient.from_env()
+
+    assert client.base_url == "https://api.openai.com/v1"
+    assert client.model == "gpt-4o-mini"
+    assert client.timeout == 30.0
+
+
 @pytest.mark.skipif(
     not os.getenv("SIPX_LLM_API_KEY"),
     reason="set SIPX_LLM_API_KEY to run live LLM validation",

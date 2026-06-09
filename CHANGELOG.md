@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.6.1 - 2026-06-08
+
+- Fixed `LLMChatClient.from_env()` so missing optional `SIPX_LLM_*` settings use concrete defaults instead of dataclass slot descriptors.
+- Added regression coverage for minimal LLM env config used by direct example execution.
+- Recorded SPEC B10 and invariant V35 for LLM env defaults.
+- Bumped package version to `1.6.1`.
+
 ## 1.6.0 - 2026-06-08
 
 - Renamed the LLM provider client to simple `LLMChatClient` with `SIPX_LLM_*` runtime environment settings.

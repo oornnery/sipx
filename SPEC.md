@@ -111,6 +111,7 @@ V31: operational softphone call ! outbound INVITE includes SDP audio offer, open
 V32: LLM integrations ! external provider keys only via environment/runtime injection; tests/examples ⊥ hardcoded private keys or proxy data.
 V33: validation gate ! `uv run ty check` passes before an implementation block is complete; system-interpreter tool absence is reported separately.
 V34: operational DTMF ! confirmed native calls can send DTMF via SIP INFO `application/dtmf-relay`; CLI examples show call, OPTIONS, MESSAGE, INFO, and DTMF flows without hardcoded private secrets.
+V35: LLM env config ! missing optional `SIPX_LLM_*` vars use concrete defaults; no dataclass descriptors or internal objects leak into runtime parsing.
 
 ## §T
 
@@ -158,6 +159,7 @@ T39|x|add native softphone SDP offer/answer negotiation and media CLI flags|V17,
 T40|x|add opt-in generic OpenAI-compatible LLM client/tests and LLM/native/Asterisk examples|V13,V23,V32,I.api
 T41|x|clear baseline type-check diagnostics for current implementation surfaces|V33,I.ci
 T42|x|add in-dialog SIP INFO DTMF support plus richer native CLI/Python examples|V13,V25,V30,V31,V34,I.cmd
+T43|x|fix LLM env defaults for direct example execution|V32,V35,I.api
 
 ## §B
 
@@ -172,3 +174,4 @@ B6|2026-06-08|real proxy INVITE returned `401 Unauthorized`; call path accepted 
 B7|2026-06-08|authenticated real proxy INVITE reached `603 Declined`; outbound softphone INVITE had no SDP offer or open RTP port|V31
 B8|2026-06-08|`uv run ty check` baseline had 29 diagnostics from dynamic call, mapping, URI, SDP, and media frame typing|V33
 B9|2026-06-08|DTMF implementation added helper/softphone call path but backend method/import was incomplete during focused validation|V34
+B10|2026-06-08|`LLMChatClient.from_env()` read dataclass slot descriptors as defaults when optional env vars were missing, causing timeout float parsing failure|V35

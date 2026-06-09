@@ -32,7 +32,7 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.6.0`.
+- Current implementation version: `1.6.1`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
@@ -42,6 +42,7 @@
 - Native softphone outbound calls now send SDP audio offers, validate 2xx SDP answers, and keep the advertised RTP UDP port open while the call exists.
 - Public Mizu demo profile is in `examples/mizu/harness.toml`; private proxy test data must not be committed.
 - `LLMChatClient` exists in `sipx.llm`; live LLM validation is opt-in via `SIPX_LLM_API_KEY` and secrets must not be committed.
+- `LLMChatClient.from_env()` works with only `SIPX_LLM_API_KEY`; optional base URL/model/timeout use concrete defaults.
 - Native softphone calls can send in-dialog SIP INFO DTMF via `NativeSoftphone.send_dtmf()` and CLI `sipx call --dtmf`.
 - Phone CLI network commands require a profile or explicit `--aor` and `--registrar`; without config they fail before opening sockets.
 - Phone CLI derives default remote host/port from `--registrar` when `--remote-host/--remote-port` are omitted.

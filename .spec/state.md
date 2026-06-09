@@ -207,6 +207,9 @@ Implement `sipx` in verified commit blocks. Block `1.6.0` adds generic OpenAI-co
 - Added native examples for REGISTER, OPTIONS, MESSAGE, raw INFO DTMF, call-with-DTMF, Mizu call helpers, and reusable CLI command arrays.
 - Updated README with concrete example commands and Python template usage.
 - Recorded `SPEC.md` B9 after focused validation caught incomplete DTMF backend wiring; V34 already covered the behavior.
+- Bumped `pyproject.toml` version from `1.6.0` to `1.6.1`.
+- Recorded `SPEC.md` B10 and V35 after direct LLM example execution failed when optional `SIPX_LLM_TIMEOUT` was missing.
+- Fixed `LLMChatClient.from_env()` to use concrete defaults for optional env settings.
 
 ## Active Decision
 
