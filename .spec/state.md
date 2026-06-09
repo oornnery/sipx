@@ -210,6 +210,9 @@ Implement `sipx` in verified commit blocks. Block `1.6.0` adds generic OpenAI-co
 - Bumped `pyproject.toml` version from `1.6.0` to `1.6.1`.
 - Recorded `SPEC.md` B10 and V35 after direct LLM example execution failed when optional `SIPX_LLM_TIMEOUT` was missing.
 - Fixed `LLMChatClient.from_env()` to use concrete defaults for optional env settings.
+- Bumped `pyproject.toml` version from `1.6.1` to `1.7.0`.
+- Added `examples/llm/sip_flow_audit.py` as a richer runnable LLM SIP-flow audit example with deterministic signals and structured JSON output.
+- Recorded `SPEC.md` B11 and V37 after focused validation caught redacted auth being treated as unredacted in the SIP-flow audit.
 
 ## Active Decision
 

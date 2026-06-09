@@ -112,6 +112,8 @@ V32: LLM integrations ! external provider keys only via environment/runtime inje
 V33: validation gate ! `uv run ty check` passes before an implementation block is complete; system-interpreter tool absence is reported separately.
 V34: operational DTMF ! confirmed native calls can send DTMF via SIP INFO `application/dtmf-relay`; CLI examples show call, OPTIONS, MESSAGE, INFO, and DTMF flows without hardcoded private secrets.
 V35: LLM env config ! missing optional `SIPX_LLM_*` vars use concrete defaults; no dataclass descriptors or internal objects leak into runtime parsing.
+V36: LLM SIP audit examples ! runnable directly and via `sipx scenario run`; output structured behavior/risk/findings/actions while deterministic SIP checks remain separate from LLM judgment.
+V37: LLM SIP audit security ! redacted auth markers are accepted; unredacted `Authorization`/`Proxy-Authorization` values are flagged before LLM analysis.
 
 ## §T
 
@@ -160,6 +162,8 @@ T40|x|add opt-in generic OpenAI-compatible LLM client/tests and LLM/native/Aster
 T41|x|clear baseline type-check diagnostics for current implementation surfaces|V33,I.ci
 T42|x|add in-dialog SIP INFO DTMF support plus richer native CLI/Python examples|V13,V25,V30,V31,V34,I.cmd
 T43|x|fix LLM env defaults for direct example execution|V32,V35,I.api
+T44|x|add richer runnable LLM SIP-flow audit example|V5,V13,V32,V36,I.cmd
+T45|x|fix SIP-flow audit auth redaction detection|V13,V36,V37,I.cmd
 
 ## §B
 
@@ -175,3 +179,4 @@ B7|2026-06-08|authenticated real proxy INVITE reached `603 Declined`; outbound s
 B8|2026-06-08|`uv run ty check` baseline had 29 diagnostics from dynamic call, mapping, URI, SDP, and media frame typing|V33
 B9|2026-06-08|DTMF implementation added helper/softphone call path but backend method/import was incomplete during focused validation|V34
 B10|2026-06-08|`LLMChatClient.from_env()` read dataclass slot descriptors as defaults when optional env vars were missing, causing timeout float parsing failure|V35
+B11|2026-06-08|SIP-flow audit treated `Authorization: [REDACTED]` as unredacted auth during deterministic security checks|V37

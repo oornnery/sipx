@@ -334,7 +334,7 @@
 | 2026-06-08 | final `uv run ty check` | pass | Configured type-check gate passes after `1.6.0` changes. |
 | 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors after `1.6.0` changes. |
 | 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.6.0-final` | pass | Built final `1.6.0` sdist and wheel outside the repo. |
-| 2026-06-08 | final secret/provider-name scan | pass/no matches | No private proxy markers, inline LLM keys, SIP auth headers, or Mistral-specific names in code/tests/examples/docs/TOML/YAML. |
+| 2026-06-08 | final secret/provider-name scan | pass/no matches | No private proxy markers, inline LLM keys, SIP auth headers, or provider-specific names in code/tests/examples/docs/TOML/YAML. |
 | 2026-06-08 | final `docker --version` | blocked | Docker command is unavailable in this WSL environment; Asterisk integration remains opt-in and unrun. |
 | 2026-06-08 | `python -m pytest tests/test_llm.py tests/test_examples_templates.py` | pass | 8 passed, 1 skipped after LLM env default regression. |
 | 2026-06-08 | minimal LLM env default smoke | pass | `SIPX_LLM_API_KEY=test-key` builds `LLMChatClient.from_env()` with default base URL, model, and timeout. |
@@ -344,6 +344,16 @@
 | 2026-06-08 | final `uv run ty check` | pass | Configured type-check gate passes after `1.6.1` fix. |
 | 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors after `1.6.1` fix. |
 | 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.6.1-final` | pass | Built final `1.6.1` sdist and wheel outside the repo. |
+| 2026-06-08 | `uv lock` | pass | Updated lockfile project version from `1.6.1` to `1.7.0`. |
+| 2026-06-08 | focused SIP-flow audit tests | pass | `tests/test_examples_templates.py tests/test_llm.py`: 11 passed, 1 skipped after auth-redaction audit fix. |
+| 2026-06-08 | runnable LLM/native example smoke | pass | Direct LLM smoke and SIP-flow audit skipped cleanly without key; native CLI flow printer emitted runnable commands. |
+| 2026-06-08 | final `python -m pytest` | pass | 128 passed, 3 skipped after `1.7.0` SIP-flow audit example. |
+| 2026-06-08 | final `ruff check .` | pass | All lint checks passed after `1.7.0` changes. |
+| 2026-06-08 | final `ruff format --check .` | pass | 80 files already formatted after `1.7.0` changes. |
+| 2026-06-08 | final `uv run ty check` | pass | Configured type-check gate passes after `1.7.0` changes. |
+| 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors after `1.7.0` changes. |
+| 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.7.0-final` | pass | Built final `1.7.0` sdist and wheel outside the repo. |
+| 2026-06-08 | final secret/provider-name scan | pass/no matches | No private proxy markers, inline LLM keys, SIP auth headers, or provider-specific names in code/tests/examples/docs/TOML/YAML. |
 
 ## Validation Policy
 

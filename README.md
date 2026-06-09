@@ -304,12 +304,15 @@ Scenario examples are run with the harness CLI:
 
 ```bash
 uv run sipx scenario run examples/llm/semantic_smoke.py --artifacts-dir artifacts
+uv run sipx scenario run examples/llm/sip_flow_audit.py --artifacts-dir artifacts
 ```
 
 You can also run the LLM scenario file directly:
 
 ```bash
 uv run python examples/llm/semantic_smoke.py
+uv run python examples/llm/sip_flow_audit.py
+uv run python examples/llm/sip_flow_audit.py --trace-file /path/to/sip-trace.txt
 ```
 
 The public Mizu demo server profile lives at `examples/mizu/harness.toml`:
@@ -326,7 +329,10 @@ export SIPX_LLM_API_KEY=...
 export SIPX_LLM_BASE_URL=https://api.openai.com/v1
 export SIPX_LLM_MODEL=gpt-4o-mini
 uv run sipx scenario run examples/llm/semantic_smoke.py --artifacts-dir artifacts
+uv run python examples/llm/sip_flow_audit.py --trace-file /path/to/sip-trace.txt
 ```
+
+`semantic_smoke.py` is the quick smoke test. `sip_flow_audit.py` is the richer example: it extracts deterministic SIP signals, asks the LLM for structured JSON, returns summary, behavior, risk score, protocol findings, media assessment, and next actions.
 
 Templates live under `examples/llm`, `examples/asterisk`, and `examples/native`. The live LLM smoke test is skipped unless `SIPX_LLM_API_KEY` is set.
 

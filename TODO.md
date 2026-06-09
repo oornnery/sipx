@@ -420,6 +420,14 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Fixed `LLMChatClient.from_env()` optional env defaults for direct example execution.
 - [x] Added regression coverage for minimal `SIPX_LLM_API_KEY` env config.
 
+## Block 1.7.0 Done
+
+- [x] Bumped package version to `1.7.0`.
+- [x] Added runnable `examples/llm/sip_flow_audit.py`.
+- [x] Added deterministic SIP signals plus structured LLM audit JSON output.
+- [x] Added deterministic auth-redaction checks for SIP-flow audit traces.
+- [x] Documented direct and `sipx scenario run` commands for the quick smoke and SIP-flow audit examples.
+
 ## Blocked Or Pending
 
 - [ ] `python -m ty check` still needs the system interpreter environment synced; configured validation now uses passing `uv run ty check`.

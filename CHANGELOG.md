@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.7.0 - 2026-06-08
+
+- Added runnable `examples/llm/sip_flow_audit.py` for richer LLM SIP-flow analysis.
+- The audit example extracts deterministic SIP signals, asks the LLM for structured JSON, and reports behavior, risk score, protocol findings, media assessment, and next actions.
+- The audit example flags unredacted SIP auth headers while accepting `[REDACTED]` auth markers.
+- Documented how to run the quick LLM smoke and richer SIP-flow audit examples directly or through `sipx scenario run`.
+- Bumped package version to `1.7.0`.
+
 ## 1.6.1 - 2026-06-08
 
 - Fixed `LLMChatClient.from_env()` so missing optional `SIPX_LLM_*` settings use concrete defaults instead of dataclass slot descriptors.
