@@ -2,29 +2,31 @@
 
 ## Source Of Truth
 
-This file is the detailed implementation design for `sipx`. `IDEA.md` is historical source material only. There is intentionally no separate `/docs` tree. Implementation context must live in the current project structure: `README.md`, `SPEC.md`, `DESIGN.md`, `TODO.md`, `.spec/*`, and `.mem/*`.
+This file is the detailed implementation design for `sipx`. `IDEA.md` is historical source material only. There is intentionally no separate `/docs` tree. Implementation context must live in the current project structure: `README.md`, `FORMAT.md`, `SPEC.md`, `DESIGN.md`, `TODO.md`, `.spec/*`, and `.mem/*`.
 
 ## Product Identity
 
-`sipx` is a Python programmable Voice/SIP Harness for AI, automation, IVR testing, technical softphones, contact-center apps, and real-time media validation.
+`sipx` is a Python Voice/SIP workspace for AI, automation, IVR testing, technical softphones, contact-center apps, and real-time media validation.
 
 It is not only a SIP User Agent, not only a PBX wrapper, and not a normal end-user softphone. The product center is the harness: actors, scenarios, expectations, timelines, verdicts, artifacts, replay, and reports.
 
 ```text
-Asterisk is a backend.
-Native SIP is the low-level engine.
-The Harness is the product.
+Root sipx is SIP protocol/runtime.
+The Harness lives in sipx-harness.
+Asterisk is a runtime app.
+SIP UAC/UAS runtime is the low-level engine.
+The workspace Harness is the product.
 ```
 
 ## Product Shape
 
 | Product | Purpose |
 | --- | --- |
-| Voice Harness | Scenario runner, `expect`, timeline, artifacts, verdicts, automation, replay, reports. |
-| Technical Softphone | Native SIP/RTP endpoint for engineers, automation, inspection, negative tests, scenario recording. |
-| Asterisk Integration Backend | Asterisk as PBX/media/contact-center engine controlled by Python. |
+| Voice Harness | `sipx-harness` scenario runner, `expect`, timeline, artifacts, verdicts, automation, replay, reports. |
+| Technical Softphone | SIP/RTP endpoint for engineers, automation, inspection, negative tests, scenario recording. |
+| Asterisk Integration Runtime | Asterisk as PBX/media/contact-center engine controlled by Python. |
 
-The headless native technical softphone app lives in workspace package `apps/softphone` as `sipx_softphone.NativeSoftphone` and imports the root `sipx` core library.
+The root package `sipx` owns SIP protocol/runtime and RTP media primitives. The harness lives in workspace package `apps/harness` as `sipx_harness`. Headless SIP technical softphone ergonomics live in split root `SipUac`/`SipUas` modules instead of a separate wrapper package.
 
 ## Main Use Cases
 
@@ -80,7 +82,7 @@ Semantic AI expectations are probabilistic. They must not be the only pass/fail 
 ## Non-Goals For MVP
 
 - No carrier-grade PBX replacement.
-- No full native SIP/RTP stack before harness core exists.
+- No full SIP/RTP stack before harness core exists.
 - No GUI before headless engine and CLI prove the model.
 - No Asterisk loadable modules in first product path.
 - No AI-only pass/fail for critical regressions.
@@ -92,13 +94,13 @@ Semantic AI expectations are probabilistic. They must not be the only pass/fail 
 Applications / CLI / CI / QA / Softphone UI
         |
         v
-sipx Harness Core
+sipx-harness
   Actor, Scenario, Expect, Timeline, Verdict, Artifact, Metrics
         |
         +-------------------------+-------------------------+
         |                         |                         |
         v                         v                         v
- AsteriskBackend            NativeSipBackend            Mock/Replay
+ AsteriskRuntime            SipUserAgent                Mock/Replay
  ARI, Stasis, bridges       SIP, SDP, RTP, DTMF         tests, replay
  media, recordings          strict/lab, softphone       fixtures
         |                         |
@@ -106,13 +108,13 @@ sipx Harness Core
  Asterisk/PJSIP             SIP endpoints/PBX/SBC/IVR
 ```
 
-Scenarios should describe participants and expectations, not backend plumbing. A backend is an execution detail behind an actor.
+Scenarios should describe participants and expectations, not runtime plumbing. A runtime is an execution detail behind an actor.
 
 ## Core Entities
 
 | Entity | Responsibility |
 | --- | --- |
-| `Harness` | Owns config, backends, actors, scenario execution, artifacts. |
+| `Harness` | Owns config, runtimes, actors, scenario execution, artifacts. |
 | `Actor` | Programmable participant: softphone, Asterisk, remote target, bot, queue, fake carrier. |
 | `Scenario` | Executable flow with steps, fixtures, expectations, final verdict. |
 | `Call` | High-level call facade for apps and tests. |
@@ -126,9 +128,9 @@ Scenarios should describe participants and expectations, not backend plumbing. A
 ## Actor-First Model
 
 ```python
-caller = h.actor("caller").softphone(backend="native")
-pbx = h.actor("pbx").asterisk(backend="asterisk_lab")
-agent = h.actor("agent").softphone(backend="native")
+caller = h.actor("caller").softphone(runtime="sip")
+pbx = h.actor("pbx").asterisk(runtime="asterisk_lab")
+agent = h.actor("agent").softphone(runtime="sip")
 target = h.actor("target").remote("sip:ivr@example.com")
 bot = h.actor("bot").ai_agent(policy=my_policy)
 ```
@@ -137,19 +139,23 @@ Actor types:
 
 | Actor | Purpose |
 | --- | --- |
-| `NativeSoftphoneActor` | Native SIP/RTP endpoint and technical softphone. |
-| `AsteriskActor` | Controlled Asterisk PBX/media/backend actor. |
+| `SipActor` | SIP/RTP endpoint and technical softphone. |
+| `AsteriskActor` | Controlled Asterisk PBX/media/runtime actor. |
 | `RemoteSipTarget` | External SIP endpoint, PBX, IVR, carrier, SBC, or softphone. |
 | `AiBotActor` | AI participant, observer, judge, or navigator. |
 | `FakeCarrierActor` | Simulated provider or trunk for tests. |
 | `QueueActor` | Queue behavior for contact-center scenarios. |
 
-An actor can use native SIP, Asterisk, mock, replay, or a future backend. The scenario should keep the same mental model when the backend changes.
+An actor can use the SIP UAC/UAS runtime, Asterisk, mock, replay, or a future runtime. The scenario should keep the same mental model when the runtime changes.
 
-## Backend Interfaces
+## Runtime Interfaces
+
+Implemented harness contracts are ABCs: `Runtime`, `CallRuntime`, and `DtmfRuntime`. `MockRuntime` implements the call-control and DTMF contracts as a deterministic test-double for harness tests and local scenario skeletons.
+
+Implemented SIP role contracts are ABCs: `SipWireRuntime`, `SipUacRuntime`, and `SipUasRuntime`. `SipUserAgent` implements all three; `SipUac` and `SipUas` are role-specific subclasses for clearer UAC/UAS test and app code.
 
 ```python
-class TelephonyBackend(Protocol):
+class TelephonyRuntime(Protocol):
     async def originate(self, target: str, **opts) -> "Call": ...
     async def accept(self, event: "IncomingCallEvent") -> "Call": ...
     async def answer(self, call: "Call", **opts) -> None: ...
@@ -175,25 +181,25 @@ class MediaControl(Protocol):
     async def send_dtmf(self, digit: str) -> None: ...
 ```
 
-`AsteriskBackend` implements high-level call control and parts of media control. `NativeSipBackend` implements high-level call control, SIP wire control, and media control.
+`AsteriskRuntime` implements high-level call control and parts of media control. `SipUserAgent`/`SipUac`/`SipUas` implement high-level call control, SIP wire control, and media control.
 
-## Backend Types
+## Runtime Types
 
-| Backend | Purpose |
+| Runtime | Purpose |
 | --- | --- |
-| `AsteriskBackend` | Fast MVP, real trunks/endpoints, bridges, queues, recordings, media server, contact center. |
-| `NativeSipBackend` | Raw SIP/SDP/RTP, technical softphone, lab mode, malformed messages, fuzzing, conformance. |
-| `MockBackend` | Unit and scenario tests without network. |
-| `ReplayBackend` | Replay recorded timelines/artifacts for debugging and regression. |
-| `PjsipBackend` | Optional future robust softphone backend, less suitable for wire-level lab control. |
-| `SippBackend` | Optional future load/conformance helper, not core public API. |
+| `AsteriskRuntime` | Fast MVP, real trunks/endpoints, bridges, queues, recordings, media server, contact center. |
+| `SipUserAgent` | Raw SIP/SDP/RTP, technical softphone, lab mode, malformed messages, fuzzing, conformance. |
+| `MockRuntime` | Unit and scenario tests without network. |
+| `ReplayRuntime` | Replay recorded timelines/artifacts for debugging and regression. |
+| `PjsipRuntime` | Optional future robust softphone runtime, less suitable for wire-level lab control. |
+| `SippRuntime` | Optional future load/conformance helper, not core public API. |
 
 ## Capability Model
 
-Every backend must declare capabilities.
+Every runtime must declare capabilities.
 
 ```python
-class BackendCapability(StrEnum):
+class RuntimeCapability(StrEnum):
     HIGH_LEVEL_CALL_CONTROL = "high_level_call_control"
     RAW_SIP = "raw_sip"
     RAW_RTP = "raw_rtp"
@@ -211,7 +217,7 @@ class BackendCapability(StrEnum):
 Example capability sets:
 
 ```python
-AsteriskBackend.capabilities = {
+AsteriskRuntime.capabilities = {
     HIGH_LEVEL_CALL_CONTROL,
     BRIDGE,
     QUEUE,
@@ -220,7 +226,7 @@ AsteriskBackend.capabilities = {
     AI_MEDIA,
 }
 
-NativeSipBackend.capabilities = {
+SipUserAgent.capabilities = {
     HIGH_LEVEL_CALL_CONTROL,
     RAW_SIP,
     RAW_RTP,
@@ -236,8 +242,8 @@ If an expectation is unsupported, fail loud:
 
 ```text
 UnsupportedExpectation:
-AsteriskBackend does not expose raw SIP wire-level Via branch.
-Use NativeSipBackend or enable passive packet capture.
+AsteriskRuntime does not expose raw SIP wire-level Via branch.
+Use `SipUserAgent`/`SipUac`/`SipUas` or enable passive packet capture.
 ```
 
 ## Responsibility Matrix
@@ -245,20 +251,20 @@ Use NativeSipBackend or enable passive packet capture.
 | Responsibility | Where it belongs |
 | --- | --- |
 | Scenarios, expectations, timeline, reports | Python harness core. |
-| STT, TTS, LLM, VAD, semantic analysis | Python media/AI runtime. |
+| STT, TTS, LLM, VAD, semantic analysis | App/runtime packages on top of root media primitives. |
 | Enriched recording, transcript, artifacts | Python harness core. |
 | User-facing SDK | Python harness core. |
-| Raw SIP validation | `NativeSipBackend`. |
-| Malformed message tests | `NativeSipBackend`. |
+| Raw SIP validation | `SipUserAgent`. |
+| Malformed message tests | `SipUserAgent`. |
 | Real SIP trunks | Asterisk first. |
 | Queues, MOH, bridge, production call handling | Asterisk first. |
 | Product IVR logic | Python controlling Asterisk through ARI first. |
-| Headless softphone automation | Native Python SIP first, optional PJSIP later. |
-| Real-time AI media | Python plus Asterisk ExternalMedia, AudioSocket, WebSocket, or native RTP. |
+| Headless softphone automation | Python SIP first, optional PJSIP later. |
+| Real-time AI media | Python plus Asterisk ExternalMedia, AudioSocket, WebSocket, or RTP. |
 | Massive SIP traffic | SIPp, Kamailio, OpenSIPS, Asterisk, or specialized tools. |
 | High-volume SBC/proxy/registrar | Kamailio/OpenSIPS, not `sipx` MVP. |
 
-## AsteriskBackend
+## AsteriskRuntime
 
 Use Asterisk where it accelerates the product:
 
@@ -294,9 +300,9 @@ Primary interface choices:
 
 | Role | Description |
 | --- | --- |
-| Controlled backend | Python controls Asterisk through ARI. |
-| System under test | A native `sipx` softphone registers or calls into Asterisk to validate it from outside. |
-| Scenario resource | Asterisk is one actor inside a mixed native/Asterisk/remote scenario. |
+| Controlled runtime | Python controls Asterisk through ARI. |
+| System under test | A `sipx` SIP softphone registers or calls into Asterisk to validate it from outside. |
+| Scenario resource | Asterisk is one actor inside a mixed SIP/Asterisk/remote scenario. |
 
 ## Asterisk Main Flow
 
@@ -329,7 +335,7 @@ Suggested implementation order:
 
 1. WebSocket media or AudioSocket for fast AI media MVP.
 2. ExternalMedia RTP when RTP stats, packet timing, or protocol validation matters.
-3. Native RTP in `NativeSipBackend` for protocol-lab work.
+3. RTP in `SipUserAgent` for protocol-lab work.
 
 ## Asterisk Inbound AI Flow
 
@@ -482,7 +488,7 @@ await expect(call).to_hangup_cleanly()
 
 Asterisk normalizes and hides raw protocol details. That is good for product behavior and bad for protocol conformance.
 
-Use `NativeSipBackend` instead of `AsteriskBackend` when validating:
+Use `SipUserAgent`/`SipUac`/`SipUas` instead of `AsteriskRuntime` when validating:
 
 - Exact retransmission behavior.
 - Exact `Via` branch.
@@ -497,9 +503,9 @@ Use `NativeSipBackend` instead of `AsteriskBackend` when validating:
 - Content-Length mismatch.
 - RTP sequence gaps, strange timestamps, unknown payload types.
 
-## NativeSipBackend
+## SipUserAgent / SipUac / SipUas
 
-The native backend gives `sipx` its identity as a SIP harness, not only an Asterisk app.
+The SIP user-agent runtime gives `sipx` its identity as a SIP harness, not only an Asterisk app.
 
 Responsibilities:
 
@@ -514,6 +520,12 @@ Responsibilities:
 - Run malformed scenarios.
 - Provide technical softphone behavior.
 
+High-level ergonomics belong in separate role files:
+
+- `sipx/uac.py`: outbound identity, REGISTER, OPTIONS, MESSAGE, generic request, call, BYE, INFO, re-INVITE, RTP send policy.
+- `sipx/uas.py`: inbound listen/answer/reject, SDP answer, ACK wait, BYE answer, inbound re-INVITE, RTP receive/playout policy.
+- `sipx/ua.py`: shared UDP transport, dialog, transaction, retransmission, auth, and low-level SIP runtime behavior.
+
 Modes:
 
 | Mode | Purpose |
@@ -523,10 +535,10 @@ Modes:
 
 Lab hook shape:
 
-- `NativeSipLabHooks.before_send_message` may mutate or replace outbound SIP messages, or return raw bytes for malformed SIP.
-- `NativeSipLabHooks.before_sdp_body` may rewrite SDP bodies before serialization.
-- `NativeSipLabHooks.after_receive_event` may observe, replace, or drop received wire events.
-- `NativeSipLabHooks.retransmission_intervals` may override transaction timer intervals.
+- `SipHooks.before_send_message` may mutate or replace outbound SIP messages, or return raw bytes for malformed SIP.
+- `SipHooks.before_sdp_body` may rewrite SDP bodies before serialization.
+- `SipHooks.after_receive_event` may observe, replace, or drop received wire events.
+- `SipHooks.retransmission_intervals` may override transaction timer intervals.
 - Hooks are rejected in `strict` mode and are available only in `lab` mode.
 
 ## Protocol Normative Base
@@ -570,7 +582,7 @@ The first implementation should support audio only. Video, multi-party conferenc
 
 ## Sans-I/O Rule
 
-Native protocol core must be sans-I/O.
+SIP protocol core must be sans-I/O.
 
 Core sans-I/O modules:
 
@@ -720,6 +732,8 @@ jitter playout loop:
 
 RTP provides payload type, sequence, timestamp, and monitoring through RTCP. It does not guarantee delivery, order, latency, or QoS. `sipx` must provide jitter buffer, loss tolerance, stats, and metrics.
 
+Implemented RTP primitives now include PCMU/PCMA encode/decode without `audioop`, synthetic `silence`/`noise` PCM sources, optional lazy PyAudio input, `RtpSequenceStats` jitter/loss/duplicate counters, `RtpMetrics` tx/rx snapshots, `RtpJitterBuffer` ordered playout with concealment and underrun/overrun/late/duplicate counters, and `RtpAudioSession` for UDP RTP send/receive with metrics snapshots. High-level `SipUac.call(audio="none|silence|noise|pyaudio")` and `SipUas.answer(audio="none|silence|noise|pyaudio")` support no-device synthetic media or optional PyAudio during calls and separate RTP bind host from SDP advertised host. UAS answers use `SipProvisionalResponse` for `0+` configured RFC 3261 `1xx` responses before the final response, including direct final-only flows and `100 + 183/SDP + 200`. The root `sipx` CLI exposes `--audio`, `--jitter-buffer-ms`, `--rtp-stats`, and `--metrics-json` on `call`/`listen`.
+
 ## Jitter Buffer
 
 Initial config:
@@ -763,7 +777,7 @@ Future:
 | CN | Comfort noise. |
 | L16 | Lab/testing. |
 
-Do not depend on stdlib `audioop` for G.711. It was removed in Python 3.13. Implement PCMU/PCMA directly or use an explicit compatible package/native extension.
+Do not depend on stdlib `audioop` for G.711. It was removed in Python 3.13. Implement PCMU/PCMA directly or use an explicit compatible package/C extension.
 
 ## DTMF
 
@@ -869,7 +883,7 @@ Network-exposed protocol parsers must fail closed with typed errors, no crash, a
 The public API centers on actors and scenarios, not on `UserAgent` directly.
 
 ```python
-from sipx import Harness, expect, scenario
+from sipx_harness import Harness, expect, scenario
 
 
 async with Harness.from_file("harness.toml") as h:
@@ -886,9 +900,9 @@ async with Harness.from_file("harness.toml") as h:
 ```python
 h = Harness()
 
-h.add_backend(
+h.register_runtime(
     "asterisk_lab",
-    AsteriskBackend(
+    AsteriskRuntime(
         ari_url="http://127.0.0.1:8088/ari",
         app="sipx",
         username="sipx",
@@ -896,9 +910,9 @@ h.add_backend(
     ),
 )
 
-h.add_backend(
-    "native",
-    NativeSipBackend(
+h.register_runtime(
+    "sip",
+    SipUserAgent(
         bind=("0.0.0.0", 5062),
         rtp_ports=(20000, 30000),
         mode="strict",
@@ -1309,9 +1323,9 @@ class MediaPort(Protocol):
 
 Implementations:
 
-| Port | Backend |
+| Port | Runtime |
 | --- | --- |
-| `RtpMediaPort` | `NativeSipBackend`. |
+| `RtpMediaPort` | `SipUserAgent`. |
 | `AsteriskExternalRtpPort` | Asterisk ExternalMedia RTP. |
 | `AsteriskWebSocketPort` | Asterisk `chan_websocket`. |
 | `AudioSocketPort` | Asterisk AudioSocket. |
@@ -1320,7 +1334,13 @@ Implementations:
 
 ## STT And TTS Interfaces
 
+STT/TTS protocols live in app packages, not root `sipx.media`. Root media owns only generic audio frames, media ports, and barge-in policy.
+
 ```python
+from sipx_stt import SttEngine, SttStream, TranscriptEvent
+from sipx_tts import TtsEngine
+
+
 class SttEngine(Protocol):
     async def start(self, *, sample_rate: int, language: str) -> "SttStream": ...
 
@@ -1469,7 +1489,7 @@ This is useful but probabilistic. Robust tests should combine it with determinis
 
 The implemented LLM provider surface starts with `LLMChatClient` in workspace package `apps/llm` as `sipx_llm.LLMChatClient`. It uses stdlib HTTP against an OpenAI-compatible `/chat/completions` endpoint with an injectable transport so unit tests do not call the network. Live validation is explicitly opt-in through `SIPX_LLM_API_KEY`, `SIPX_LLM_BASE_URL`, and `SIPX_LLM_MODEL`; no provider key belongs in examples, tests, logs, artifacts, or committed config.
 
-Example templates live in `apps/llm/examples`, `apps/asterisk/examples`, and `apps/softphone/examples`. They are templates only: they import without secrets and skip or no-op when `SIPX_LLM_API_KEY` is absent.
+Example templates live in `apps/llm/examples`, `apps/asterisk/examples`, and `apps/scenarios/examples`. They are templates only: they import without secrets and skip or no-op when `SIPX_LLM_API_KEY` is absent.
 
 ## Voice Apps
 
@@ -1527,10 +1547,10 @@ await call.bridge(leg_b, record=True, transcribe=True)
 The technical softphone is not an end-user softphone. It is closer to a Postman or Playwright for voice, with SIP/RTP inspection and scenario automation.
 
 ```text
-TechnicalSoftphone = NativeSipActor + MediaEngine + ScenarioRunner + Inspector
+technical softphone behavior = SipUac/SipUas + MediaEngine + ScenarioRunner + Inspector
 ```
 
-It must be built on `NativeSipBackend`, not on Asterisk. Asterisk can be a backend, peer, lab PBX, scenario resource, or system under test.
+It must be built into `SipUac`/`SipUas` on top of `SipUserAgent`, not as a separate redundant wrapper and not on Asterisk. Asterisk can be a runtime, peer, lab PBX, scenario resource, or system under test.
 
 ## Technical Softphone Engine
 
@@ -1547,7 +1567,7 @@ Softphone Engine / Python daemon
         +-----------------------+
         |                       |
         v                       v
-Native SIP/RTP Stack       Harness Runtime
+SIP/RTP Stack              Harness Runtime
 UAC/UAS, REGISTER, SDP     scenarios, artifacts
 RTP, DTMF, media
 ```
@@ -1569,7 +1589,7 @@ Interfaces can come later:
 - Inspect SIP messages in real time.
 - Change headers in lab mode.
 - Customize SDP in lab mode.
-- Pass native SIP lab hooks through softphone config in lab mode.
+- Pass SIP lab hooks through UAC/UAS config in lab mode.
 - Send DTMF through RFC4733, SIP INFO, or in-band when supported.
 - Play audio, TTS, silence, tones, noise, or files.
 - Receive RTP, record, transcribe, and measure quality.
@@ -1580,33 +1600,25 @@ Interfaces can come later:
 
 ## Technical Softphone CLI
 
-The CLI command is `sipx`.
+The CLI command is `sipx`. The current root command surface is SIP/RTP-only and curl-like: `options`, `message`, `request`, `register`, `unregister`, `call`, and `listen`.
 
 ```bash
-sipx phone register lab_account
-sipx phone unregister lab_account
-sipx phone call sip:6000@pbx.lab --profile lab_account --duration 5
-sipx phone listen lab_account --duration 30
-sipx register lab_account
-sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password secret
-sipx call sip:6000@pbx.lab --profile lab_account
-sipx call sip:6000@pbx.lab --aor sip:1001@pbx.lab --registrar sip:pbx.lab --username 1001 --password secret --media-port 40000
-sipx call sip:6000@pbx.lab --aor sip:1001@pbx.lab --registrar sip:pbx.lab --username 1001 --password secret --codec PCMU --debug-sip
-sipx options sip:pbx.lab --from sip:1001@example.com -i
-sipx message sip:1002@pbx.lab 'hello' --from sip:1001@example.com
-sipx request INFO sip:1002@pbx.lab --from sip:1001@example.com --username 1001 --password secret --debug-sip -H 'Content-Type: application/dtmf-relay' -d 'Signal=1'
-uv run --package sipx-cli sipx register mizu_demo --config apps/softphone/examples/mizu/harness.toml --local-host <your-local-ip> --keepalive 5 --debug-sip
-sipx scenario run ivr_second_copy.py
-sipx scenario export timeline.jsonl --format python
-sipx replay timeline.jsonl
+sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password "$SIP_PASSWORD"
+sipx unregister --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password "$SIP_PASSWORD"
+sipx call sip:6000@pbx.example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --audio noise --rtp-stats --duration 5
+sipx call sip:6000@pbx.example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --rtp-bind 0.0.0.0 --rtp-advertise 203.0.113.10 --jitter-buffer-ms 80 --metrics-json metrics.json
+sipx listen --aor sip:1001@example.com --registrar sip:pbx.example.com --local-port 5062 --audio silence --duration 30 --rtp-stats
+sipx options sip:pbx.example.com --from sip:1001@example.com -i
+sipx message sip:1002@pbx.example.com 'hello' --from sip:1001@example.com
+sipx request INFO sip:1002@pbx.example.com --from sip:1001@example.com --username 1001 --password "$SIP_PASSWORD" --debug-sip -H 'Content-Type: application/dtmf-relay' -d 'Signal=1'
 ```
 
-Implemented profile inspection commands are `sipx profile list` and `sipx profile show <name>`.
-Implemented phone commands fail before network access unless a profile or explicit SIP account identity is provided.
+Root `sipx` intentionally does not expose `scenario`, `profile`, `replay`, or `phone` subcommands.
+Implemented account commands fail before network access unless explicit SIP account identity is provided.
 Implemented raw SIP request commands support curl-like `-H`, `-d`, `--body-file`, `--include`, and `--no-wait` flags.
 Implemented Digest auth retries one `401` or `407` challenge for calls and raw SIP requests when credentials are provided.
-Implemented `--debug-sip` prints redacted SIP datagrams for phone and raw SIP commands without requiring lab mode.
-Implemented native softphone calls generate SDP audio offers, open the advertised RTP UDP port, and validate `2xx` SDP answers before confirmation.
+Implemented `--debug-sip` prints redacted SIP datagrams without requiring lab mode.
+Implemented SIP calls generate SDP audio offers, open RTP, validate `2xx` SDP answers before confirmation, separate RTP bind from advertised SDP address, support synthetic `silence`/`noise` and optional lazy `pyaudio`, and emit call/RTP metrics with `--rtp-stats` or `--metrics-json`.
 Implemented `sipx call --dtmf` sends in-dialog SIP INFO `application/dtmf-relay` digits after confirmation.
 Implemented LLM examples use `sipx_llm.LLMChatClient` with provider keys supplied only at runtime through `SIPX_LLM_API_KEY`.
 
@@ -1678,7 +1690,7 @@ Implemented profile shape uses `harness.toml` tables loaded by `load_profiles()`
 ```toml
 [profiles.normal]
 mode = "strict"
-backend = "native"
+runtime = "sip"
 
 [profiles.normal.account]
 aor = "sip:alice@example.com"
@@ -1774,18 +1786,18 @@ steps:
       within: 10s
 ```
 
-Implemented exports are intentionally simple: `ScenarioRecorder.from_timeline()` converts timeline events and user actions into Python or YAML text, and `sipx scenario export <timeline.jsonl>` writes the chosen export to stdout.
+Implemented exports are intentionally simple: `ScenarioRecorder.from_timeline()` converts timeline events and user actions into Python or YAML text. Root `sipx` no longer exposes scenario export commands; scenario tooling belongs outside the SIP/RTP-only CLI surface.
 
 ## Mixed Scenario
 
 This is a core differentiator.
 
 ```python
-@scenario("asterisk_routes_to_native_agent")
+@scenario("asterisk_routes_to_sip_agent")
 async def test_inbound_to_agent(h: Harness):
-    caller = h.actor("caller").softphone(backend="native")
-    agent = h.actor("agent").softphone(backend="native", auto_answer=True)
-    pbx = h.actor("pbx").asterisk(backend="asterisk_lab")
+    caller = h.actor("caller").softphone(runtime="sip")
+    agent = h.actor("agent").softphone(runtime="sip", auto_answer=True)
+    pbx = h.actor("pbx").asterisk(runtime="asterisk_lab")
 
     await agent.register()
     await caller.register()
@@ -1800,86 +1812,32 @@ async def test_inbound_to_agent(h: Harness):
     await call.hangup()
 ```
 
-This validates SIP behavior seen by caller, ARI behavior seen by backend, real media flow, AI/STT/TTS behavior when present, and business flow.
+This validates SIP behavior seen by caller, ARI behavior seen by runtime, real media flow, AI/STT/TTS behavior when present, and business flow.
 
-Implemented mixed support starts with `MixedScenario` and `MixedActorSpec`, which bind actors from different registered backends onto one shared harness timeline. Native/Asterisk/media orchestration can build on this binding layer.
+Implemented mixed support starts with `MixedScenario` and `MixedActorSpec`, which bind actors from different registered runtimes onto one shared harness timeline. SIP/Asterisk/media orchestration can build on this binding layer.
 
 ## Package Layout
 
-Initial target layout:
+Current workspace layout:
 
 ```text
 sipx/
-  core/
-    actor.py
-    event.py
-    timeline.py
-    scenario.py
-    expect.py
-    verdict.py
-    artifacts.py
-    metrics.py
-  backends/
-    asterisk/
-      backend.py
-      ari.py
-      channels.py
-      bridges.py
-      external_media.py
-      audiosocket.py
-      websocket_media.py
-      recordings.py
-    native_sip/
-      backend.py
-      softphone.py
-      server.py
-      client.py
   sip/
-    message.py
-    uri.py
-    parser.py
-    serializer.py
-    transaction.py
-    dialog.py
-    auth.py
-    hooks.py
   sdp/
-    model.py
-    parser.py
-    offer_answer.py
-    matchers.py
   rtp/
-    packet.py
-    session.py
-    jitter.py
-    rtcp.py
-    dtmf.py
-    impairment.py
-    codecs/
   media/
-    frame.py
-    graph.py
-    player.py
-    recorder.py
-    vad.py
-    stt.py
-    tts.py
-  softphone/
-    engine.py
-    account.py
-    inspector.py
-    recorder.py
-    automation.py
-  apps/
-    ivr.py
-    queue.py
-    bot.py
-    contact_center.py
-  cli/
-    main.py
+  ua.py
+apps/
+  harness/src/sipx_harness/
+  cli/src/sipx_cli/
+  asterisk/src/sipx_asterisk/
+  llm/src/sipx_llm/
+  scenarios/src/sipx_scenarios/
+  stt/src/sipx_stt/
+  tts/src/sipx_tts/
 ```
 
-The CLI command and import package are both `sipx`.
+Root import package is `sipx` and contains SIP protocol/runtime surfaces only. Harness concepts import from `sipx_harness`. CLI command is still `sipx`, owned by package `sipx-cli`.
 
 ## Security
 
@@ -1927,9 +1885,9 @@ Every call should have a trace identity that links SIP Call-ID, local/remote tag
 ## Testing Strategy
 
 - Unit tests first for core timeline, expectations, verdicts, artifacts, capabilities.
-- Mock backend tests for scenario runner without network.
+- Mock runtime tests for scenario runner without network.
 - Asterisk integration tests behind explicit environment/config.
-- Native SIP parser and RTP parser tests with fuzz/property coverage.
+- SIP parser and RTP parser tests with fuzz/property coverage.
 - Semantic AI assertions separated from deterministic protocol assertions.
 - Parser tests for valid messages, compact headers, multiline headers, body with Content-Length.
 - Transaction tests for timers, retransmission, timeout, CANCEL, ACK.
@@ -1953,11 +1911,11 @@ sipx RTP  <-> RTP proxy / packet capture / impairment simulator
 Priority rule: do not start with a complete AI bot. Start with testability and timeline.
 
 1. Harness core: Actor, Scenario, Expect, Timeline, Artifact, Verdict, Metrics.
-2. MockBackend and CLI skeleton.
-3. AsteriskBackend via ARI/Stasis.
+2. MockRuntime and CLI skeleton.
+3. AsteriskRuntime via ARI/Stasis.
 4. One Asterisk media path.
-5. STT/TTS protocols and media frame pipeline.
-6. NativeSipBackend minimum.
+5. STT/TTS app protocols and media frame pipeline.
+6. SipUserAgent minimum.
 7. Technical softphone headless.
 8. Scenario recorder/exporter and replay.
 9. Reports.
@@ -1974,11 +1932,11 @@ Tasks:
 - `Artifact`.
 - `Verdict`.
 - `Metrics`.
-- Backend capability model.
+- Runtime capability model.
 - Rich failure format.
 - CLI skeleton.
 
-## Phase 2 - AsteriskBackend MVP
+## Phase 2 - AsteriskRuntime MVP
 
 Tasks:
 
@@ -2001,15 +1959,15 @@ Tasks:
 
 - `AudioFrame`.
 - `MediaPort`.
-- STT protocol.
-- TTS protocol.
+- STT protocol in `sipx_stt`.
+- TTS protocol in `sipx_tts`.
 - Transcript events.
 - Barge-in policy.
 - Silence/placeholder behavior when AI is slow.
 - DTMF event model.
 - Recording/transcript artifacts.
 
-## Phase 4 - NativeSipBackend Minimum
+## Phase 4 - SipUserAgent Minimum
 
 SIP tasks:
 
@@ -2095,7 +2053,7 @@ Tasks:
 - Fuzzing CI.
 - Conformance suites.
 
-## Phase 8 - Optional UI And Optional Backends
+## Phase 8 - Optional UI And Optional Runtimes
 
 UI features:
 
@@ -2109,18 +2067,18 @@ UI features:
 - Timeline viewer.
 - Export scenario button.
 
-Optional backends:
+Optional runtimes:
 
-- `PjsipBackend` for robust softphone interop.
-- `SippBackend` for load/conformance workflows.
+- `PjsipRuntime` for robust softphone interop.
+- `SippRuntime` for load/conformance workflows.
 - External SBC/proxy integrations when required.
 
-`PjsipBackend` tradeoffs:
+`PjsipRuntime` tradeoffs:
 
 - Use it when robust softphone interoperability, mature NAT behavior, TLS/SRTP, or production endpoint compatibility matter more than malformed wire control.
-- Do not use it as the core protocol-lab backend because PJSIP normalizes messages and is not designed to emit arbitrary malformed SIP/SDP/RTP.
-- Keep it optional so the native SIP stack remains the source for strict/lab wire-level tests and technical-softphone fault injection.
-- Prefer adding `PjsipBackend` after profile config, native lab hooks, and Asterisk integration are stable.
+- Do not use it as the core protocol-lab runtime because PJSIP normalizes messages and is not designed to emit arbitrary malformed SIP/SDP/RTP.
+- Keep it optional so the SIP UAC/UAS runtime remains the source for strict/lab wire-level tests and technical-softphone fault injection.
+- Prefer adding `PjsipRuntime` after profile config, SIP lab hooks, and Asterisk integration are stable.
 
 ## Asterisk Docker Lab
 

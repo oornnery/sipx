@@ -4,16 +4,123 @@
 
 | Command | Purpose | Status |
 | --- | --- | --- |
-| `ruff format --check .` | formatting | not run yet |
-| `ruff check .` | lint | not run yet |
-| `uv run ty check` | type check | pass after block `1.5.0` |
-| `pytest` | tests | not run yet |
+| `ruff format --check .` | formatting | pass after block `1.11.0` |
+| `ruff check .` | lint | pass after block `1.11.0` |
+| `uv run ty check` | type check | pass after block `1.11.0` |
+| `pytest` | tests | skipped for block `1.11.0` per user; last pass after block `1.10.0` |
 | `pre-commit run --all-files` | full local hooks | not run yet |
 
 ## Latest Results
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-06-09 | `ruff check .` | pass | Full lint clean after 1.11 API/CLI/example updates. |
+| 2026-06-09 | `ruff format --check .` | pass | 114 files already formatted after targeted formatting of CLI, handler example, and SIP headers. |
+| 2026-06-09 | `uv run ty check` | pass | Type check passes after 1.11 request/helper/summary/hook surfaces. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after 1.11 validation. |
+| 2026-06-09 | `ruff format --check .` | fail | Three files needed formatting after manual edits; fixed with targeted `ruff format`. |
+| 2026-06-09 | `uv run --package sipx-cli sipx request ... --print-message --compact-headers` | pass | Rendered SIP OPTIONS with compact headers and explicit capabilities without opening a socket. |
+| 2026-06-09 | `uv run --package sipx-cli sipx call ... --print-message --compact-headers` | pass | Rendered INVITE plus SDP with compact headers without opening SIP/RTP sockets. |
+| 2026-06-09 | `uv run python -m sipx.examples.build_request` | pass | No-network request construction example ran. |
+| 2026-06-09 | `uv run python -m sipx.examples.handlers` | pass | No-network decorator handler example ran. |
+| 2026-06-09 | `uv run python -m sipx.examples.options` | pass | Live public Mizu run with `SIPX_LOCAL_HOST=172.26.249.223`; returned `200 OK`. |
+| 2026-06-09 | `uv run python -m sipx.examples.smoke_tests` | pass | Live no-call smoke returned `register: registered` and OPTIONS `200 OK`. |
+| 2026-06-09 | `uv run python -m sipx.examples.invite_without_sdp` | pass/behavior | With explicit demo target and short timeout, returned structured `SipCallError` for `502 Bad Gateway`. |
+| 2026-06-09 | `uv run python -m sipx.examples.invite_with_sdp` | pass/behavior | With explicit demo target, returned structured `SipCallError`; without `SIPX_TARGET`, returned structured `ExampleConfigError`. |
+| 2026-06-09 | `uv run python -m sipx.examples.metrics` | pass/behavior | With explicit demo target, returned structured `SipCallError` and `rtp: null`. |
+| 2026-06-09 | `uv run python -m sipx.examples.manipulation` | pass/behavior | With explicit demo target, returned structured `SipCallError`. |
+| 2026-06-09 | `SIPX_RUN_CALL=1 uv run python -m sipx.examples.smoke_tests` | pass/behavior | REGISTER/OPTIONS pass; call branch returned structured `SipCallError`. |
+| 2026-06-09 | `git diff --check` | pass/no output | Final whitespace check after latest checks/handoff/decision updates. |
+| 2026-06-09 | `python -m pytest` | pass | 92 core tests after moving root examples to `sipx.examples` and adding V65/B30-B32 coverage. |
+| 2026-06-09 | `ruff check .` | pass | Full lint clean after root example move and timeout/error handling. |
+| 2026-06-09 | `ruff format --check .` | pass | 109 files already formatted after root example move and timeout/error handling. |
+| 2026-06-09 | `uv run ty check` | pass | Type check passes after typing timeout regression coroutine as `SipCall`. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after root example move and V65 updates. |
+| 2026-06-09 | `uv run ty check` | fail | Timeout regression test coroutine returned `None` where `await_call` expected `SipCall`; recorded B32 and fixed annotation. |
+| 2026-06-09 | `python -m pytest tests/test_examples.py` | pass | 5 example tests for root module paths, no app deps, explicit `SIPX_TARGET`, structured errors, and bounded waits. |
+| 2026-06-09 | `uv run python -m sipx.examples.register` | pass | Live public Mizu run with `SIPX_LOCAL_HOST=172.26.249.223`; returned `registered`. |
+| 2026-06-09 | `uv run python -m sipx.examples.options` | pass | Live public Mizu run with `SIPX_LOCAL_HOST=172.26.249.223`; returned `200 OK`. |
+| 2026-06-09 | `uv run python -m sipx.examples.invite_without_sdp` | pass/behavior | With explicit demo self-target, returned structured `SipCallError` for `502 Bad Gateway`; before fix this was traceback B30. |
+| 2026-06-09 | `uv run python -m sipx.examples.invite_with_sdp` | pass/behavior | With explicit demo self-target, returned structured `SipCallError` for `502 Bad Gateway`; without `SIPX_TARGET`, returned structured `ExampleConfigError`. |
+| 2026-06-09 | `uv run python -m sipx.examples.metrics` | pass/behavior | With explicit demo self-target and `SIPX_TIMEOUT=3`, returned structured `ExampleCallTimeout` and `rtp: null`. |
+| 2026-06-09 | `uv run python -m sipx.examples.manipulation` | pass/behavior | With explicit demo self-target, returned structured `SipCallError` for `502 Bad Gateway`. |
+| 2026-06-09 | `uv run python -m sipx.examples.smoke_tests` | pass | Live no-call smoke returned `register: registered` and OPTIONS `200 OK`. |
+| 2026-06-09 | `SIPX_RUN_CALL=1 uv run python -m sipx.examples.smoke_tests` | pass/behavior | With explicit demo self-target and `SIPX_TIMEOUT=3`, returned structured call failure; before timeout fix shell command timed out at 60s B31. |
+| 2026-06-09 | `git diff --check` | pass/no output | Final whitespace check after checks/handoff updates. |
+| 2026-06-09 | `python -m pytest` | pass | 89 core tests after T67/T68 configurable UAS provisionals and root Mizu examples. |
+| 2026-06-09 | `python -m pytest apps` | pass | 65 passed, 3 skipped after T67/T68. |
+| 2026-06-09 | `ruff check .` | pass | Full lint clean after T67/T68. |
+| 2026-06-09 | `ruff format --check .` | pass | 110 files already formatted after T67/T68. |
+| 2026-06-09 | `uv run ty check` | pass | Type check passes after `SipProvisionalResponse` API and root examples. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after T67/T68 before final checks update. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.10.0-provisionals` | pass | Built root `sipx-1.10.0` and all app package sdists/wheels outside repo. |
+| 2026-06-09 | `uv lock` | pass | Updated lockfile root package from `sipx v1.9.0` to `sipx v1.10.0`. |
+| 2026-06-09 | `python -m pytest tests/test_uac_uas.py tests/test_examples.py` | pass | 31 focused tests for `SipProvisionalResponse`, UAS provisional sequences, and root examples. |
+| 2026-06-09 | `ruff check sipx/ua.py sipx/uas.py sipx/uac.py sipx/sip/requests.py sipx/__init__.py sipx/examples tests/test_uac_uas.py tests/test_examples.py` | pass | Focused lint clean for changed SIP/example surfaces. |
+| 2026-06-09 | `ruff format --check sipx/ua.py sipx/uas.py sipx/uac.py sipx/sip/requests.py sipx/__init__.py sipx/examples tests/test_uac_uas.py tests/test_examples.py` | pass | 17 focused files already formatted after targeted formatting. |
+| 2026-06-09 | `python -m pytest apps/scenarios/tests/test_examples_templates.py` | pass | 7 example import/secret-scan tests after README/example doc updates. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after final docs/state updates. |
+| 2026-06-09 | `python -m pytest` | pass | 83 core tests after T59/T65/T66 SIP/RTP CLI, lazy PyAudio, and pure-Python Mizu examples. |
+| 2026-06-09 | `python -m pytest apps` | pass | 65 passed, 3 skipped after T59/T65/T66. |
+| 2026-06-09 | `ruff check .` | pass | Full lint clean after T59/T65/T66. |
+| 2026-06-09 | `ruff format --check .` | pass | 99 files already formatted after T59/T65/T66. |
+| 2026-06-09 | `uv run ty check` | pass | Type check passes after narrowing CLI/Mizu audio modes and optional RTP sessions. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after T59/T65/T66. |
+| 2026-06-09 | `uv run --package sipx-cli sipx --help` | pass | Top-level commands are `options`, `message`, `request`, `register`, `unregister`, `call`, `listen`. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.9.0-cli-rtp` | pass | Built root and all app package sdists/wheels outside repo after T59/T65/T66. |
+| 2026-06-09 | `uv lock` | pass | Refreshed lockfile after `sipx-cli` dependency narrowed to root `sipx`. |
+| 2026-06-09 | `python -m pytest tests/test_media.py tests/test_uac_uas.py apps/cli/tests/test_cli.py apps/scenarios/tests/test_examples_templates.py` | pass | 60 focused tests for PyAudio, UAC/UAS media, CLI surface, and examples. |
+| 2026-06-09 | `ruff check apps/cli/src/sipx_cli/main.py apps/cli/tests/test_cli.py apps/scenarios/tests/test_examples_templates.py apps/scenarios/examples/mizu sipx/media/pyaudio.py sipx/media/frame.py sipx/media/__init__.py sipx/__init__.py sipx/uac.py sipx/uas.py tests/test_media.py tests/test_uac_uas.py` | pass | Focused lint clean for changed Python surfaces. |
+| 2026-06-09 | `ruff format --check apps/cli/src/sipx_cli/main.py apps/cli/tests/test_cli.py apps/scenarios/tests/test_examples_templates.py apps/scenarios/examples/mizu sipx/media/pyaudio.py sipx/media/frame.py sipx/media/__init__.py sipx/__init__.py sipx/uac.py sipx/uas.py tests/test_media.py tests/test_uac_uas.py` | pass | Focused formatting clean after targeted `ruff format apps/cli/src/sipx_cli/main.py`. |
+| 2026-06-09 | `uv run ty check` | fail | CLI/Mizu argparse audio values were not narrowed to Literals and RTP snapshots called optional session lookup twice. Recorded B29; fixed with explicit narrowing. |
+| 2026-06-09 | `python -m pytest` | pass | 81 core tests after T58 completion and softphone package removal. |
+| 2026-06-09 | `python -m pytest apps` | pass | 64 passed, 3 skipped after removing `apps/softphone` package/tests. |
+| 2026-06-09 | `ruff check .` | pass | Full lint clean after T58 completion. |
+| 2026-06-09 | `ruff format --check .` | pass | 90 files already formatted after T58 completion. |
+| 2026-06-09 | `uv run ty check` | pass | Type check passes after `SipUserAgent.__aenter__` preserves concrete `Self`. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.9.0-uac-uas` | pass | Built root and all remaining app package sdists/wheels; `sipx-softphone` absent. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after T58 completion. |
+| 2026-06-09 | `uv run ty check` | fail | Inherited async context typed `SipUac`/`SipUas` as base `SipUserAgent`; mixed test dict inferred `int` values. Recorded B26; fixed with `Self` return and test annotation. |
+| 2026-06-09 | `python -m pytest tests/test_uac_uas.py apps/cli/tests/test_cli.py apps/scenarios/tests/test_examples_templates.py` | pass | 51 focused tests after B26 type fix. |
+| 2026-06-09 | `python -m pytest apps/cli/tests/test_cli.py apps/scenarios/tests/test_examples_templates.py` | pass | 26 tests after CLI UAC/UAS mocks and scenario example move. |
+| 2026-06-09 | `ruff check apps/cli/src/sipx_cli/main.py apps/cli/tests/test_cli.py apps/scenarios/tests/test_examples_templates.py apps/scenarios/examples/sip/call_with_dtmf.py apps/scenarios/examples/sip/mizu_call.py apps/scenarios/examples/sip/sip_cli_flow.py` | pass | Touched CLI/example Python lint clean. |
+| 2026-06-09 | `ruff format --check apps/cli/src/sipx_cli/main.py apps/cli/tests/test_cli.py apps/scenarios/tests/test_examples_templates.py apps/scenarios/examples/sip/call_with_dtmf.py apps/scenarios/examples/sip/mizu_call.py apps/scenarios/examples/sip/sip_cli_flow.py` | pass | 6 touched Python files already formatted. |
+| 2026-06-09 | `uv lock` | pass | Removed `sipx-softphone v0.1.0` from lockfile after workspace package removal. |
+| 2026-06-09 | `ruff format --check apps/cli/src/sipx_cli/main.py apps/cli/tests/test_cli.py apps/cli/pyproject.toml FORMAT.md` | blocked | Ruff Markdown formatting is experimental without preview; Python/TOML checks reran separately and `git diff --check` covers whitespace. |
+| 2026-06-09 | `python -m pytest` | pass | 81 core tests after call-level synthetic RTP and V59 bind/advertise split. |
+| 2026-06-09 | `python -m pytest apps` | pass | 71 passed, 3 skipped after call-level synthetic RTP and V59 bind/advertise split. |
+| 2026-06-09 | `ruff check .` | pass | No lint violations after final call-audio validation. |
+| 2026-06-09 | `ruff format --check .` | pass | 93 files already formatted after final call-audio validation. |
+| 2026-06-09 | `uv run ty check` | pass | Type check passes after final call-audio validation. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.9.0-call-audio` | pass | Built root and all app package sdists/wheels outside repo. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after final call-audio validation. |
+| 2026-06-09 | `python -m pytest tests/test_uac_uas.py tests/test_rtp.py` | pass | 40 tests including call-level synthetic RTP and V59 bind/advertise split. |
+| 2026-06-09 | `python -m pytest` | pass | 79 core tests after `RtpAudioSession` and high-level UAC/UAS helpers. |
+| 2026-06-09 | `python -m pytest apps` | pass | 71 passed, 3 skipped after `RtpAudioSession` and high-level UAC/UAS helpers. |
+| 2026-06-09 | `ruff check .` | pass | No lint violations after final validation. |
+| 2026-06-09 | `ruff format --check .` | pass | 93 files already formatted after final validation. |
+| 2026-06-09 | `uv run ty check` | pass | Type check passes after RTP UDP address normalization. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.9.0-rtp-audio` | pass | Built root and all app package sdists/wheels outside repo. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after final validation. |
+| 2026-06-09 | `python -m pytest tests/test_rtp.py` | pass | 15 tests including `RtpAudioSession` loopback noise/silence and parse-error metrics. |
+| 2026-06-09 | `python -m pytest tests/test_uac_uas.py` | pass | 23 tests including high-level `SipUac` register/call and `SipUas` answer/wait-hangup helpers. |
+| 2026-06-09 | `python -m pytest` | pass | 73 core tests after split `sipx.uac`/`sipx.uas` modules. |
+| 2026-06-09 | `python -m pytest apps` | pass | 71 passed, 3 skipped after split `sipx.uac`/`sipx.uas` modules. |
+| 2026-06-09 | `ruff check .` | pass | No lint violations in final validation. |
+| 2026-06-09 | `ruff format --check .` | pass | 91 files already formatted in final validation. |
+| 2026-06-09 | `uv run ty check` | pass | Type check passes after split modules. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.9.0-final` | pass | Built root and all app package sdists/wheels outside repo after split modules. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors in final validation. |
+| 2026-06-09 | `python -m pytest tests/test_uac_uas.py` | pass | 20 tests including split `sipx.uac`/`sipx.uas` module regression. |
+| 2026-06-09 | `python -m pytest` | pass | 72 core tests after RTP metrics/jitter buffer block. |
+| 2026-06-09 | `python -m pytest apps` | pass | 71 passed, 3 skipped after RTP metrics/jitter buffer block. |
+| 2026-06-09 | `ruff check .` | pass | No lint violations after formatting. |
+| 2026-06-09 | `ruff format --check .` | pass | 89 files already formatted after targeted `ruff format`. |
+| 2026-06-09 | `uv run ty check` | pass | Type check passes after new RTP/media exports. |
+| 2026-06-09 | `uv lock` | pass | Lockfile metadata resolved after version bump to `1.9.0`. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.9.0-rtp-metrics` | pass | Built root and all app package sdists/wheels outside repo. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after block `1.9.0`. |
+| 2026-06-09 | `python -m pytest tests/test_rtp.py tests/test_media.py` | pass | 18 tests covering G.711, synthetic silence/noise, RTP jitter metrics, `RtpMetrics`, and `RtpJitterBuffer`. |
 | 2026-06-08 | `git diff --check` | pass/no output | Repo root has untracked `sipx/`, so this does not cover new untracked docs. |
 | 2026-06-08 | `rg -n "[ \\t]$" <new docs>` | pass/no output | New files have no trailing whitespace. |
 | 2026-06-08 | `grep` tool trailing whitespace scan | pre-existing issue | Matches only in existing `IDEA.md`; not modified. |
@@ -378,6 +485,51 @@
 | 2026-06-09 | final `git diff --check` | pass/no output | No whitespace errors after workspace split. |
 | 2026-06-09 | final private marker/auth scan | pass/no matches | Scanned code, apps, tests, docs, and TOML for private proxy/account/password/destination markers, personal author stub, and unredacted SIP auth headers. |
 | 2026-06-09 | final `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.8.0-final-docs` | pass | Built root package plus all seven app package sdists/wheels outside the repo after docs/workflow updates. |
+| 2026-06-09 | `uv lock` | pass | Updated lockfile project version from `1.8.0` to `1.8.1`. |
+| 2026-06-09 | focused SIP/core/app tests | pass | `python -m pytest tests/test_uac_uas.py apps/softphone/tests/test_sip_softphone.py apps/cli/tests/test_cli.py apps/scenarios/tests/test_examples_templates.py`: 51 passed after SIP naming/provisional timeout work. |
+| 2026-06-09 | root core `python -m pytest` | pass | Root pytest now collects only `tests/`; 82 core tests passed with backend/SIP ABC contract tests. |
+| 2026-06-09 | explicit app tests | pass | `python -m pytest apps/cli/tests/test_cli.py apps/softphone/tests/test_sip_softphone.py`: 26 app tests passed by explicit path. |
+| 2026-06-09 | `uv run ty check` | fail | Generic `**kwargs` SIP role ABC signatures caused invalid method override diagnostics; recorded as SPEC B14/V46 and fixed with explicit signatures. |
+| 2026-06-09 | final `uv run ty check` | pass | Configured type-check gate passes after explicit SIP role ABC signatures. |
+| 2026-06-09 | final `ruff check .` | pass | All lint checks passed after ABC/test-boundary changes. |
+| 2026-06-09 | final `ruff format --check .` | pass | 83 files already formatted after ABC/test-boundary changes. |
+| 2026-06-09 | final `git diff --check` | pass/no output | No whitespace errors after ABC/test-boundary changes. |
+| 2026-06-09 | final name/auth scan | pass/no matches | No `NativeSip`/`NativeSoftphone` Python/TOML references and no unredacted SIP auth/private markers in Python files. |
+| 2026-06-09 | final `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.8.1-final` | pass | Built root package plus all seven app package sdists/wheels outside the repo. |
+| 2026-06-09 | `uv lock` | pass | Added `sipx-harness` workspace member to lockfile. |
+| 2026-06-09 | focused harness migration tests | partial fail | Root `python -m pytest` passed 66; `apps/harness/tests` passed 16; CLI/softphone collection failed because softphone test still imported `Timeline` from root `sipx`; Asterisk collection failed due `AsteriskRuntime` import/export indentation bug. Recorded SPEC B15/B16. |
+| 2026-06-09 | focused harness migration retry | pass | `apps/harness/tests` passed 17 including package-boundary regression; CLI/softphone passed 26; Asterisk app tests passed 13. |
+| 2026-06-09 | `ruff format .` | pass | 84 files left unchanged after docs/runtime rename cleanup. |
+| 2026-06-09 | `python -m pytest` | pass | 66 root SIP/protocol tests passed; root pytest remains core-only. |
+| 2026-06-09 | `python -m pytest apps` | pass | 67 app tests passed, 3 skipped; integration/LLM live tests remain opt-in. |
+| 2026-06-09 | `ruff check .` | pass | All lint checks passed after `sipx-harness` split and runtime naming cleanup. |
+| 2026-06-09 | `ruff format --check .` | pass | 84 files already formatted. |
+| 2026-06-09 | `uv run ty check` | pass | Type-check gate passes after harness split. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after harness split. |
+| 2026-06-09 | secret/auth marker scan | pass/no matches | Python, Markdown, and TOML scan found no unredacted SIP auth headers, inline LLM keys, ARI password assignments, or literal password assignments. |
+| 2026-06-09 | public `backend` name scan | pass except packaging | Python scan has no generic backend API names; only `build-backend` packaging metadata remains. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.8.1-harness` | pass | Built root plus `sipx-asterisk`, `sipx-cli`, `sipx-harness`, `sipx-llm`, `sipx-scenarios`, `sipx-softphone`, `sipx-stt`, and `sipx-tts` sdists/wheels outside repo. |
+| 2026-06-09 | empty directory scan | pass | `find . -path ./.git -prune -o -type d -empty -print` returned no empty directories after removing stale `sipx/core`, `sipx/backends`, and `apps/softphone/examples/native`. |
+| 2026-06-09 | focused media/redaction tests | pass | `tests/test_media.py`, `tests/test_redaction.py`, `apps/stt/tests/test_stt_protocol.py`, and `apps/asterisk/tests/test_asterisk_runtime.py`: 17 passed after moving speech protocols and tightening redaction. |
+| 2026-06-09 | `python -m pytest` | pass | 66 root tests passed; root no longer exports STT/TTS speech protocols. |
+| 2026-06-09 | `python -m pytest apps` | pass | 69 app tests passed, 3 skipped; STT/TTS protocol tests are under app packages. |
+| 2026-06-09 | `ruff check .` | pass | All lint checks passed after root media boundary fix. |
+| 2026-06-09 | `ruff format --check .` | pass | 87 files already formatted. |
+| 2026-06-09 | `uv run ty check` | pass | Type-check gate passes after STT/TTS move. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after STT/TTS move before checks log update. |
+| 2026-06-09 | root speech protocol scan | pass/no matches | No `SttEngine`, `SttStream`, `TranscriptEvent`, `TtsEngine`, `sipx.media.speech`, or `source="tts"` remains under root `sipx`. |
+| 2026-06-09 | secret/auth marker scan | pass/no matches | Python and Markdown scans found no unredacted SIP auth headers, inline LLM keys, ARI password assignments, or literal password assignments. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.8.1-boundary` | pass | Built root plus all app package sdists/wheels outside repo after root media boundary fix. |
+| 2026-06-09 | `python -m pytest` | pass | 64 root tests passed after moving generic redaction out of root `sipx`. |
+| 2026-06-09 | `python -m pytest apps` | pass | 71 app tests passed, 3 skipped; redaction tests now live under `apps/harness/tests`. |
+| 2026-06-09 | `ruff check .` | pass | All lint checks passed after moving redaction to `sipx_harness`. |
+| 2026-06-09 | `ruff format --check .` | pass | 86 files already formatted. |
+| 2026-06-09 | `uv run ty check` | pass | Type-check gate passes after removing root `sipx.security`. |
+| 2026-06-09 | `git diff --check` | pass/no output | No whitespace errors after redaction move before checks log update. |
+| 2026-06-09 | empty directory scan | pass/no output | No empty directories remain after removing `sipx/security`. |
+| 2026-06-09 | root redaction boundary scan | pass/no matches | No `sipx.security`, root `Redactor`, root `default_redactor`, or `sipx/security/**` remains. |
+| 2026-06-09 | secret/auth marker scan | pass/no matches | Python and Markdown scans found no unredacted SIP auth headers, inline LLM keys, ARI password assignments, or literal password assignments. |
+| 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.8.1-redaction` | pass | Built root plus all app package sdists/wheels outside repo after moving redaction to `sipx_harness`. |
 
 ## Validation Policy
 

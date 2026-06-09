@@ -1,3 +1,5 @@
 """TTS adapter slot for sipx media protocols."""
 
-__all__: list[str] = []
+from sipx_tts.protocol import TtsEngine
+
+__all__ = ["TtsEngine"]

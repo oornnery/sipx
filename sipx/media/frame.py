@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import Literal
 
 
-AudioSource = Literal["rtp", "tts", "file", "tone", "silence", "websocket"]
+AudioSource = Literal[
+    "rtp", "generated", "file", "tone", "silence", "noise", "pyaudio", "websocket"
+]
 
 
 @dataclass(init=False, slots=True)

@@ -7,9 +7,9 @@ members = [
     "sipx",
     "sipx-asterisk",
     "sipx-cli",
+    "sipx-harness",
     "sipx-llm",
     "sipx-scenarios",
-    "sipx-softphone",
     "sipx-stt",
     "sipx-tts",
 ]
@@ -300,7 +300,7 @@ wheels = [
 
 [[package]]
 name = "sipx"
-version = "1.8.0"
+version = "1.11.0"
 source = { editable = "." }
 
 [package.dev-dependencies]
@@ -312,9 +312,9 @@ dev = [
     { name = "ruff" },
     { name = "sipx-asterisk" },
     { name = "sipx-cli" },
+    { name = "sipx-harness" },
     { name = "sipx-llm" },
     { name = "sipx-scenarios" },
-    { name = "sipx-softphone" },
     { name = "sipx-stt" },
     { name = "sipx-tts" },
     { name = "taskipy" },
@@ -332,9 +332,9 @@ dev = [
     { name = "ruff", specifier = ">=0.15.16" },
     { name = "sipx-asterisk", editable = "apps/asterisk" },
     { name = "sipx-cli", editable = "apps/cli" },
+    { name = "sipx-harness", editable = "apps/harness" },
     { name = "sipx-llm", editable = "apps/llm" },
     { name = "sipx-scenarios", editable = "apps/scenarios" },
-    { name = "sipx-softphone", editable = "apps/softphone" },
     { name = "sipx-stt", editable = "apps/stt" },
     { name = "sipx-tts", editable = "apps/tts" },
     { name = "taskipy", specifier = ">=1.14.1" },
@@ -347,10 +347,14 @@ version = "0.1.0"
 source = { editable = "apps/asterisk" }
 dependencies = [
     { name = "sipx" },
+    { name = "sipx-harness" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "sipx", editable = "." }]
+requires-dist = [
+    { name = "sipx", editable = "." },
+    { name = "sipx-harness", editable = "apps/harness" },
+]
 
 [[package]]
 name = "sipx-cli"
@@ -358,14 +362,21 @@ version = "0.1.0"
 source = { editable = "apps/cli" }
 dependencies = [
     { name = "sipx" },
-    { name = "sipx-softphone" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "sipx", editable = "." },
-    { name = "sipx-softphone", editable = "apps/softphone" },
+requires-dist = [{ name = "sipx", editable = "." }]
+
+[[package]]
+name = "sipx-harness"
+version = "0.1.0"
+source = { editable = "apps/harness" }
+dependencies = [
+    { name = "sipx" },
 ]
+
+[package.metadata]
+requires-dist = [{ name = "sipx", editable = "." }]
 
 [[package]]
 name = "sipx-llm"
@@ -373,10 +384,14 @@ version = "0.1.0"
 source = { editable = "apps/llm" }
 dependencies = [
     { name = "sipx" },
+    { name = "sipx-harness" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "sipx", editable = "." }]
+requires-dist = [
+    { name = "sipx", editable = "." },
+    { name = "sipx-harness", editable = "apps/harness" },
+]
 
 [[package]]
 name = "sipx-scenarios"
@@ -385,28 +400,17 @@ source = { editable = "apps/scenarios" }
 dependencies = [
     { name = "sipx" },
     { name = "sipx-asterisk" },
+    { name = "sipx-harness" },
     { name = "sipx-llm" },
-    { name = "sipx-softphone" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "sipx", editable = "." },
     { name = "sipx-asterisk", editable = "apps/asterisk" },
+    { name = "sipx-harness", editable = "apps/harness" },
     { name = "sipx-llm", editable = "apps/llm" },
-    { name = "sipx-softphone", editable = "apps/softphone" },
 ]
-
-[[package]]
-name = "sipx-softphone"
-version = "0.1.0"
-source = { editable = "apps/softphone" }
-dependencies = [
-    { name = "sipx" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "sipx", editable = "." }]
 
 [[package]]
 name = "sipx-stt"

@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
+from sipx.sip.message import SipResponse
+
 
 class SipAuthError(ValueError):
     pass
@@ -34,6 +36,16 @@ def parse_digest_challenge(value: str) -> DigestChallenge:
         qop=fields.get("qop"),
         opaque=fields.get("opaque"),
     )
+
+
+def digest_challenge_for_response(response: SipResponse) -> tuple[str, str] | None:
+    if response.status_code == 401:
+        value = response.headers.get("WWW-Authenticate")
+        return ("Authorization", value) if value is not None else None
+    if response.status_code == 407:
+        value = response.headers.get("Proxy-Authenticate")
+        return ("Proxy-Authorization", value) if value is not None else None
+    return None
 
 
 def build_digest_authorization(

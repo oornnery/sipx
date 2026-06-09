@@ -4,13 +4,13 @@ from collections.abc import AsyncIterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from sipx_asterisk.backend import (
+from sipx_asterisk.runtime import (
     AsteriskAriEvent,
-    AsteriskBackend,
     AsteriskBridge,
     AsteriskChannel,
     AsteriskMediaPortConfig,
     AsteriskPlayback,
+    AsteriskRuntime,
 )
 
 
@@ -61,16 +61,16 @@ class InboundStasisSession:
 
 
 async def handle_inbound_stasis_start(
-    backend: AsteriskBackend,
+    runtime: AsteriskRuntime,
     *,
     source: AsyncIterable[str | bytes | Mapping[str, Any]] | None = None,
     config: InboundStasisExampleConfig | None = None,
 ) -> InboundStasisSession | None:
     cfg = config or InboundStasisExampleConfig()
-    async for event in backend.events(source):
+    async for event in runtime.events(source):
         if not _is_inbound_stasis_start(event, cfg):
             continue
-        return await _build_inbound_session(backend, event, cfg)
+        return await _build_inbound_session(runtime, event, cfg)
     return None
 
 
@@ -113,7 +113,7 @@ def minimal_asterisk_stasis_config(
 
 
 async def _build_inbound_session(
-    backend: AsteriskBackend,
+    runtime: AsteriskRuntime,
     event: AsteriskAriEvent,
     config: InboundStasisExampleConfig,
 ) -> InboundStasisSession:
@@ -126,26 +126,26 @@ async def _build_inbound_session(
     media_channel_id = f"{config.media_channel_id_prefix}-{safe_channel_id}"
 
     _record_example_event(
-        backend,
+        runtime,
         "stasis_inbound_started",
         {"channel_id": channel_id, "args": list(args)},
     )
-    await backend.answer_channel(channel_id)
-    bridge = await backend.create_bridge(
+    await runtime.answer_channel(channel_id)
+    bridge = await runtime.create_bridge(
         bridge_type=config.bridge_type,
         bridge_id=bridge_id,
     )
-    media_channel = await backend.create_websocket_media_channel(
+    media_channel = await runtime.create_websocket_media_channel(
         config.media_endpoint,
         media_config=config.media,
         app_args=config.media_app_arg,
         channel_id=media_channel_id,
     )
-    await backend.add_channel_to_bridge(bridge.id, channel_id)
-    await backend.add_channel_to_bridge(bridge.id, media_channel.id)
+    await runtime.add_channel_to_bridge(bridge.id, channel_id)
+    await runtime.add_channel_to_bridge(bridge.id, media_channel.id)
     playback = None
     if config.greeting_media is not None:
-        playback = await backend.play_channel(channel_id, config.greeting_media)
+        playback = await runtime.play_channel(channel_id, config.greeting_media)
 
     session = InboundStasisSession(
         channel=event_channel(event),
@@ -155,7 +155,7 @@ async def _build_inbound_session(
         args=args,
     )
     _record_example_event(
-        backend,
+        runtime,
         "stasis_inbound_ready",
         session.to_timeline_data(),
     )
@@ -198,15 +198,15 @@ def _safe_identifier(value: str) -> str:
 
 
 def _record_example_event(
-    backend: AsteriskBackend,
+    runtime: AsteriskRuntime,
     name: str,
     data: Mapping[str, Any],
 ) -> None:
-    if backend.timeline is None:
+    if runtime.timeline is None:
         return
-    backend.timeline.record(
+    runtime.timeline.record(
         "asterisk",
         name,
-        actor_id=backend.actor_id,
+        actor_id=runtime.actor_id,
         data=dict(data),
     )

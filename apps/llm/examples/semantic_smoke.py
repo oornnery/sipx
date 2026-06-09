@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 
-from sipx import Harness, Verdict, scenario
+from sipx_harness import Harness, Verdict, scenario
 from sipx_llm import LLMChatClient
 
 

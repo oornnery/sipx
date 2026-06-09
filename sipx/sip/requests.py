@@ -1,6 +1,12 @@
+# RFC 3261 request/response builders.
+# These helpers assemble wire SIP messages: Via/From/To/Call-ID/CSeq routing
+# headers, Contact when applicable, and optional body Content-Type metadata.
+# SDP bodies are opaque bytes here; offer/answer rules live in `sipx.sdp`.
+
 from __future__ import annotations
 
 from sipx.sip.dialog import Dialog, header_tag
+from sipx.sip.capabilities import SipCapabilities
 from sipx.sip.headers import HeaderMap
 from sipx.sip.message import SipRequest, SipResponse
 from sipx.sip.uri import SipUri
@@ -93,6 +99,46 @@ def create_invite_request(
     if content_type is not None:
         headers.add("Content-Type", content_type)
     return SipRequest(method="INVITE", uri=target, headers=headers, body=body)
+
+
+def create_request(
+    *,
+    method: str,
+    target: SipUri,
+    caller: SipUri,
+    contact: SipUri,
+    call_id: str,
+    branch: str,
+    from_tag: str,
+    cseq: int = 1,
+    body: bytes = b"",
+    content_type: str | None = None,
+    headers: tuple[tuple[str, str], ...] = (),
+    capabilities: SipCapabilities | None = None,
+    auth_header: tuple[str, str] | None = None,
+    max_forwards: int = 70,
+) -> SipRequest:
+    request_headers = HeaderMap()
+    request_headers.add("Via", f"SIP/2.0/UDP {_host_port(contact)};branch={branch}")
+    request_headers.add("From", f"<{caller}>;tag={from_tag}")
+    request_headers.add("To", f"<{target}>")
+    request_headers.add("Call-ID", call_id)
+    request_headers.add("CSeq", f"{cseq} {method}")
+    request_headers.add("Contact", f"<{contact}>")
+    request_headers.add("Max-Forwards", str(max_forwards))
+    if capabilities is not None:
+        capabilities.apply(request_headers)
+    if auth_header is not None:
+        request_headers.add(auth_header[0], auth_header[1])
+    if body and content_type is not None:
+        request_headers.add("Content-Type", content_type)
+    for name, value in headers:
+        request_headers.add(name, value)
+    return SipRequest(method=method, uri=target, headers=request_headers, body=body)
+
+
+def _host_port(uri: SipUri) -> str:
+    return uri.host if uri.port is None else f"{uri.host}:{uri.port}"
 
 
 def create_ack_request(

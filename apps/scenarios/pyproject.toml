@@ -3,13 +3,18 @@ name = "sipx-scenarios"
 version = "0.1.0"
 description = "Runnable scenario and example collection for sipx apps"
 requires-python = ">=3.14"
-dependencies = ["sipx", "sipx-asterisk", "sipx-llm", "sipx-softphone"]
+dependencies = [
+    "sipx",
+    "sipx-asterisk",
+    "sipx-harness",
+    "sipx-llm",
+]
 
 [tool.uv.sources]
 sipx = { workspace = true }
 sipx-asterisk = { workspace = true }
+sipx-harness = { workspace = true }
 sipx-llm = { workspace = true }
-sipx-softphone = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

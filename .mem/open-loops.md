@@ -9,10 +9,10 @@
 | O5 | Asterisk test environment? | Docker lab exists; external PBX optional | Before non-local integration expansion. |
 | O6 | License? | MIT/Apache/proprietary/other | Before public distribution and Asterisk positioning. |
 | O7 | Config format? | `harness.toml` profiles exist; YAML scenarios still optional | Before richer scenario runner UX. |
-| O8 | Native SIP next scope? | media wiring, live inspector, advanced dialogs | After current SPEC completion. |
-| O9 | PJSIP backend priority? | after native lab mode and Asterisk lab; only if interop demand appears | Before optional backend work. |
+| O8 | SIP runtime next scope? | media wiring, live inspector, advanced dialogs | After current SPEC completion. |
+| O9 | PJSIP runtime priority? | after SIP lab mode and Asterisk lab; only if interop demand appears | Before optional runtime work. |
 | O11 | Slow AI media behavior? | silence, comfort tone, waiting prompt, configurable policy | Before real STT/TTS/LLM runtime. |
-| O12 | Advanced RTP depth? | jitter buffer, RTCP, impairment, payload validation | After basic RTP/DTMF primitives. |
-| O13 | Next native SIP/softphone layer after 1.4.0? | RTP media send/receive, DTMF over RTP, live inspector, recordings/transcripts, multi-challenge auth policies | Before choosing work outside current SPEC table. |
+| O12 | Advanced RTP depth after fixed jitter buffer/session? | adaptive jitter, RTCP, impairment, payload validation | After CLI RTP metrics and basic audio modes prove operational behavior. |
+| O13 | Next SIP/UAC/UAS layer after 1.11.0? | live SIP inspector, RFC4733 RTP DTMF send, recording/transcript capture | After generic request helpers, summaries, hooks/handlers, and CLI dry-run are validated. |
 | O14 | Release draft policy? | keep latest draft only, publish manually, automate cleanup | Before first public `sipx` release is published. |
 | O15 | LLM provider scope? | OpenAI-compatible client only, provider protocol, or vendor-specific adapters | Before building AI media agents beyond templates. |

@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has root core `sipx` package for harness core, SIP/SDP/RTP/media/security primitives, MockBackend, and native SIP runtime, plus `uv` workspace app packages for CLI, softphone, Asterisk, LLM, scenarios, STT, and TTS. App packages import the root `sipx` core via workspace dependencies. The CLI command belongs to `apps/cli` and runs with `uv run --package sipx-cli sipx ...` from the repo root.
+Implement `sipx` in small verified blocks. Current code now has root `sipx` package for SIP/SDP/RTP/media primitives, SIP UAC/UAS runtime, high-level `SipUac`/`SipUas` phone ergonomics, configurable INVITE provisional responses, G.711 helpers, RTP metrics, jitter buffer, synthetic audio sources, optional lazy PyAudio input, direct root Mizu examples, and a SIP/RTP-only `sipx` CLI in a curl/httpx-cli style. Harness concepts and generic redaction live in workspace package `apps/harness` as `sipx_harness`, with `MockRuntime` for deterministic scenarios. Asterisk, LLM, scenarios, STT, and TTS remain app packages.
 
 ## Milestone 0 - Project Grounding
 
@@ -19,8 +19,9 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 ## Documentation Source Of Truth
 
 - [x] `README.md` product orientation and source-of-truth map.
+- [x] `FORMAT.md` `SPEC.md` format rules.
 - [x] `SPEC.md` goals, constraints, interfaces, invariants, tasks.
-- [x] `DESIGN.md` detailed product/API/backend/protocol/media/softphone/Asterisk/roadmap decisions.
+- [x] `DESIGN.md` detailed product/API/runtime/protocol/media/softphone/Asterisk/roadmap decisions.
 - [x] `TODO.md` executable roadmap.
 - [x] `.spec/state.md` current project state.
 - [x] `.spec/handoff.md` handoff/read order.
@@ -29,29 +30,29 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] `.mem/open-loops.md` unresolved choices.
 - [x] No separate `docs/` tree is required or desired.
 
-## Milestone 1 - Harness Core
+## Milestone 1 - Harness Package
 
-- [x] Create `sipx/core/event.py` with `TimelineEvent`.
-- [x] Create `sipx/core/timeline.py` with monotonic event recording and JSONL export.
-- [x] Create `sipx/core/verdict.py` with `passed|failed|error|skipped`.
-- [x] Create `sipx/core/artifacts.py` with artifact registry and output paths.
-- [x] Create `sipx/core/actor.py` with actor identity and backend binding.
-- [x] Create `sipx/core/scenario.py` with async scenario runner skeleton.
-- [x] Create `sipx/core/expect.py` with `within`, `during`, `not_before`, and rich failure data.
-- [x] Create `sipx/core/capabilities.py` with backend capability model.
+- [x] Create `apps/harness/src/sipx_harness/event.py` with `TimelineEvent`.
+- [x] Create `apps/harness/src/sipx_harness/timeline.py` with monotonic event recording and JSONL export.
+- [x] Create `apps/harness/src/sipx_harness/verdict.py` with `passed|failed|error|skipped`.
+- [x] Create `apps/harness/src/sipx_harness/artifacts.py` with artifact registry and output paths.
+- [x] Create `apps/harness/src/sipx_harness/actor.py` with actor identity and runtime binding.
+- [x] Create `apps/harness/src/sipx_harness/scenario.py` with async scenario runner skeleton.
+- [x] Create `apps/harness/src/sipx_harness/expect.py` with `within`, `during`, `not_before`, and rich failure data.
+- [x] Create `apps/harness/src/sipx_harness/capabilities.py` with runtime capability model.
 - [x] Add unit tests for timeline ordering, verdict generation, and unsupported expectation behavior.
 
-## Milestone 2 - Mock Backend And CLI
+## Milestone 2 - Mock Runtime And CLI
 
-- [x] Create `MockBackend` for deterministic scenario tests without network.
+- [x] Create `MockRuntime` for deterministic scenario tests without network.
 - [x] Add fake calls, fake SIP final response events, DTMF events, and hangup events.
 - [x] Add CLI entrypoint.
 - [x] Implement `sipx scenario run <file>` skeleton.
 - [x] Implement artifact output directory convention.
 - [ ] Add fake media events beyond SIP/DTMF.
-- [ ] Add an example scenario using mock backend in the current documentation structure.
+- [ ] Add an example scenario using mock runtime in the current documentation structure.
 
-## Milestone 3 - AsteriskBackend MVP
+## Milestone 3 - AsteriskRuntime MVP
 
 - [x] Choose first media path: WebSocket media, AudioSocket, or ExternalMedia RTP.
 - [x] Create async ARI REST client.
@@ -67,15 +68,15 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 
 - [x] Define `AudioFrame`.
 - [x] Define `MediaPort` protocol.
-- [x] Define STT/TTS protocols.
+- [x] Define STT/TTS protocols in `apps/stt` and `apps/tts`, not root media.
 - [x] Add barge-in policy model.
 - [ ] Add silence/placeholder behavior when AI is slow.
 - [x] Add transcript events.
 - [ ] Add media artifacts beyond timeline/verdict.
-- [x] Add central redaction for artifact/log writes.
+- [x] Add central redaction for harness artifact/log writes.
 - [ ] Add transcript/recording-specific retention and metadata policy.
 
-## Milestone 5 - NativeSipBackend MVP
+## Milestone 5 - SipUserAgent MVP
 
 - [x] Implement SIP URI and header models.
 - [x] Implement SIP parser/serializer with bounds and typed errors.
@@ -91,8 +92,12 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Implement SDP model/parser/serializer for audio.
 - [x] Implement offer/answer for PCMU, PCMA, telephone-event.
 - [x] Implement RTP packet parse/serialize and sequence stats.
+- [x] Implement RTP jitter/loss metrics and jitter buffer snapshots.
+- [x] Implement RTP jitter buffer playout with concealment and late/drop counters.
 - [x] Implement DTMF RFC4733 events.
-- [x] Implement real async UDP SIP transport and NativeSipBackend send/receive runtime.
+- [x] Implement G.711 PCMU/PCMA helpers without `audioop`.
+- [x] Implement synthetic `silence` and `noise` PCM sources for RTP media without audio devices.
+- [x] Implement real async UDP SIP transport and `SipUserAgent` send/receive runtime.
 - [x] Implement strict mode UAC/UAS basic INVITE/ACK/BYE calls over UDP.
 - [x] Implement CANCEL runtime over UDP.
 - [x] Implement REGISTER runtime orchestration over UDP.
@@ -111,18 +116,22 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Add curl-like raw SIP CLI commands for OPTIONS, MESSAGE, and generic requests.
 - [x] Add redacted SIP packet debug output for phone and raw SIP CLI commands.
 - [x] Add SDP offer generation and local RTP port binding for outbound softphone calls.
-- [x] Add in-dialog SIP INFO DTMF support for confirmed native calls.
+- [x] Add in-dialog SIP INFO DTMF support for confirmed SIP calls.
+- [x] Move high-level softphone ergonomics into `SipUac` and `SipUas`; remove `SipSoftphone*` public package/concept.
+- [x] Add `RtpAudioSession` send/receive loops with G.711, synthetic audio, jitter buffer, and metrics.
+- [x] Finish call-level media policy by separating RTP bind and SDP advertised addresses before marking call audio wiring complete.
+- [x] Add SIP/RTP-only root CLI with curl/httpx-cli-style flags and audio/jitter/metrics options.
 - [ ] Implement live SIP inspector events.
 - [x] Implement strict/lab profiles.
 - [x] Implement lab hooks for SIP headers, SDP, timers, and malformed behavior.
 - [ ] Implement call recording and transcript collection.
 - [x] Implement scenario recorder/exporter.
 - [x] Implement replay from timeline/artifacts.
-- [x] Add mixed scenario example with native caller, Asterisk actor, and native agent.
+- [x] Add mixed scenario example with SIP caller, Asterisk actor, and SIP agent.
 
-## Milestone 7 - Optional Backends And UI
+## Milestone 7 - Optional Runtimes And UI
 
-- [x] Document `PjsipBackend` as optional future backend.
+- [x] Document `PjsipRuntime` as optional future runtime.
 - [ ] Keep GUI/TUI out until headless engine and CLI are stable.
 - [ ] Prototype technical softphone UI only as client of the engine.
 
@@ -211,13 +220,13 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Added Digest challenge processing for 401/407 and authenticated REGISTER retry generation without password storage.
 - [x] Added unregister request creation via `Expires: 0`.
 - [x] Added SIP auth/register tests for REGISTER flow success, failure, auth retry, unregister, and missing challenge errors.
-- [x] Historical note: kept `SPEC.md` T21 pending because native sockets/timers, strict runtime, and integrated call flows were not complete.
+- [x] Historical note: kept `SPEC.md` T21 pending because SIP sockets/timers, strict runtime, and integrated call flows were not complete.
 
 ## Block 0.8.0 Done
 
 - [x] Bumped package version to `0.8.0`.
 - [x] Added real async UDP SIP endpoint with typed wire events, parser integration, size limits, receive timeouts, and fail-closed parse-error events.
-- [x] Added `NativeSipBackend` with real UDP start/stop, request/response send, lab-mode raw datagrams, strict-mode raw-send rejection, and timeline recording.
+- [x] Added `SipUserAgent` with real UDP start/stop, request/response send, lab-mode raw datagrams, strict-mode raw-send rejection, and timeline recording.
 - [x] Added loopback UDP tests for request/response exchange, malformed datagrams, strict raw-send rejection, and receive timeout handling.
 - [x] Historical note: kept `SPEC.md` T21 pending because integrated strict UAC/UAS call flows and transaction retransmission timers were not complete.
 
@@ -225,8 +234,8 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 
 - [x] Bumped package version to `0.8.1`.
 - [x] Added INVITE, ACK, and generic response construction helpers.
-- [x] Added strict UAC/UAS call runtime on `NativeSipBackend` for INVITE, provisional/final response, ACK, BYE, and BYE 200 OK over real UDP.
-- [x] Added `NativeSipCall`, call states, and call timeline events.
+- [x] Added strict UAC/UAS call runtime on `SipUserAgent` for INVITE, provisional/final response, ACK, BYE, and BYE 200 OK over real UDP.
+- [x] Added `SipCall`, call states, and call timeline events.
 - [x] Added loopback UDP test for INVITE -> 180/200 -> ACK -> BYE/200.
 - [x] Historical note: kept `SPEC.md` T21 pending because CANCEL runtime, REGISTER over-UDP orchestration, and transaction retransmission timers were not complete.
 
@@ -234,7 +243,7 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 
 - [x] Bumped package version to `0.8.2`.
 - [x] Added pending/incoming INVITE attempt models.
-- [x] Added `start_invite`, `receive_invite`, `cancel_invite`, and `answer_cancel` methods on `NativeSipBackend`.
+- [x] Added `start_invite`, `receive_invite`, `cancel_invite`, and `answer_cancel` methods on `SipUserAgent`.
 - [x] Added real UDP CANCEL flow with 200 OK to CANCEL, 487 Request Terminated to INVITE, and ACK of the terminated INVITE.
 - [x] Added loopback UDP CANCEL test for INVITE -> CANCEL -> 200/487 -> ACK.
 - [x] Historical note: kept `SPEC.md` T21 pending because REGISTER over-UDP orchestration and transaction retransmission timers were not complete.
@@ -242,8 +251,8 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 ## Block 0.8.3 Done
 
 - [x] Bumped package version to `0.8.3`.
-- [x] Added REGISTER and unregister orchestration over real UDP on `NativeSipBackend`.
-- [x] Added Digest 401/407 retry path over UDP without backend password storage.
+- [x] Added REGISTER and unregister orchestration over real UDP on `SipUserAgent`.
+- [x] Added Digest 401/407 retry path over UDP without runtime password storage.
 - [x] Added REGISTER timeline events for registered and unregistered states.
 - [x] Added loopback UDP tests for Digest REGISTER and unregister `Expires: 0`.
 - [x] Historical note: kept `SPEC.md` T21 pending because transaction retransmission timers were not complete.
@@ -251,7 +260,7 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 ## Block 0.8.4 Done
 
 - [x] Bumped package version to `0.8.4`.
-- [x] Added configurable native SIP retransmission policy.
+- [x] Added configurable SIP retransmission policy.
 - [x] Added async retransmission timers for REGISTER, INVITE, CANCEL, BYE, and final INVITE responses.
 - [x] Added retransmission timeline events and cleanup on timeout/error paths.
 - [x] Added loopback UDP retransmission test with delayed REGISTER response.
@@ -260,7 +269,7 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 ## Block 0.9.0 Done
 
 - [x] Bumped package version to `0.9.0`.
-- [x] Added `AsteriskBackend` with ARI capability declaration and timeline recording for ARI requests/events.
+- [x] Added `AsteriskRuntime` with ARI capability declaration and timeline recording for ARI requests/events.
 - [x] Added `AsteriskAriClient`, config, response, event, and typed error models.
 - [x] Added async ARI REST request support with stdlib HTTP transport and injectable test transport.
 - [x] Added ARI WebSocket event consumer with local text-frame reader and injectable event source.
@@ -282,7 +291,7 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Chose WebSocket media as the Asterisk media MVP path.
 - [x] Added `AsteriskMediaPath`, `AsteriskMediaPortConfig`, and `AsteriskWebSocketMediaPort`.
 - [x] Added async WebSocket binary media receive/send support and `AudioFrame` conversion.
-- [x] Added Asterisk backend helpers for WebSocket media channel creation and media port creation.
+- [x] Added Asterisk runtime helpers for WebSocket media channel creation and media port creation.
 - [x] Added explicit unsupported errors for planned AudioSocket and ExternalMedia RTP paths.
 - [x] Added focused no-Asterisk tests for media path selection, injected media frames, and local binary WebSocket exchange.
 - [x] Marked `SPEC.md` T11 complete after validation.
@@ -299,8 +308,8 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 ## Block 0.9.4 Done
 
 - [x] Bumped package version to `0.9.4`.
-- [x] Added `NativeSoftphone`, `NativeSoftphoneAccount`, `NativeSoftphoneConfig`, and `NativeSoftphoneError`.
-- [x] Added headless start/stop, register/unregister, outbound call, inbound answer, and hangup methods over `NativeSipBackend`.
+- [x] Added `SipSoftphone`, `SipSoftphoneAccount`, `SipSoftphoneConfig`, and `SipSoftphoneError`.
+- [x] Added headless start/stop, register/unregister, outbound call, inbound answer, and hangup methods over `SipUserAgent`.
 - [x] Added strict/lab mode passthrough in softphone config while keeping profile loading pending for T29.
 - [x] Added focused loopback UDP tests for register/unregister, outbound call/hangup, and inbound answer.
 - [x] Marked `SPEC.md` T22 complete after validation.
@@ -308,10 +317,10 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 ## Block 0.9.5 Done
 
 - [x] Bumped package version to `0.9.5`.
-- [x] Added lab-only `NativeSipLabHooks` for before-send, before-SDP-body, after-receive, and retransmission interval overrides.
+- [x] Added lab-only `SipHooks` for before-send, before-SDP-body, after-receive, and retransmission interval overrides.
 - [x] Added malformed raw-byte send support through before-send lab hooks while keeping strict mode hook-free.
 - [x] Added receive hook observation/filtering with timeout preservation.
-- [x] Added `NativeSoftphoneConfig.lab_hooks` passthrough to `NativeSipBackend`.
+- [x] Added `SipSoftphoneConfig.lab_hooks` passthrough to `SipUserAgent`.
 - [x] Added focused loopback tests for header mutation, SDP mutation, malformed send, receive hooks, timer override, and softphone hook passthrough.
 - [x] Marked `SPEC.md` T23 complete after validation.
 
@@ -322,10 +331,10 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Added `sipx replay` and timeline JSONL loading.
 - [x] Added automatic `report.txt` and `report.html` artifacts for scenario runs.
 - [x] Added `Profile` config with strict/lab/account/SIP/media overrides loaded from `harness.toml`.
-- [x] Added `MixedScenario` and `MixedActorSpec` for native/Asterisk/mock actor binding on one timeline.
+- [x] Added `MixedScenario` and `MixedActorSpec` for SIP/Asterisk/mock actor binding on one timeline.
 - [x] Added parser fuzz/regression tests for SIP, SDP, RTP, and DTMF malformed inputs.
-- [x] Added Docker Asterisk 22 lab and opt-in ARI/Native SIP integration tests.
-- [x] Documented optional future `PjsipBackend` tradeoffs.
+- [x] Added Docker Asterisk 22 lab and opt-in ARI/SIP integration tests.
+- [x] Documented optional future `PjsipRuntime` tradeoffs.
 - [x] Marked `SPEC.md` T24-T26 and T28-T31 complete after validation.
 
 ## Block 1.0.1 Done
@@ -342,7 +351,7 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Added `sipx profile list` and `sipx profile show`.
 - [x] Added `sipx phone register`, `sipx phone unregister`, `sipx phone call`, and `sipx phone listen`.
 - [x] Added top-level `sipx register`, `sipx unregister`, `sipx call`, and `sipx listen` aliases.
-- [x] Added no-network CLI tests with fake `NativeSoftphone` objects.
+- [x] Added no-network CLI tests with fake `SipSoftphone` objects.
 - [x] Added GitHub workflows for CI, Asterisk integration, draft release creation, and PyPI publish.
 - [x] Marked `SPEC.md` T33-T34 complete after validation.
 
@@ -370,13 +379,13 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Backpropagated challenged INVITE authentication as `SPEC.md` B6 and V29.
 - [x] Added Digest retry for challenged INVITE calls and raw SIP request commands.
 - [x] Matched authenticated retry responses by current `CSeq` to ignore stale challenge retransmissions.
-- [x] Added loopback Native SIP test for INVITE Digest auth retry.
+- [x] Added loopback SIP test for INVITE Digest auth retry.
 - [x] Added no-network CLI test for raw SIP request Digest auth retry.
 
 ## Block 1.3.0 Done
 
 - [x] Bumped package version to `1.3.0`.
-- [x] Added strict-mode native SIP wire event callback for packet visibility.
+- [x] Added strict-mode SIP wire event callback for packet visibility.
 - [x] Added `--debug-sip` to phone and raw SIP request CLI commands.
 - [x] Printed redacted SIP TX/RX datagrams to stderr during debug runs.
 - [x] Added no-network CLI tests for packet debug output and authorization redaction.
@@ -385,7 +394,7 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 
 - [x] Bumped package version to `1.4.0`.
 - [x] Backpropagated authenticated `603 Declined` without SDP as `SPEC.md` B7 and V31.
-- [x] Added outbound SDP offer generation for native softphone calls.
+- [x] Added outbound SDP offer generation for SIP softphone calls.
 - [x] Added inbound SDP answer generation for INVITEs with audio offers.
 - [x] Added SDP answer validation before confirming outbound calls.
 - [x] Added lightweight local RTP UDP sink while calls exist.
@@ -399,7 +408,7 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Added LLM unit tests using fake transport and live test skipped unless provider credentials exist.
 - [x] Added LLM harness scenario example using runtime environment key only.
 - [x] Added Asterisk + LLM Stasis template.
-- [x] Added Native + Mizu example helper.
+- [x] Added SIP + Mizu example helper.
 - [x] Added example import and inline-secret scan tests.
 - [x] Backpropagated and fixed the type-check baseline as `SPEC.md` B8 and V33.
 - [x] Fixed dynamic call, mapping, URI, SDP, and media-frame typing so `uv run ty check` passes.
@@ -409,8 +418,8 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Bumped package version to `1.6.0`.
 - [x] Renamed LLM provider client to simple `LLMChatClient`.
 - [x] Switched live LLM settings to `SIPX_LLM_API_KEY`, `SIPX_LLM_BASE_URL`, `SIPX_LLM_MODEL`, and `SIPX_LLM_TIMEOUT`.
-- [x] Added native SIP INFO DTMF support and `sipx call --dtmf`.
-- [x] Added native examples for REGISTER, OPTIONS, MESSAGE, raw INFO DTMF, call-with-DTMF, and Mizu call helpers.
+- [x] Added SIP INFO DTMF support and `sipx call --dtmf`.
+- [x] Added SIP examples for REGISTER, OPTIONS, MESSAGE, raw INFO DTMF, call-with-DTMF, and Mizu call helpers.
 - [x] Updated README with concrete example usage.
 
 ## Block 1.6.1 Done
@@ -432,8 +441,8 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 
 - [x] Bumped package version to `1.7.1`.
 - [x] Backpropagated challenged BYE hangup failure as `SPEC.md` B12 and V38.
-- [x] Added one-shot Digest retry for in-dialog native BYE when credentials are configured.
-- [x] Passed softphone account credentials from `NativeSoftphone.hangup()` into the backend hangup path.
+- [x] Added one-shot Digest retry for in-dialog SIP BYE when credentials are configured.
+- [x] Passed softphone account credentials from `SipSoftphone.hangup()` into the user-agent hangup path.
 - [x] Added loopback regression coverage for challenged BYE retry without persisting passwords.
 
 ## Block 1.8.0 Done
@@ -443,9 +452,75 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [x] Kept root `sipx` core-only and removed LLM, softphone, Asterisk, examples, and CLI exports from root public API.
 - [x] Moved LLM code/tests/examples to `apps/llm` as `sipx_llm`.
 - [x] Moved softphone code/tests/examples and Mizu profile to `apps/softphone` as `sipx_softphone`.
-- [x] Moved Asterisk backend/Stasis code/tests/templates to `apps/asterisk` as `sipx_asterisk`.
+- [x] Moved Asterisk runtime/Stasis code/tests/templates to `apps/asterisk` as `sipx_asterisk`.
 - [x] Moved the console command implementation to `apps/cli` as `sipx_cli`; command is validated with `uv run --package sipx-cli sipx --help`.
 - [x] Added placeholder app packages for scenarios, STT, and TTS adapters.
+
+## Block 1.8.1 Done
+
+- [x] Bumped root package version to `1.8.1`.
+- [x] Renamed SIP runtime public classes to `SipUserAgent`, `SipUac`, `SipUas`, `SipCall`, `SipHooks`, and `SipRetransmissionPolicy` without `Native*` aliases.
+- [x] Renamed softphone app public classes to `SipSoftphone`, `SipSoftphoneAccount`, `SipSoftphoneConfig`, and `SipSoftphoneError` without `Native*` aliases.
+- [x] Moved softphone examples/tests to SIP naming and updated CLI/profile defaults to `runtime = "sip"`.
+- [x] Fixed INVITE handling so `183 Session Progress` counts as progress and does not trigger the initial no-response timeout.
+- [x] Added loopback regression coverage for a pending INVITE after provisional `183`.
+- [x] Added harness runtime ABC contracts for `Runtime`, `CallRuntime`, and `DtmfRuntime` in `sipx_harness`.
+- [x] Added SIP role ABC contracts for `SipWireRuntime`, `SipUacRuntime`, and `SipUasRuntime`.
+- [x] Kept SIP role ABC signatures explicit so concrete keyword-only UAC/UAS overrides pass `uv run ty check`.
+- [x] Configured root `pytest` to collect only core `tests/`; app tests under `apps/*/tests` are opt-in by explicit path.
+- [x] Moved Harness/Mock/Timeline/Scenario surfaces to `apps/harness` as `sipx_harness` and kept root `sipx` SIP-only.
+- [x] Renamed generic public `Backend*` surfaces to `Runtime*`/`user_agent` names.
+- [x] Added package-boundary regression coverage for harness symbols living in `sipx_harness`, not root `sipx`.
+- [x] Moved STT/TTS speech protocols out of root `sipx.media` into `sipx_stt` and `sipx_tts`.
+- [x] Tightened redaction so `a=crypto` keeps a safe `a=crypto: [REDACTED]` evidence marker.
+- [x] Moved generic redaction out of root `sipx.security` into `sipx_harness` and removed the root security package.
+
+## Block 1.9.0 Done
+
+- [x] Bumped root package version to `1.9.0`.
+- [x] Added `FORMAT.md` for compact `SPEC.md` section, table, invariant, task, and backprop rules.
+- [x] Added PCMU/PCMA encode/decode helpers without `audioop`.
+- [x] Added synthetic `silence` and `noise` PCM sources without opening media devices.
+- [x] Added RTP jitter/loss metrics, `RtpMetrics`, `RtpJitterBuffer`, and `RtpAudioSession`.
+- [x] Moved concrete high-level phone ergonomics into root `SipUac` and `SipUas` modules.
+- [x] Wired `SipUac.call(audio="noise|silence")` and `SipUas.answer(audio="noise|silence")` to synthetic RTP sessions.
+- [x] Separated RTP bind and SDP advertised addresses for high-level UAC/UAS calls.
+- [x] Ported CLI phone commands and no-network CLI tests from the removed softphone wrapper to `SipUac`/`SipUas`.
+- [x] Removed `sipx-softphone` from workspace dependencies and moved SIP examples/Mizu profile to `apps/scenarios/examples`.
+- [x] Removed `scenario`, `profile`, `replay`, and `phone` from the root `sipx` CLI command surface.
+- [x] Added CLI `call`/`listen` flags for `--audio`, `--rtp-bind`, `--rtp-advertise`, `--jitter-buffer-ms`, `--rtp-stats`, and `--metrics-json`.
+- [x] Added optional lazy PyAudio mode through `audio="pyaudio"` without a default native dependency.
+- [x] Added pure-Python public Mizu examples under `apps/scenarios/examples/mizu`.
+- [x] Marked `SPEC.md` T59, T65, and T66 complete after focused CLI/media/example validation.
+- [x] Final validation passed: core tests, app tests, Ruff lint/format, `uv run ty check`, `git diff --check`, CLI help, and workspace package build.
+- [x] Recorded CLI mock migration failure as `SPEC.md` B25.
+
+## Block 1.10.0 Done
+
+- [x] Bumped root package version to `1.10.0`.
+- [x] Added `SipProvisionalResponse` for configurable INVITE `1xx` UAS responses.
+- [x] Replaced old single-provisional UAS answer parameters with `provisionals=None|()|(...)`.
+- [x] Kept default UAS answer behavior as `180 Ringing`; `provisionals=()` sends final `200 OK` directly.
+- [x] Added configured `100 Trying`, `180 Ringing`, and `183 Session Progress` with optional SDP.
+- [x] Enforced RFC-shaped `100 Trying`: no To tag, no Contact, no body.
+- [x] Added direct root SIP examples under `sipx.examples`, defaulting to the public Mizu demo with generic SIP env vars and no `argparse`.
+- [x] Made call-oriented root examples require explicit `SIPX_TARGET` and report config/call failures as structured JSON instead of tracebacks.
+- [x] Bounded call-oriented root examples by `SIPX_TIMEOUT` so provisional-only public behavior cannot hang example runs.
+- [x] Added RFC summary comments to SIP UA/UAC/UAS and request builder files.
+- [x] Marked `SPEC.md` T67 and T68 complete after focused validation.
+
+## Block 1.11.0 Done
+
+- [x] Bumped root package version to `1.11.0`.
+- [x] Added `SipHooks` decorator-style lab hooks and removed `SipLabHooks` public name.
+- [x] Added `SipHandlers` decorator-style observation handlers.
+- [x] Added dataclass summaries for SIP requests, responses, calls, and SDP.
+- [x] Added core SIP ID helpers and `SipUserAgent.request()` for generic request auth/matching.
+- [x] Added explicit `SipCapabilities` and compact header serialization.
+- [x] Added CLI `--print-message`, `--compact-headers`, and capability header flags.
+- [x] Added direct examples for request building and handlers.
+- [x] Ran CLI dry-run, no-network examples, live Mizu examples, call examples, Ruff lint/format, type check, and whitespace validation.
+- [x] Marked `SPEC.md` T69 complete after verification; `pytest` was intentionally skipped for this block per user direction.
 
 ## Blocked Or Pending
 
@@ -453,7 +528,8 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - [ ] Next Asterisk media path after WebSocket MVP remains open: AudioSocket or ExternalMedia RTP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and system-interpreter tooling remain pending after 1.8.0.
+- [ ] Live SIP inspector events remain pending after 1.11.0.
+- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and system-interpreter tooling remain pending after 1.11.0.
 
 ## Open Questions
 
@@ -461,4 +537,4 @@ Implement `sipx` in small verified blocks. Current code now has root core `sipx`
 - Should the first shipped product optimize for IVR testing or technical softphone?
 - Which STT/TTS providers should have first adapters?
 - What artifact retention/redaction policy is acceptable for real recordings?
-- Is `PjsipBackend` needed before or after native SIP lab mode?
+- Is `PjsipRuntime` needed before or after SIP lab mode?

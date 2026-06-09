@@ -22,12 +22,18 @@ class SipRequest:
     body: bytes = b""
     version: str = "SIP/2.0"
 
-    def to_bytes(self) -> bytes:
+    def to_bytes(self, *, compact_headers: bool = False) -> bytes:
         return _serialize(
             f"{self.method} {self.uri} {self.version}",
             self.headers,
             self.body,
+            compact_headers=compact_headers,
         )
+
+    def summary(self):
+        from sipx.summary import request_summary
+
+        return request_summary(self)
 
 
 @dataclass(slots=True)
@@ -38,12 +44,18 @@ class SipResponse:
     body: bytes = b""
     version: str = "SIP/2.0"
 
-    def to_bytes(self) -> bytes:
+    def to_bytes(self, *, compact_headers: bool = False) -> bytes:
         return _serialize(
             f"{self.version} {self.status_code} {self.reason}",
             self.headers,
             self.body,
+            compact_headers=compact_headers,
         )
+
+    def summary(self):
+        from sipx.summary import response_summary
+
+        return response_summary(self)
 
 
 SipMessage: TypeAlias = SipRequest | SipResponse
@@ -136,9 +148,18 @@ def _parse_response(start_line: str, headers: HeaderMap, body: bytes) -> SipResp
     )
 
 
-def _serialize(start_line: str, headers: HeaderMap, body: bytes) -> bytes:
+def _serialize(
+    start_line: str,
+    headers: HeaderMap,
+    body: bytes,
+    *,
+    compact_headers: bool = False,
+) -> bytes:
     output_headers = headers.copy()
     output_headers.set("Content-Length", str(len(body)))
     lines = [start_line]
-    lines.extend(f"{name}: {value}" for name, value in output_headers.items())
+    lines.extend(
+        f"{name}: {value}"
+        for name, value in output_headers.items(compact=compact_headers)
+    )
     return ("\r\n".join(lines) + "\r\n\r\n").encode("utf-8") + body

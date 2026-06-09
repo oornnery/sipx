@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from sipx import Harness, Verdict, scenario
+from sipx_harness import Harness, Verdict, scenario
 from sipx_llm import LLMChatClient
 
 

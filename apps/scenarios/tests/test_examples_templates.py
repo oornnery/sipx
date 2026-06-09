@@ -5,7 +5,7 @@ from pathlib import Path
 
 EXAMPLE_ROOTS = (
     Path("apps/llm/examples"),
-    Path("apps/softphone/examples"),
+    Path("apps/scenarios/examples"),
     Path("apps/asterisk/examples"),
 )
 
@@ -15,7 +15,12 @@ def _example_files() -> list[Path]:
 
 
 def _example_paths() -> list[Path]:
-    return [path for root in EXAMPLE_ROOTS for path in root.rglob("*")]
+    return [
+        path
+        for root in EXAMPLE_ROOTS
+        for path in root.rglob("*")
+        if path.suffix in {".py", ".md", ".toml"}
+    ]
 
 
 def test_examples_import_without_required_secrets() -> None:
@@ -49,9 +54,16 @@ def test_runnable_examples_expose_main() -> None:
     for path in (
         "apps/llm/examples/semantic_smoke.py",
         "apps/llm/examples/sip_flow_audit.py",
-        "apps/softphone/examples/native/call_with_dtmf.py",
-        "apps/softphone/examples/native/mizu_call.py",
-        "apps/softphone/examples/native/sip_cli_flow.py",
+        "apps/scenarios/examples/sip/call_with_dtmf.py",
+        "apps/scenarios/examples/sip/mizu_call.py",
+        "apps/scenarios/examples/sip/sip_cli_flow.py",
+        "apps/scenarios/examples/mizu/register.py",
+        "apps/scenarios/examples/mizu/options.py",
+        "apps/scenarios/examples/mizu/invite_without_sdp.py",
+        "apps/scenarios/examples/mizu/invite_with_sdp.py",
+        "apps/scenarios/examples/mizu/metrics.py",
+        "apps/scenarios/examples/mizu/manipulation.py",
+        "apps/scenarios/examples/mizu/smoke_tests.py",
     ):
         namespace = runpy.run_path(path)
         assert callable(namespace["main"])

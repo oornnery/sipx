@@ -2,20 +2,20 @@ from __future__ import annotations
 
 import os
 
-from sipx import Timeline
-from sipx_asterisk import AsteriskBackend, handle_inbound_stasis_start
+from sipx_harness import Timeline
+from sipx_asterisk import AsteriskRuntime, handle_inbound_stasis_start
 from sipx_llm import LLMChatClient
 
 
-async def run_asterisk_llm_template(backend: AsteriskBackend) -> str | None:
+async def run_asterisk_llm_template(runtime: AsteriskRuntime) -> str | None:
     """Answer one inbound Stasis call and ask an OpenAI-compatible LLM for a label."""
-    session = await handle_inbound_stasis_start(backend)
+    session = await handle_inbound_stasis_start(runtime)
     if session is None:
         return None
 
     if not os.getenv("SIPX_LLM_API_KEY"):
-        if isinstance(backend.timeline, Timeline):
-            backend.timeline.record(
+        if isinstance(runtime.timeline, Timeline):
+            runtime.timeline.record(
                 "llm",
                 "skipped",
                 data={
@@ -31,8 +31,8 @@ async def run_asterisk_llm_template(backend: AsteriskBackend) -> str | None:
         system="Return only one lowercase routing label.",
         max_tokens=12,
     )
-    if isinstance(backend.timeline, Timeline):
-        backend.timeline.record(
+    if isinstance(runtime.timeline, Timeline):
+        runtime.timeline.record(
             "llm",
             "routing_label",
             data={"provider": _provider_name(), "label": label.strip().lower()},

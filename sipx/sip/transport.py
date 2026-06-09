@@ -47,6 +47,7 @@ class SipUdpEndpoint:
         local_host: str = "127.0.0.1",
         local_port: int = 0,
         max_message_size: int = DEFAULT_MAX_MESSAGE_SIZE,
+        compact_headers: bool = False,
     ) -> None:
         if not local_host:
             raise SipUdpError("local_host is required")
@@ -57,6 +58,7 @@ class SipUdpEndpoint:
         self.local_host = local_host
         self.local_port = local_port
         self.max_message_size = max_message_size
+        self.compact_headers = compact_headers
         self._events: asyncio.Queue[SipWireEvent] = asyncio.Queue()
         self._transport: asyncio.DatagramTransport | None = None
         self._protocol: _SipDatagramProtocol | None = None
@@ -111,7 +113,7 @@ class SipUdpEndpoint:
         await self.close()
 
     def send_message(self, message: SipMessage, remote: UdpAddress) -> SipWireEvent:
-        raw = message.to_bytes()
+        raw = message.to_bytes(compact_headers=self.compact_headers)
         self.send_raw(raw, remote)
         return SipWireEvent(
             direction=SipWireDirection.TX,

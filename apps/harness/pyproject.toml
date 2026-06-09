@@ -1,0 +1,13 @@
+[project]
+name = "sipx-harness"
+version = "0.1.0"
+description = "Harness runtime, scenarios, reports, and test doubles for sipx apps"
+requires-python = ">=3.14"
+dependencies = ["sipx"]
+
+[tool.uv.sources]
+sipx = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

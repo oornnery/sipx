@@ -1,13 +1,15 @@
 # sipx
 
-`sipx` is a Python programmable Voice/SIP Harness for call automation, IVR testing, technical softphones, contact-center workflows, real-time media validation, and AI-assisted voice applications.
+`sipx` is a Python Voice/SIP workspace for call automation, IVR testing, technical softphones, contact-center workflows, real-time media validation, and AI-assisted voice applications.
 
 The product is not a PBX wrapper, not only a SIP bot, and not a normal end-user softphone. The product is the harness: actors, scenarios, expectations, timelines, verdicts, artifacts, reports, and replayable evidence.
 
 ```text
-Asterisk is a backend.
-Native SIP is the low-level engine.
-The Harness is the product.
+Root sipx is SIP protocol/runtime.
+The Harness lives in sipx-harness.
+Asterisk is a runtime app.
+SIP UAC/UAS runtime is the low-level engine.
+The workspace Harness is the product.
 ```
 
 ## Status
@@ -17,7 +19,7 @@ This repository has an initial working harness implementation. The maintained En
 The implementation should follow:
 
 - `SPEC.md` for goals, constraints, invariants, public surfaces, and build tasks.
-- `DESIGN.md` for detailed architecture, API, backends, protocol, media, softphone, Asterisk, security, testing, and roadmap decisions.
+- `DESIGN.md` for detailed architecture, API, runtimes, protocol, media, softphone, Asterisk, security, testing, and roadmap decisions.
 - `TODO.md` for the executable roadmap.
 - `.spec/state.md` and `.spec/handoff.md` for current project state.
 - `.mem/hot.md`, `.mem/decisions.md`, and `.mem/open-loops.md` for persistent project memory.
@@ -27,7 +29,7 @@ The implementation should follow:
 `sipx` should let engineers model voice systems as executable scenarios:
 
 ```python
-from sipx import Harness, expect, scenario
+from sipx_harness import Harness, expect, scenario
 
 
 @scenario("ivr_second_copy")
@@ -71,11 +73,11 @@ Artifacts: timeline.jsonl, recording.wav, transcript.json, sip.pcap, report.html
 
 | Product | Purpose |
 | --- | --- |
-| Voice Harness | Core scenario runner, `expect`, timeline, artifacts, verdicts, reports, replay. |
-| Technical Softphone | Native SIP/RTP endpoint for engineers, automation, inspection, negative tests, and scenario recording. |
-| Asterisk Integration Backend | Asterisk-backed call control, media, bridges, queues, recordings, and production-ish telephony workflows. |
+| Voice Harness | `sipx-harness` scenario runner, `expect`, timeline, artifacts, verdicts, reports, replay. |
+| Technical Softphone | SIP/RTP endpoint for engineers, automation, inspection, negative tests, and scenario recording. |
+| Asterisk Integration Runtime | Asterisk call control, media, bridges, queues, recordings, and production-ish telephony workflows. |
 
-The same scenario model should work across backends whenever capabilities allow it.
+The same scenario model should work across runtimes whenever capabilities allow it.
 
 ## Detailed Scope
 
@@ -86,10 +88,10 @@ The detailed implementation context that used to be spread through `IDEA.md` is 
 - Product identity and operating modes.
 - API design, Python scenarios, YAML scenarios, requests-like SIP API, and transaction-level API.
 - `expect` families, deterministic/temporal/probabilistic/statistical validation, verdicts, and rich failures.
-- Backend responsibility split and capability model.
+- Runtime responsibility split and capability model.
 - Asterisk ARI/Stasis integration, media paths, flows, config, and limitations.
-- Native SIP/SDP/RTP/DTMF protocol scope, state machines, timers, codecs, jitter, fuzzing, and security.
-- Media and AI runtime, STT/TTS, IVR, DTMF, barge-in, voice apps, and metrics.
+- SIP/SDP/RTP/DTMF protocol scope, state machines, timers, codecs, jitter, fuzzing, and security.
+- Media and AI runtime, STT/TTS app protocols, IVR, DTMF, barge-in, voice apps, and metrics.
 - Technical softphone, profiles, lab hooks, scenario recorder, mixed scenarios, and UI roadmap.
 - Implementation roadmap and validation gates.
 
@@ -99,13 +101,13 @@ The detailed implementation context that used to be spread through `IDEA.md` is 
 Applications / CLI / CI / QA / Softphone UI
         |
         v
-sipx Harness Core
+sipx-harness
   Actor, Scenario, Expect, Timeline, Verdict, Artifact, Metrics
         |
         +-------------------------+-------------------------+
         |                         |                         |
         v                         v                         v
- AsteriskBackend            NativeSipBackend            Mock/Replay
+ AsteriskRuntime            SipUserAgent                Mock/Replay
  ARI, Stasis, bridges       SIP, SDP, RTP, DTMF         tests, replay
  media, recordings          strict/lab, softphone       fixtures
         |                         |
@@ -117,8 +119,8 @@ sipx Harness Core
 
 | Concept | Meaning |
 | --- | --- |
-| `Harness` | Runtime that owns configuration, backends, actors, scenario runs, and artifacts. |
-| `Actor` | Programmable participant: native softphone, Asterisk, remote SIP target, AI bot, fake carrier, queue. |
+| `Harness` | `sipx_harness` runtime that owns configuration, runtimes, actors, scenario runs, and artifacts. |
+| `Actor` | Programmable participant: SIP softphone, Asterisk, remote SIP target, AI bot, fake carrier, queue. |
 | `Scenario` | Executable call flow with steps, fixtures, expectations, and final verdict. |
 | `Call` | High-level call facade for apps and tests. |
 | `CallLeg` | One leg of a call, such as a SIP dialog or Asterisk channel. |
@@ -127,11 +129,11 @@ sipx Harness Core
 | `Verdict` | First-class outcome with reason, failures, warnings, metrics, and artifact links. |
 | `Artifact` | Persisted evidence: JSONL timeline, WAV, transcript, PCAP, report. |
 
-## Backends
+## Runtimes
 
-### AsteriskBackend
+### AsteriskRuntime
 
-The first practical backend should use Asterisk where Asterisk is strong:
+The first practical runtime should use Asterisk where Asterisk is strong:
 
 - PJSIP endpoints and trunks.
 - ARI REST commands and ARI WebSocket events.
@@ -139,11 +141,11 @@ The first practical backend should use Asterisk where Asterisk is strong:
 - Bridges, queues, recordings, MOH, DTMF, playback, transfers.
 - ExternalMedia, AudioSocket, or WebSocket media for AI and STT/TTS.
 
-This backend is the fastest path to IVR automation, AI voice bots, contact-center flows, queue validation, and functional voice testing.
+This runtime is the fastest path to IVR automation, AI voice bots, contact-center flows, queue validation, and functional voice testing.
 
-### NativeSipBackend
+### SipUserAgent / SipUac / SipUas
 
-The native backend is required for what Asterisk intentionally hides or normalizes:
+The SIP user-agent runtime is required for what Asterisk intentionally hides or normalizes:
 
 - Raw SIP wire-level assertions.
 - Exact headers, CSeq, Via branch, tags, timers, retransmissions.
@@ -152,6 +154,8 @@ The native backend is required for what Asterisk intentionally hides or normaliz
 - Technical softphone behavior.
 - RTP impairment, payload validation, jitter/loss measurement.
 
+Softphone ergonomics now live in `SipUac` and `SipUas` instead of a separate wrapper. `SipUserAgent` remains the shared transport/dialog engine; UAC and UAS own their outbound/inbound convenience behavior. Inbound UAS answers use `SipProvisionalResponse` to choose zero or more RFC 3261 `1xx` responses before the final response.
+
 It should have two modes:
 
 | Mode | Purpose |
@@ -159,7 +163,7 @@ It should have two modes:
 | `strict` | RFC-oriented behavior for real interop and reliable softphone automation. |
 | `lab` | Controlled malformed messages, protocol overrides, delayed messages, custom SDP, and fault injection. |
 
-The native SIP/SDP/RTP core should be sans-I/O so protocol logic can be tested without sockets.
+The SIP/SDP/RTP core should be sans-I/O so protocol logic can be tested without sockets.
 
 ## Expectations
 
@@ -206,11 +210,11 @@ Timeline data must correlate SIP Call-ID, Asterisk channel ID, bridge ID, RTP SS
 1. Document product identity and decisions.
 2. Build harness core: events, timeline, verdict, artifacts, metrics.
 3. Build scenario runner and `expect()` engine.
-4. Build `MockBackend` and `sipx` CLI skeleton.
-5. Build `AsteriskBackend` with ARI/Stasis.
+4. Build `MockRuntime` and `sipx` CLI skeleton.
+5. Build `AsteriskRuntime` with ARI/Stasis.
 6. Choose and implement one Asterisk media path.
-7. Add media frame, STT/TTS protocols, and barge-in policy.
-8. Build minimum `NativeSipBackend` for technical softphone mode.
+7. Add media frame and barge-in policy in root; keep STT/TTS protocols in app packages.
+8. Build minimum `SipUserAgent`/`SipUac`/`SipUas` runtime for technical softphone mode.
 9. Add reports, replay, and scenario export.
 10. Add lab mode, fuzzing, SIP/RTP conformance, and advanced interop.
 
@@ -227,95 +231,148 @@ uv run ty check
 pytest
 ```
 
-The repository is a `uv` workspace. The root package `sipx` is the core library only. App packages live under `apps/*` and import the root core package as a workspace dependency:
+Root `pytest` is intentionally core-only and collects `tests/`. App package tests under `apps/*/tests` are opt-in by explicit path when changing an app, for example:
 
+```bash
+pytest apps/cli/tests/test_cli.py
+pytest apps/scenarios/tests/test_examples_templates.py
+```
+
+The repository is a `uv` workspace. `FORMAT.md` defines the `SPEC.md` format. The root package `sipx` owns SIP protocol/runtime and RTP media primitives. Harness and app packages live under `apps/*` and import the root package as a workspace dependency:
+
+- `apps/harness`: `sipx-harness`, owns `Harness`, `Actor`, `Timeline`, `Verdict`, artifacts, profiles, reports, and mock runtimes.
 - `apps/cli`: `sipx-cli`, owns the `sipx` console command.
-- `apps/softphone`: `sipx-softphone`, owns `NativeSoftphone` wrappers and native examples.
-- `apps/asterisk`: `sipx-asterisk`, owns ARI backend and Stasis helpers.
+- `apps/asterisk`: `sipx-asterisk`, owns ARI runtime and Stasis helpers.
 - `apps/llm`: `sipx-llm`, owns `LLMChatClient` and LLM examples.
-- `apps/scenarios`, `apps/stt`, `apps/tts`: scenario/example and future speech adapter packages.
+- `apps/scenarios`: `sipx-scenarios`, owns runnable scenario and SIP example templates.
+- `apps/stt`, `apps/tts`: speech protocol/adapter packages.
 
 Integration tests that require Asterisk must be explicitly configured and must not depend on real secrets committed to the repository.
+
+The installed `sipx` command is SIP/RTP-only and curl-like. Top-level commands are `options`, `message`, `request`, `register`, `unregister`, `call`, and `listen`; harness `scenario`, `profile`, `replay`, and `phone` subcommands are not part of this root command surface.
 
 Useful CLI commands:
 
 ```bash
-uv run --package sipx-cli sipx scenario run path/to/scenario.py --artifacts-dir artifacts
-uv run --package sipx-cli sipx scenario export artifacts/<run_id>/timeline.jsonl --format python
-uv run --package sipx-cli sipx replay artifacts/<run_id>/timeline.jsonl
-uv run --package sipx-cli sipx profile list --config harness.toml
-uv run --package sipx-cli sipx profile show lab --config harness.toml
-uv run --package sipx-cli sipx phone register lab --config harness.toml
-uv run --package sipx-cli sipx phone unregister lab --config harness.toml
-uv run --package sipx-cli sipx phone call sip:6000@pbx.lab --profile lab --config harness.toml
-uv run --package sipx-cli sipx phone listen lab --config harness.toml --duration 30
-uv run --package sipx-cli sipx register lab --config harness.toml
-uv run --package sipx-cli sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password secret
-uv run --package sipx-cli sipx call sip:6000@pbx.lab --profile lab --duration 5
-uv run --package sipx-cli sipx call sip:6000@pbx.lab --aor sip:1001@pbx.lab --registrar sip:pbx.lab --username 1001 --password secret --media-port 40000
-uv run --package sipx-cli sipx call sip:6000@pbx.lab --aor sip:1001@pbx.lab --registrar sip:pbx.lab --username 1001 --password secret --codec PCMU --dtmf '123#' --debug-sip
-uv run --package sipx-cli sipx options sip:pbx.lab --from sip:1001@example.com -i
-uv run --package sipx-cli sipx message sip:1002@pbx.lab 'hello' --from sip:1001@example.com
-uv run --package sipx-cli sipx request INFO sip:1002@pbx.lab --from sip:1001@example.com --username 1001 --password secret --debug-sip -H 'Content-Type: application/dtmf-relay' -d $'Signal=1\r\nDuration=160\r\n'
+uv run --package sipx-cli sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password "$SIP_PASSWORD"
+uv run --package sipx-cli sipx unregister --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password "$SIP_PASSWORD"
+uv run --package sipx-cli sipx call sip:6000@pbx.example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --username 1001 --password "$SIP_PASSWORD" --audio noise --rtp-stats --duration 5
+uv run --package sipx-cli sipx call sip:6000@pbx.example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --rtp-bind 0.0.0.0 --rtp-advertise 203.0.113.10 --jitter-buffer-ms 80 --metrics-json metrics.json --debug-sip
+uv run --package sipx-cli sipx listen --aor sip:1001@example.com --registrar sip:pbx.example.com --local-port 5062 --audio silence --duration 30 --rtp-stats
+uv run --package sipx-cli sipx options sip:pbx.example.com --from sip:1001@example.com -i
+uv run --package sipx-cli sipx message sip:1002@pbx.example.com 'hello' --from sip:1001@example.com
+uv run --package sipx-cli sipx request INFO sip:1002@pbx.example.com --from sip:1001@example.com --username 1001 --password "$SIP_PASSWORD" --debug-sip -H 'Content-Type: application/dtmf-relay' -d $'Signal=1\r\nDuration=160\r\n'
+uv run --package sipx-cli sipx request OPTIONS sip:pbx.example.com --from sip:1001@example.com --print-message --compact-headers --accept application/sdp --allow OPTIONS
+uv run --package sipx-cli sipx call sip:6000@pbx.example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --print-message --compact-headers --media-port 40000
 ```
 
-Phone commands that touch the network require either a profile or explicit `--aor` and `--registrar` flags. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the registrar host and port.
+Commands that need SIP account identity require explicit `--aor` and `--registrar` flags before network access. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the registrar host and port.
 
-Raw SIP request commands require `--from`/`--aor` or a profile with `account.aor`. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the target URI host/port, falling back to registrar/profile remote settings when provided.
+Raw SIP request commands require `--from`/`--aor`. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the target URI host and port.
 
 When `--username` and `--password` are provided, calls and raw SIP request commands retry one `401` or `407` Digest challenge without persisting the password.
 
-Use `--debug-sip` on phone and raw SIP commands to print redacted SIP datagrams to stderr as they are sent and received. `Authorization` and `Proxy-Authorization` lines are redacted before printing.
+Use `--debug-sip` to print redacted SIP datagrams to stderr as they are sent and received. `Authorization` and `Proxy-Authorization` lines are redacted before printing.
 
-Outbound native softphone calls send an SDP audio offer by default, open the advertised RTP UDP port while the call exists, and validate the `2xx` SDP answer before reporting the call as confirmed. Use `--media-host`, `--media-port`, and repeatable `--codec` to adjust the offered media address and codecs. Use `--dtmf` to send in-dialog SIP INFO DTMF after confirmation.
+Use `--print-message` to render a SIP request without opening a socket. Use `--compact-headers` to serialize RFC compact header names where defined; receive parsing always expands compact names to canonical headers. Raw request commands also accept explicit capability headers with repeatable `--accept`, `--allow`, `--allow-event`, and `--supported`. The CLI does not claim unsupported `Allow` or event-package features unless you set them.
+
+Outbound `SipUac` calls send an SDP audio offer by default, open RTP while the call exists, and validate the `2xx` SDP answer before reporting the call as confirmed. Use `--rtp-bind` for the local RTP socket, `--rtp-advertise` for the SDP address, `--media-port`/`--rtp-port` for the RTP port, and repeatable `--codec` to adjust offered media. Use `--dtmf` to send in-dialog SIP INFO DTMF after confirmation.
+
+Current RTP media primitives include PCMU/PCMA encode/decode without `audioop`, deterministic synthetic `silence` and `noise` PCM sources, RFC3550-style jitter metrics, tx/rx packet metrics, a fixed target/max `RtpJitterBuffer` with concealment and late/drop counters, and `RtpAudioSession` for UDP RTP send/receive with metrics snapshots. High-level `SipUac.call(audio="none|silence|noise|pyaudio")` and `SipUas.answer(audio="none|silence|noise|pyaudio")` support no-device synthetic media plus optional lazy PyAudio microphone input. The CLI exposes `--audio`, `--jitter-buffer-ms`, `--rtp-stats`, and `--metrics-json` on `call` and `listen`.
+
+UAS provisional response examples:
+
+```python
+from sipx import SipProvisionalResponse, SipUas
+
+uas = SipUas(aor="sip:1001@example.com")
+
+# Default: 180 Ringing, then 200 OK.
+await uas.answer()
+
+# RFC-valid direct final response: INVITE -> 200 OK -> ACK.
+await uas.answer(provisionals=())
+
+# Explicit carrier-style progress: 100 Trying, 183 Session Progress with SDP, 200 OK.
+await uas.answer(
+    provisionals=(
+        SipProvisionalResponse.trying(),
+        SipProvisionalResponse.session_progress(include_sdp=True),
+    )
+)
+```
+
+Hooks mutate SIP traffic only in `lab` mode. Handlers observe traffic and can be registered as decorators:
+
+```python
+from sipx import SipHandlers, SipHooks, SipMessage, SipRequest
+
+hooks = SipHooks()
+
+@hooks.before_send_message
+def add_header(message: SipMessage, remote: tuple[str, int]) -> SipMessage:
+    if isinstance(message, SipRequest):
+        message.headers.add("X-Lab", "yes")
+    return message
+
+handlers = SipHandlers()
+
+@handlers.on_response
+def record_response(response, remote):
+    print(response.summary())
+```
+
+Summaries are dataclasses. Convert them to JSON at the CLI/example edge with `dataclasses.asdict()` or a JSON helper:
+
+```python
+from dataclasses import asdict
+
+summary = response.summary()
+payload = asdict(summary)
+```
 
 ## Examples
 
 Use `uv run` from the repository root so the local package is importable.
 
-Native operation examples live under `apps/softphone/examples/native`:
+SIP operation examples live under `apps/scenarios/examples/sip`:
 
 ```bash
-uv run --package sipx-cli sipx register lab --config harness.toml --debug-sip --keepalive 10
+uv run --package sipx-cli sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com --username 1001 --password "$SIP_PASSWORD" --debug-sip --keepalive 10
 uv run --package sipx-cli sipx options sip:pbx.example.com --from sip:1001@example.com --include --debug-sip
 uv run --package sipx-cli sipx message sip:1002@example.com 'hello from sipx' --from sip:1001@example.com --debug-sip
-uv run --package sipx-cli sipx call sip:ivr@example.com --profile lab --config harness.toml --codec PCMU --dtmf '123#' --duration 3 --debug-sip
+uv run --package sipx-cli sipx call sip:ivr@example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --codec PCMU --audio noise --rtp-stats --dtmf '123#' --duration 3 --debug-sip
 uv run --package sipx-cli sipx request INFO sip:ivr@example.com --from sip:1001@example.com -H 'Content-Type: application/dtmf-relay' -d $'Signal=1\r\nDuration=160\r\n' --include --debug-sip
 ```
 
 Python templates:
 
 ```python
-from apps.softphone.examples.native.call_with_dtmf import call_with_dtmf
+from apps.scenarios.examples.sip.call_with_dtmf import call_with_dtmf
 
 call_id = await call_with_dtmf("sip:ivr@example.com", digits="123#")
 ```
 
-More command examples are in `apps/softphone/examples/native/README.md`. `apps/softphone/examples/native/sip_cli_flow.py` builds reusable command arrays for register, OPTIONS, MESSAGE, raw INFO DTMF, and call-with-DTMF flows.
+More command examples are in `apps/scenarios/examples/sip/README.md`. `apps/scenarios/examples/sip/sip_cli_flow.py` builds reusable command arrays for register, OPTIONS, MESSAGE, raw INFO DTMF, and call-with-DTMF flows.
 
 Runnable example files:
 
 ```bash
-uv run --package sipx-softphone python apps/softphone/examples/native/sip_cli_flow.py
+uv run --package sipx-scenarios python apps/scenarios/examples/sip/sip_cli_flow.py
 
 SIPX_AOR=sip:1001@example.com \
 SIPX_REGISTRAR=sip:pbx.example.com \
 SIPX_USERNAME=1001 \
 SIPX_PASSWORD=... \
-uv run --package sipx-softphone python apps/softphone/examples/native/call_with_dtmf.py sip:ivr@example.com --digits '123#'
+uv run --package sipx-scenarios python apps/scenarios/examples/sip/call_with_dtmf.py sip:ivr@example.com --digits '123#'
 
-uv run --package sipx-softphone python apps/softphone/examples/native/mizu_call.py register --local-host <your-local-ip>
-uv run --package sipx-softphone python apps/softphone/examples/native/mizu_call.py call sip:<target>@demo.mizu-voip.com:37075 --local-host <your-local-ip> --digits '123#'
+export SIPX_LOCAL_HOST=<your-local-ip>
+export SIPX_TARGET=sip:<target>@demo.mizu-voip.com:37075
+uv run python -m sipx.examples.register
+SIPX_AUDIO=noise uv run python -m sipx.examples.metrics
 ```
 
-Scenario examples are run with the harness CLI:
-
-```bash
-uv run --package sipx-cli sipx scenario run apps/llm/examples/semantic_smoke.py --artifacts-dir artifacts
-uv run --package sipx-cli sipx scenario run apps/llm/examples/sip_flow_audit.py --artifacts-dir artifacts
-```
-
-You can also run the LLM scenario file directly:
+LLM scenario files are run directly for now:
 
 ```bash
 uv run --package sipx-llm python apps/llm/examples/semantic_smoke.py
@@ -323,12 +380,32 @@ uv run --package sipx-llm python apps/llm/examples/sip_flow_audit.py
 uv run --package sipx-llm python apps/llm/examples/sip_flow_audit.py --trace-file /path/to/sip-trace.txt
 ```
 
-The public Mizu demo server profile lives at `apps/softphone/examples/mizu/harness.toml`:
+Direct SIP example scripts live under `sipx.examples`. They default to the public Mizu demo account, but use generic SIP env vars so the same code can target another SIP provider:
 
 ```bash
-uv run --package sipx-cli sipx register mizu_demo --config apps/softphone/examples/mizu/harness.toml --local-host <your-local-ip> --keepalive 5 --debug-sip
-uv run --package sipx-cli sipx call sip:<target>@demo.mizu-voip.com:37075 --profile mizu_demo --config apps/softphone/examples/mizu/harness.toml --local-host <your-local-ip> --dtmf '123#' --duration 5 --debug-sip
+export SIPX_LOCAL_HOST=<your-local-ip>
+export SIPX_TARGET=sip:<target>@demo.mizu-voip.com:37075
+
+# Optional overrides for non-Mizu providers:
+export SIPX_AOR=sip:1001@example.com
+export SIPX_REGISTRAR=sip:pbx.example.com:5060
+export SIPX_USERNAME=1001
+export SIPX_PASSWORD=...
+export SIPX_REMOTE_HOST=pbx.example.com
+export SIPX_REMOTE_PORT=5060
+
+uv run python -m sipx.examples.register
+uv run python -m sipx.examples.options
+uv run python -m sipx.examples.build_request
+uv run python -m sipx.examples.handlers
+uv run python -m sipx.examples.invite_without_sdp
+SIPX_AUDIO=silence uv run python -m sipx.examples.invite_with_sdp
+SIPX_AUDIO=noise uv run python -m sipx.examples.metrics
+SIPX_AUDIO=noise uv run python -m sipx.examples.manipulation
+SIPX_RUN_CALL=1 uv run python -m sipx.examples.smoke_tests
 ```
+
+Call examples require `SIPX_TARGET`; without it they print a structured JSON configuration error instead of opening a network call to the demo account itself.
 
 LLM examples use a generic OpenAI-compatible `/chat/completions` provider and read provider settings only from runtime environment variables:
 
@@ -336,13 +413,12 @@ LLM examples use a generic OpenAI-compatible `/chat/completions` provider and re
 export SIPX_LLM_API_KEY=...
 export SIPX_LLM_BASE_URL=https://api.openai.com/v1
 export SIPX_LLM_MODEL=gpt-4o-mini
-uv run --package sipx-cli sipx scenario run apps/llm/examples/semantic_smoke.py --artifacts-dir artifacts
 uv run --package sipx-llm python apps/llm/examples/sip_flow_audit.py --trace-file /path/to/sip-trace.txt
 ```
 
 `semantic_smoke.py` is the quick smoke test. `sip_flow_audit.py` is the richer example: it extracts deterministic SIP signals, asks the LLM for structured JSON, returns summary, behavior, risk score, protocol findings, media assessment, and next actions.
 
-Templates live under `apps/llm/examples`, `apps/asterisk/examples`, and `apps/softphone/examples`. The live LLM smoke test is skipped unless `SIPX_LLM_API_KEY` is set.
+Templates live under `apps/llm/examples`, `apps/asterisk/examples`, and `apps/scenarios/examples`. The live LLM smoke test is skipped unless `SIPX_LLM_API_KEY` is set.
 
 GitHub automation lives under `.github/workflows`:
 
@@ -353,7 +429,7 @@ GitHub automation lives under `.github/workflows`:
 
 ## Asterisk Lab
 
-The repo includes a local Asterisk 22 lab under `docker/asterisk` for backend and Native SIP integration work.
+The repo includes a local Asterisk 22 lab under `docker/asterisk` for Asterisk runtime and SIP UAC/UAS integration work.
 
 ```bash
 docker compose -f docker/asterisk/docker-compose.yml up --build
@@ -364,7 +440,7 @@ Default lab-only endpoints:
 
 - ARI: `http://127.0.0.1:8088/ari`, user `sipx`, password `sipx`.
 - SIP UDP: `127.0.0.1:5060`.
-- Native SIP UAS tests: `sip:1000@127.0.0.1:5060` and `sip:1001@127.0.0.1:5060`.
+- SIP UAS tests: `sip:1000@127.0.0.1:5060` and `sip:1001@127.0.0.1:5060`.
 
 ## Security Notes
 

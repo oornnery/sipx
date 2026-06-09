@@ -76,3 +76,5 @@ __pypackages__/
 
 .*_cache/
 *.log
+
+artifacts/

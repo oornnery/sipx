@@ -1,5 +1,72 @@
 # CHANGELOG
 
+## 1.11.0 - 2026-06-09
+
+- Added `SipHooks` decorator-style lab hooks and removed the old `SipLabHooks` public name.
+- Added `SipHandlers` decorator-style observation handlers for wire events, requests, and responses.
+- Added dataclass summaries for SIP requests, responses, calls, and SDP.
+- Added core SIP ID helpers and `SipUserAgent.request()` for generic requests with one-shot Digest retry and CSeq-scoped response matching.
+- Added explicit `SipCapabilities` for `Accept`, `Allow`, `Allow-Events`, and `Supported` headers.
+- Added compact SIP header serialization when explicitly requested.
+- Added CLI dry-run message rendering with `--print-message` and `--compact-headers`.
+- Added direct examples for message building and handlers.
+- Bumped package version to `1.11.0`.
+
+## 1.10.0 - 2026-06-09
+
+- Added `SipProvisionalResponse` for configurable INVITE `1xx` UAS responses.
+- Replaced the old single-provisional UAS API with `provisionals=None|()|(...)`.
+- Kept default UAS answer behavior as `180 Ringing`; `provisionals=()` sends final `200 OK` directly.
+- Added support for configured sequences such as `100 Trying`, `180 Ringing`, and `183 Session Progress` with optional SDP.
+- Enforced RFC-shaped `100 Trying`: no To tag, no Contact, and no body.
+- Added direct root SIP examples under `sipx.examples`, defaulting to the public Mizu demo with generic SIP env vars and no `argparse`.
+- Made call-oriented root examples require explicit `SIPX_TARGET` and report config/call failures as structured JSON instead of tracebacks.
+- Bounded call-oriented root examples by `SIPX_TIMEOUT` so provisional-only public behavior cannot hang example runs.
+- Added RFC summary comments to SIP UA/UAC/UAS and request builder files.
+- Bumped package version to `1.10.0`.
+
+## 1.9.0 - 2026-06-09
+
+- Added G.711 PCMU/PCMA encode/decode helpers without `audioop`.
+- Added deterministic synthetic `silence` and `noise` PCM sources for RTP media without opening audio devices.
+- Expanded RTP stats with duplicate, byte, parse/decode error, late drop, loss percent, and RFC3550-style jitter metrics.
+- Added `RtpMetrics` snapshots for tx/rx packet and byte counters.
+- Added `RtpJitterBuffer` with ordered playout, fixed target/max delay, concealment payloads, and underrun/overrun/duplicate/late counters.
+- Moved the concrete `SipUac` and `SipUas` role classes into `sipx/uac.py` and `sipx/uas.py` while keeping `SipUserAgent` as the shared engine.
+- Added high-level `SipUac` helpers for contact, register, unregister, call, hangup, and SIP INFO DTMF.
+- Added high-level `SipUas` helpers for contact, answer, hangup, wait-hangup, and SIP INFO DTMF.
+- Added `RtpAudioSession` with UDP RTP send/receive, PCMU/PCMA encode/decode, synthetic silence/noise send, jitter-buffer playout, and metrics snapshots.
+- Wired `SipUac.call(audio="noise|silence")` and `SipUas.answer(audio="noise|silence")` to send synthetic RTP during confirmed calls.
+- Added separate `rtp_bind_host` and `rtp_advertise_host` controls on high-level `SipUac`/`SipUas` media setup.
+- Removed the public `sipx-softphone` workspace package and moved SIP examples plus the Mizu profile into `apps/scenarios/examples`.
+- Updated CLI phone commands and no-network tests to construct `SipUac`/`SipUas` directly instead of a softphone wrapper.
+- Moved the root `sipx` CLI to a SIP/RTP-only surface: `options`, `message`, `request`, `register`, `unregister`, `call`, and `listen`.
+- Added CLI `call`/`listen` audio, RTP bind/advertise, jitter buffer, RTP stats, and metrics JSON flags.
+- Added optional lazy PyAudio microphone input via `audio="pyaudio"` without a default native dependency.
+- Added pure-Python public Mizu examples for REGISTER, OPTIONS, INVITE without SDP, INVITE with SDP/RTP, metrics, lab manipulation, and smoke checks.
+- Added `FORMAT.md` with compact `SPEC.md` formatting rules.
+- Recorded the architecture direction in `SPEC.md`: high-level `SipUac`/`SipUas`, SIP-only root CLI, audio modes, RTP jitter buffer, and metrics surfaces.
+- Bumped package version to `1.9.0`.
+
+## 1.8.1 - 2026-06-09
+
+- Renamed SIP runtime public API from `Native*` names to `SipUserAgent`, `SipUac`, `SipUas`, `SipCall`, `SipHooks`, and `SipRetransmissionPolicy` without compatibility aliases.
+- Renamed softphone public API to `SipSoftphone`, `SipSoftphoneAccount`, `SipSoftphoneConfig`, and `SipSoftphoneError` without compatibility aliases.
+- Updated CLI/profile defaults, examples, tests, and docs to use `runtime = "sip"` and `apps/softphone/examples/sip`.
+- Fixed INVITE handling so `183 Session Progress` counts as progress and the initial no-response timeout no longer fails a proceeding call.
+- Added loopback regression coverage for INVITE provisional timeout behavior.
+- Moved Harness, Mock, Timeline, Scenario, profile, report, recorder, and artifact surfaces into new workspace package `sipx-harness` / `sipx_harness`.
+- Kept root `sipx` SIP-only: SIP/SDP/RTP/media primitives plus SIP UAC/UAS runtime.
+- Moved STT/TTS speech protocols out of root `sipx.media` into `sipx-stt` / `sipx-tts` app packages.
+- Moved generic redaction out of root `sipx.security` into `sipx-harness` / `sipx_harness`.
+- Renamed generic public runtime contracts to `Runtime`, `CallRuntime`, `DtmfRuntime`, `RuntimeCapability`, and `MockRuntime`; removed `Backend*` API identifiers outside packaging metadata.
+- Tightened text redaction so SDP `a=crypto` lines keep safe evidence shape as `a=crypto: [REDACTED]`.
+- Added SIP role ABC contracts for `SipWireRuntime`, `SipUacRuntime`, and `SipUasRuntime`; `SipUserAgent` implements the SIP wire/UAC/UAS contracts.
+- Kept SIP role ABC signatures explicit so concrete keyword-only UAC/UAS overrides pass `uv run ty check`.
+- Configured root `pytest` to collect only core `tests/`; app tests under `apps/*/tests` are opt-in by explicit path.
+- Added package-boundary regression coverage so harness symbols import from `sipx_harness`, not root `sipx`.
+- Bumped package version to `1.8.1`.
+
 ## 1.8.0 - 2026-06-09
 
 - Split the repo into a `uv` workspace with root `sipx` as the core library package.
@@ -117,7 +184,7 @@
 
 ## 0.9.5 - 2026-06-08
 
-- Added lab-only `NativeSipLabHooks` for before-send, before-SDP-body, after-receive, and retransmission interval overrides.
+- Added lab-only `SipHooks` for before-send, before-SDP-body, after-receive, and retransmission interval overrides.
 - Routed native SIP request, response, and retransmission sends through the lab hook pipeline while rejecting hooks in strict mode.
 - Added support for lab hooks to emit malformed raw SIP bytes and to observe or drop received wire events without extending receive timeouts.
 - Added `NativeSoftphoneConfig.lab_hooks` passthrough to the underlying `NativeSipBackend`.
@@ -261,10 +328,10 @@
 
 ## 0.3.0 - 2026-06-08
 
-- Added media primitives: `AudioFrame`, `MediaPort`, STT/TTS protocols, `TranscriptEvent`, and barge-in policy.
+- Added initial media primitives and barge-in policy; speech protocol surfaces were later moved to app packages.
 - Added central redaction utilities for sensitive mapping values and SIP/ARI/SDP text lines.
 - Connected `ArtifactStore` JSON/text writes to the default redactor.
-- Added tests for media frame validation, barge-in policy, transcript confidence validation, redaction, and artifact redaction.
+- Added tests for media frame validation, barge-in policy, speech event validation, redaction, and artifact redaction.
 - Recorded redaction replacement bug in `SPEC.md` §B B2 and fixed it under invariant V13.
 
 ## 0.2.0 - 2026-06-08

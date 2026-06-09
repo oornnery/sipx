@@ -2,11 +2,11 @@ import asyncio
 from collections.abc import Mapping
 from urllib.parse import parse_qs, urlsplit
 
-from sipx import Timeline
+from sipx_harness import Timeline
 from sipx_asterisk import (
     AsteriskAriClient,
     AsteriskAriHttpResponse,
-    AsteriskBackend,
+    AsteriskRuntime,
     handle_inbound_stasis_start,
     minimal_asterisk_stasis_config,
 )
@@ -72,13 +72,13 @@ async def _answer_and_bridge_media() -> None:
         }
 
     timeline = Timeline(run_id="stasis-example")
-    backend = AsteriskBackend(
+    runtime = AsteriskRuntime(
         client=AsteriskAriClient(transport=transport),
         timeline=timeline,
         actor_id="pbx",
     )
 
-    session = await handle_inbound_stasis_start(backend, source=source())
+    session = await handle_inbound_stasis_start(runtime, source=source())
 
     assert session is not None
     assert session.channel.id == "SIP:alice-0001"
@@ -152,6 +152,6 @@ async def _return_none_without_matching_event() -> None:
             "channel": {"id": "chan-1"},
         }
 
-    session = await handle_inbound_stasis_start(AsteriskBackend(), source=source())
+    session = await handle_inbound_stasis_start(AsteriskRuntime(), source=source())
 
     assert session is None

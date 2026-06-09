@@ -1,3 +1,5 @@
 """STT adapter slot for sipx media protocols."""
 
-__all__: list[str] = []
+from sipx_stt.protocol import SttEngine, SttStream, TranscriptEvent
+
+__all__ = ["SttEngine", "SttStream", "TranscriptEvent"]

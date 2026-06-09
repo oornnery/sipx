@@ -5,13 +5,46 @@ from dataclasses import dataclass
 
 
 COMPACT_HEADERS = {
+    "a": "Accept-Contact",
+    "b": "Referred-By",
     "c": "Content-Type",
+    "d": "Request-Disposition",
+    "e": "Content-Encoding",
     "f": "From",
     "i": "Call-ID",
+    "j": "Reject-Contact",
+    "k": "Supported",
     "l": "Content-Length",
     "m": "Contact",
+    "o": "Event",
+    "r": "Refer-To",
+    "s": "Subject",
     "t": "To",
+    "u": "Allow-Events",
     "v": "Via",
+    "x": "Session-Expires",
+}
+
+CANONICAL_TO_COMPACT_HEADERS = {
+    value.lower(): key for key, value in COMPACT_HEADERS.items()
+}
+CANONICAL_HEADER_NAMES = {
+    "allow-events": "Allow-Events",
+    "call-id": "Call-ID",
+    "content-encoding": "Content-Encoding",
+    "content-length": "Content-Length",
+    "content-type": "Content-Type",
+    "cseq": "CSeq",
+    "max-forwards": "Max-Forwards",
+    "proxy-authenticate": "Proxy-Authenticate",
+    "proxy-authorization": "Proxy-Authorization",
+    "record-route": "Record-Route",
+    "referred-by": "Referred-By",
+    "refer-to": "Refer-To",
+    "reject-contact": "Reject-Contact",
+    "request-disposition": "Request-Disposition",
+    "session-expires": "Session-Expires",
+    "www-authenticate": "WWW-Authenticate",
 }
 
 
@@ -22,6 +55,9 @@ def canonical_header_name(name: str) -> str:
     compact = COMPACT_HEADERS.get(stripped.lower())
     if compact:
         return compact
+    canonical = CANONICAL_HEADER_NAMES.get(stripped.lower())
+    if canonical:
+        return canonical
     return "-".join(part[:1].upper() + part[1:].lower() for part in stripped.split("-"))
 
 
@@ -77,14 +113,20 @@ class HeaderMap:
     def __iter__(self) -> Iterator[tuple[str, str]]:
         return self.items()
 
-    def items(self) -> Iterator[tuple[str, str]]:
+    def items(self, *, compact: bool = False) -> Iterator[tuple[str, str]]:
         for key in self._order:
             header = self._headers[key]
+            name = compact_header_name(header.name) if compact else header.name
             for value in header.values:
-                yield header.name, value
+                yield name, value
 
     def copy(self) -> HeaderMap:
         copied = HeaderMap()
         for name, value in self.items():
             copied.add(name, value)
         return copied
+
+
+def compact_header_name(name: str) -> str:
+    canonical = canonical_header_name(name)
+    return CANONICAL_TO_COMPACT_HEADERS.get(canonical.lower(), canonical)
