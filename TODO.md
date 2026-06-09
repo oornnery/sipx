@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone/raw-SIP commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, INVITE Digest retry, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, GitHub CI/release workflows adapted to the new project, fail-fast phone CLI config validation, redacted SIP packet debug output, native softphone SDP offer/answer negotiation, in-dialog SIP INFO DTMF, opt-in generic OpenAI-compatible LLM examples/tests, and passing `uv run ty check` validation.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone/raw-SIP commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, INVITE and BYE Digest retry, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, GitHub CI/release workflows adapted to the new project, fail-fast phone CLI config validation, redacted SIP packet debug output, native softphone SDP offer/answer negotiation, in-dialog SIP INFO DTMF, opt-in generic OpenAI-compatible LLM examples/tests, and passing `uv run ty check` validation.
 
 ## Milestone 0 - Project Grounding
 
@@ -428,13 +428,21 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added deterministic auth-redaction checks for SIP-flow audit traces.
 - [x] Documented direct and `sipx scenario run` commands for the quick smoke and SIP-flow audit examples.
 
+## Block 1.7.1 Done
+
+- [x] Bumped package version to `1.7.1`.
+- [x] Backpropagated challenged BYE hangup failure as `SPEC.md` B12 and V38.
+- [x] Added one-shot Digest retry for in-dialog native BYE when credentials are configured.
+- [x] Passed softphone account credentials from `NativeSoftphone.hangup()` into the backend hangup path.
+- [x] Added loopback regression coverage for challenged BYE retry without persisting passwords.
+
 ## Blocked Or Pending
 
 - [ ] `python -m ty check` still needs the system interpreter environment synced; configured validation now uses passing `uv run ty check`.
 - [ ] Next Asterisk media path after WebSocket MVP remains open: AudioSocket or ExternalMedia RTP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and system-interpreter tooling remain pending after 1.6.1.
+- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and system-interpreter tooling remain pending after 1.7.1.
 
 ## Open Questions
 

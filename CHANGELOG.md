@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.7.1 - 2026-06-09
+
+- Fixed native softphone hangup against proxies that challenge in-dialog `BYE` with `401` or `407`.
+- Added one-shot Digest retry for `NativeSipBackend.hangup_call()` when credentials are available.
+- Added loopback regression coverage that verifies authenticated BYE retry without persisting the password.
+- Recorded SPEC B12 and invariant V38 for challenged BYE authentication.
+- Bumped package version to `1.7.1`.
+
 ## 1.7.0 - 2026-06-08
 
 - Added runnable `examples/llm/sip_flow_audit.py` for richer LLM SIP-flow analysis.

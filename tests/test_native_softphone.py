@@ -121,6 +121,10 @@ def test_native_softphone_runs_outbound_call_and_hangup() -> None:
     asyncio.run(_run_outbound_call_and_hangup())
 
 
+def test_v38_native_softphone_retries_bye_with_digest_auth() -> None:
+    asyncio.run(_retry_bye_with_digest_auth())
+
+
 async def _run_outbound_call_and_hangup() -> None:
     callee = NativeSipBackend(actor_id="callee")
     try:
@@ -179,6 +183,88 @@ async def _run_outbound_call_and_hangup() -> None:
             await softphone.stop()
     finally:
         await callee.stop()
+
+
+async def _retry_bye_with_digest_auth() -> None:
+    callee = NativeSipBackend(actor_id="callee")
+    try:
+        await callee.start()
+        softphone = NativeSoftphone(
+            NativeSoftphoneConfig(
+                account=NativeSoftphoneAccount(
+                    aor="sip:alice@example.com",
+                    registrar="sip:example.com",
+                    username="alice",
+                    password="secret-password",
+                ),
+                remote=callee.local_address,
+                actor_id="alice",
+                timeout=1.0,
+            )
+        )
+        await softphone.start()
+        try:
+            callee_contact = SipUri.parse(
+                f"sip:bob@127.0.0.1:{callee.local_address[1]}"
+            )
+            accept_task = asyncio.create_task(
+                callee.accept_call(
+                    local_tag="callee-tag",
+                    contact=callee_contact,
+                    timeout=1.0,
+                )
+            )
+            call = await softphone.call(
+                "sip:bob@example.com",
+                call_id="softphone-bye-auth-1",
+            )
+            callee_call = await accept_task
+
+            answer_bye = asyncio.create_task(_challenge_bye_digest(callee))
+            await softphone.hangup(call)
+            authorization = await answer_bye
+
+            assert call.state is NativeSipCallState.TERMINATED
+            assert callee_call.state is NativeSipCallState.CONFIRMED
+            assert 'username="alice"' in authorization
+            assert 'nonce="bye-nonce"' in authorization
+            assert "secret-password" not in authorization
+        finally:
+            await softphone.stop()
+    finally:
+        await callee.stop()
+
+
+async def _challenge_bye_digest(callee: NativeSipBackend) -> str:
+    first = await callee.receive_event(timeout=1.0)
+    first_request = first.message
+    assert isinstance(first_request, SipRequest)
+    assert first_request.method == "BYE"
+    first_cseq = int((first_request.headers.get("CSeq") or "0").split()[0])
+    challenge = create_response_for_request(
+        request=first_request,
+        status_code=401,
+        reason="Unauthorized",
+    )
+    challenge.headers.add(
+        "WWW-Authenticate",
+        'Digest realm="example.com", nonce="bye-nonce", qop="auth"',
+    )
+    await callee.send_response(challenge, first.remote)
+
+    second = await callee.receive_event(timeout=1.0)
+    second_request = second.message
+    assert isinstance(second_request, SipRequest)
+    assert second_request.method == "BYE"
+    assert int((second_request.headers.get("CSeq") or "0").split()[0]) == first_cseq + 1
+    authorization = second_request.headers.get("Authorization") or ""
+    response = create_response_for_request(
+        request=second_request,
+        status_code=200,
+        reason="OK",
+    )
+    await callee.send_response(response, second.remote)
+    return authorization
 
 
 async def _answer_info_dtmf(callee: NativeSipBackend, *, count: int) -> list[str]:

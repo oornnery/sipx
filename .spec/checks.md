@@ -354,6 +354,18 @@
 | 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors after `1.7.0` changes. |
 | 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.7.0-final` | pass | Built final `1.7.0` sdist and wheel outside the repo. |
 | 2026-06-08 | final secret/provider-name scan | pass/no matches | No private proxy markers, inline LLM keys, SIP auth headers, or provider-specific names in code/tests/examples/docs/TOML/YAML. |
+| 2026-06-09 | real proxy `sipx call --debug-sip` | pass | Authenticated INVITE reached `200 OK`; first BYE received `401`; authenticated BYE retry received `200 OK`; no real secret/account/proxy values persisted. |
+| 2026-06-09 | `uv lock` | pass | Updated lockfile project version from `1.7.0` to `1.7.1`. |
+| 2026-06-09 | `python -m pytest tests/test_native_softphone.py::test_v38_native_softphone_retries_bye_with_digest_auth` | pass | Loopback regression verifies challenged BYE retries with Digest and password is not emitted in Authorization. |
+| 2026-06-09 | `python -m pytest tests/test_native_softphone.py tests/test_native_sip_backend.py` | pass | 24 native SIP/softphone tests passed after BYE Digest retry fix. |
+| 2026-06-09 | focused BYE fix lint/format | pass | `ruff check` and `ruff format --check` passed for native backend, softphone, and regression test. |
+| 2026-06-09 | final `python -m pytest` | pass | 129 passed, 3 skipped after `1.7.1` BYE Digest retry fix. |
+| 2026-06-09 | final `ruff check .` | pass | All lint checks passed after `1.7.1` fix. |
+| 2026-06-09 | final `ruff format --check .` | pass | 80 files already formatted after `1.7.1` fix. |
+| 2026-06-09 | final `uv run ty check` | pass | Configured type-check gate passes after `1.7.1` fix. |
+| 2026-06-09 | final `git diff --check` | pass/no output | No whitespace errors after `1.7.1` fix. |
+| 2026-06-09 | final private marker/auth scan | pass/no matches | No real proxy/account/password/destination markers or unredacted SIP auth headers found in repo files. |
+| 2026-06-09 | final `uv build --out-dir /tmp/opencode/sipx-build-1.7.1-final` | pass | Built final `1.7.1` sdist and wheel outside the repo. |
 
 ## Validation Policy
 

@@ -269,6 +269,9 @@ class NativeSoftphone:
             call,
             branch=_branch("bye"),
             timeout=self.config.timeout,
+            username=self.config.account.username,
+            password=self.config.account.password,
+            auth_branch=_branch("bye-auth"),
         )
         self._close_rtp_sink(call.call_id)
         self._record("call_hungup", {"call_id": call.call_id})

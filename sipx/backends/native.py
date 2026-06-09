@@ -738,6 +738,10 @@ class NativeSipBackend:
         *,
         branch: str,
         timeout: float = 1.0,
+        username: str | None = None,
+        password: str | None = None,
+        auth_branch: str | None = None,
+        cnonce: str = "sipx",
     ) -> SipResponse:
         if call.state is NativeSipCallState.TERMINATED:
             raise NativeSipCallError("call is already terminated")
@@ -749,35 +753,82 @@ class NativeSipBackend:
         )
         transaction = NonInviteClientTransaction(request)
         retransmission = await self._send_with_retransmissions(request, call.remote)
-        try:
-            event = await self._receive_matching(
-                timeout=timeout,
-                predicate=lambda item: _response_matches(
-                    item,
+        auth_attempted = False
+
+        while True:
+            cseq = _cseq_number(_required_header(request, "CSeq"))
+            try:
+                event = await self._receive_matching(
+                    timeout=timeout,
+                    predicate=lambda item: _response_matches(
+                        item,
+                        call_id=call.call_id,
+                        cseq_method="BYE",
+                        cseq=cseq,
+                    ),
+                )
+                response = event.message
+                if not isinstance(response, SipResponse):
+                    raise NativeSipCallError("expected BYE response")
+            finally:
+                await self._stop_retransmission(retransmission)
+            transaction.receive_response(response)
+            if 200 <= response.status_code < 300:
+                call.dialog.terminate()
+                call.state = NativeSipCallState.TERMINATED
+                self._record_call(
+                    "terminated", call_id=call.call_id, data={"role": "uac"}
+                )
+                return response
+
+            if (
+                response.status_code in {401, 407}
+                and username is not None
+                and password is not None
+                and not auth_attempted
+            ):
+                challenge = _digest_challenge(response)
+                if challenge is None:
+                    raise NativeSipCallError(
+                        f"BYE {response.status_code} missing Digest challenge"
+                    )
+                auth_header_name, challenge_value = challenge
+                authorization = build_digest_authorization(
+                    username=username,
+                    password=password,
+                    method="BYE",
+                    uri=str(call.request_uri),
+                    challenge=parse_digest_challenge(challenge_value),
+                    cnonce=cnonce,
+                )
+                request = create_bye_request(
+                    dialog=call.dialog,
+                    request_uri=call.request_uri,
+                    via_host=self.local_address[0],
+                    branch=auth_branch or f"{branch}-auth",
+                )
+                request.headers.add(auth_header_name, authorization)
+                transaction = NonInviteClientTransaction(request)
+                retransmission = await self._send_with_retransmissions(
+                    request, call.remote
+                )
+                auth_attempted = True
+                self._record_call(
+                    "auth_challenged",
                     call_id=call.call_id,
-                    cseq_method="BYE",
-                ),
+                    data={"status_code": response.status_code, "method": "BYE"},
+                )
+                continue
+
+            call.state = NativeSipCallState.FAILED
+            self._record_call(
+                "failed",
+                call_id=call.call_id,
+                data={"status_code": response.status_code, "reason": response.reason},
             )
-            response = event.message
-            if not isinstance(response, SipResponse):
-                raise NativeSipCallError("expected BYE response")
-        finally:
-            await self._stop_retransmission(retransmission)
-        transaction.receive_response(response)
-        if 200 <= response.status_code < 300:
-            call.dialog.terminate()
-            call.state = NativeSipCallState.TERMINATED
-            self._record_call("terminated", call_id=call.call_id, data={"role": "uac"})
-            return response
-        call.state = NativeSipCallState.FAILED
-        self._record_call(
-            "failed",
-            call_id=call.call_id,
-            data={"status_code": response.status_code, "reason": response.reason},
-        )
-        raise NativeSipCallError(
-            f"BYE failed with {response.status_code} {response.reason}"
-        )
+            raise NativeSipCallError(
+                f"BYE failed with {response.status_code} {response.reason}"
+            )
 
     async def send_info(
         self,

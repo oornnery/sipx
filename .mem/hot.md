@@ -32,7 +32,7 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.7.0`.
+- Current implementation version: `1.7.1`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
@@ -48,7 +48,7 @@
 - Phone CLI network commands require a profile or explicit `--aor` and `--registrar`; without config they fail before opening sockets.
 - Phone CLI derives default remote host/port from `--registrar` when `--remote-host/--remote-port` are omitted.
 - Raw SIP request CLI supports `--from/--aor`, `--username`, `--password`, `-H/--header`, `-d/--data`, `--body-file`, `--content-type`, `--include`, and `--no-wait`.
-- Calls and raw SIP requests retry one `401` or `407` Digest challenge when username/password are supplied; retry responses are matched by current `CSeq`; passwords must not be persisted.
+- INVITE calls, in-dialog BYE hangups, and raw SIP requests retry one `401` or `407` Digest challenge when username/password are supplied; retry responses are matched by current `CSeq`; passwords must not be persisted.
 - Tests currently run with plain `pytest`; async tests use `asyncio.run` because active `pytest` lacks `pytest-asyncio` plugin.
 - `ty` is declared as a dev dependency; configured validation should use `uv run ty check`.
 - Media primitives now exist: `AudioFrame`, `MediaPort`, `TranscriptEvent`, STT/TTS protocols, `BargeInPolicy`.

@@ -114,6 +114,7 @@ V34: operational DTMF ! confirmed native calls can send DTMF via SIP INFO `appli
 V35: LLM env config ! missing optional `SIPX_LLM_*` vars use concrete defaults; no dataclass descriptors or internal objects leak into runtime parsing.
 V36: LLM SIP audit examples ! runnable directly and via `sipx scenario run`; output structured behavior/risk/findings/actions while deterministic SIP checks remain separate from LLM judgment.
 V37: LLM SIP audit security ! redacted auth markers are accepted; unredacted `Authorization`/`Proxy-Authorization` values are flagged before LLM analysis.
+V38: SIP auth ! confirmed native calls receiving `401|407` to in-dialog `BYE` retry once with Digest when credentials exist; retry waits for current BYE CSeq response; secrets ⊥ logs/docs/artifacts.
 
 ## §T
 
@@ -164,6 +165,7 @@ T42|x|add in-dialog SIP INFO DTMF support plus richer native CLI/Python examples
 T43|x|fix LLM env defaults for direct example execution|V32,V35,I.api
 T44|x|add richer runnable LLM SIP-flow audit example|V5,V13,V32,V36,I.cmd
 T45|x|fix SIP-flow audit auth redaction detection|V13,V36,V37,I.cmd
+T46|x|fix Digest retry for challenged native softphone BYE hangup|V29,V30,V38,I.cmd
 
 ## §B
 
@@ -180,3 +182,4 @@ B8|2026-06-08|`uv run ty check` baseline had 29 diagnostics from dynamic call, m
 B9|2026-06-08|DTMF implementation added helper/softphone call path but backend method/import was incomplete during focused validation|V34
 B10|2026-06-08|`LLMChatClient.from_env()` read dataclass slot descriptors as defaults when optional env vars were missing, causing timeout float parsing failure|V35
 B11|2026-06-08|SIP-flow audit treated `Authorization: [REDACTED]` as unredacted auth during deterministic security checks|V37
+B12|2026-06-09|real proxy accepted authenticated INVITE but challenged in-dialog BYE; hangup path lacked Digest retry and failed with `401 Unauthorized`|V38

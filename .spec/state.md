@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.6.0` adds generic OpenAI-compatible LLM templates, in-dialog SIP INFO DTMF, and richer native SIP examples.
+Implement `sipx` in verified commit blocks. Block `1.7.1` fixes challenged in-dialog BYE Digest auth for real native softphone interop.
 
 ## Sources Read
 
@@ -213,6 +213,10 @@ Implement `sipx` in verified commit blocks. Block `1.6.0` adds generic OpenAI-co
 - Bumped `pyproject.toml` version from `1.6.1` to `1.7.0`.
 - Added `examples/llm/sip_flow_audit.py` as a richer runnable LLM SIP-flow audit example with deterministic signals and structured JSON output.
 - Recorded `SPEC.md` B11 and V37 after focused validation caught redacted auth being treated as unredacted in the SIP-flow audit.
+- Bumped `pyproject.toml` version from `1.7.0` to `1.7.1`.
+- Recorded `SPEC.md` B12 and V38 after a real confirmed call failed hangup when the proxy challenged BYE with `401 Unauthorized`.
+- Added one-shot Digest retry for in-dialog BYE and passed softphone account credentials into hangup.
+- Verified the real proxy flow reached authenticated BYE `200 OK`; no real account, proxy, number, or password values are persisted in repo files.
 
 ## Active Decision
 

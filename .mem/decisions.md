@@ -56,3 +56,4 @@
 | D52 | 2026-06-08 | Use `uv run ty check` as the type-check validation gate. | `ty` is available through the project dev environment even though the system interpreter lacks `python -m ty`. |
 | D53 | 2026-06-08 | LLM client is generic OpenAI-compatible, not provider-named. | Lets users point templates at OpenAI-compatible APIs without renaming code per vendor. |
 | D54 | 2026-06-08 | CLI DTMF starts with SIP INFO for confirmed native calls. | It is minimal, testable, and useful before full RTP RFC4733 media send is implemented. |
+| D55 | 2026-06-09 | In-dialog BYE Digest retry follows the same one-shot policy as INVITE auth retry. | Real proxies can challenge hangup too; one retry fixes interop without risking infinite auth loops or storing passwords. |
