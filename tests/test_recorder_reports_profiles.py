@@ -122,7 +122,7 @@ def test_profile_rejects_lab_overrides_in_strict_mode() -> None:
 
 def test_mixed_scenario_binds_native_asterisk_and_mock_actors() -> None:
     timeline = Timeline(run_id="mixed-run")
-    backends = {
+    backends: dict[str, object] = {
         "mock": MockBackend(),
         "native": NativeSipBackend(timeline=timeline, actor_id="native"),
         "asterisk": AsteriskBackend(timeline=timeline, actor_id="pbx"),

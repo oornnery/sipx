@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+from typing import cast
 from uuid import uuid4
 
 from sipx.backends.native import (
@@ -11,6 +13,7 @@ from sipx.backends.native import (
     NativeSipRetransmissionPolicy,
 )
 from sipx.core.timeline import Timeline
+from sipx.sdp import create_audio_offer
 from sipx.sip.register import RegisterClientState
 from sipx.sip.transport import UdpAddress
 from sipx.sip.uri import SipUri
@@ -37,7 +40,15 @@ class NativeSoftphoneAccount:
 
     @property
     def user(self) -> str:
-        return self.contact_user or self.aor.user or "softphone"
+        return self.contact_user or self.aor_uri.user or "softphone"
+
+    @property
+    def aor_uri(self) -> SipUri:
+        return cast(SipUri, self.aor)
+
+    @property
+    def registrar_uri(self) -> SipUri:
+        return cast(SipUri, self.registrar)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +62,10 @@ class NativeSoftphoneConfig:
     timeout: float = 1.0
     retransmission_policy: NativeSipRetransmissionPolicy | None = None
     lab_hooks: NativeSipLabHooks | None = None
+    media_host: str | None = None
+    media_port: int = 0
+    codecs: tuple[str, ...] = ("PCMU", "PCMA")
+    telephone_event: bool = True
 
     def __post_init__(self) -> None:
         if self.mode not in {"strict", "lab"}:
@@ -59,6 +74,10 @@ class NativeSoftphoneConfig:
             raise ValueError("timeout must be positive")
         if not self.actor_id:
             raise ValueError("actor_id is required")
+        if not 0 <= self.media_port <= 65535:
+            raise ValueError("media_port must be between 0 and 65535")
+        if not self.codecs:
+            raise ValueError("at least one codec is required")
 
 
 class NativeSoftphone:
@@ -83,6 +102,7 @@ class NativeSoftphone:
         if self.backend.mode != config.mode:
             raise NativeSoftphoneError("backend mode does not match softphone config")
         self._started = False
+        self._rtp_sinks: dict[str, _RtpSink] = {}
 
     @property
     def local_address(self) -> UdpAddress:
@@ -117,6 +137,9 @@ class NativeSoftphone:
         if not self._started:
             return
         await self.backend.stop()
+        for sink in self._rtp_sinks.values():
+            sink.close()
+        self._rtp_sinks.clear()
         self._started = False
         self._record("stopped", {"aor": str(self.config.account.aor)})
 
@@ -136,8 +159,8 @@ class NativeSoftphone:
         call_id = call_id or _id("register")
         state = await self.backend.register_account(
             remote=self.config.remote,
-            registrar=self.config.account.registrar,
-            aor=self.config.account.aor,
+            registrar=self.config.account.registrar_uri,
+            aor=self.config.account.aor_uri,
             contact=self.contact,
             call_id=call_id,
             branch=_branch("register"),
@@ -156,8 +179,8 @@ class NativeSoftphone:
         call_id = call_id or _id("unregister")
         state = await self.backend.unregister_account(
             remote=self.config.remote,
-            registrar=self.config.account.registrar,
-            aor=self.config.account.aor,
+            registrar=self.config.account.registrar_uri,
+            aor=self.config.account.aor_uri,
             contact=self.contact,
             call_id=call_id,
             branch=_branch("unregister"),
@@ -179,17 +202,34 @@ class NativeSoftphone:
         self._require_started()
         target_uri = _sip_uri(target)
         call_id = call_id or _id("call")
-        call = await self.backend.initiate_call(
-            remote=self.config.remote,
-            target=target_uri,
-            caller=self.config.account.aor,
-            contact=self.contact,
-            call_id=call_id,
-            branch=_branch("invite"),
-            from_tag=_tag("from"),
-            ack_branch=_branch("ack"),
-            timeout=self.config.timeout,
+        rtp = await self._open_rtp_sink()
+        offer = create_audio_offer(
+            connection_address=rtp.local_address[0],
+            port=rtp.local_address[1],
+            codecs=self.config.codecs,
+            telephone_event=self.config.telephone_event,
         )
+        try:
+            call = await self.backend.initiate_call(
+                remote=self.config.remote,
+                target=target_uri,
+                caller=self.config.account.aor_uri,
+                contact=self.contact,
+                call_id=call_id,
+                branch=_branch("invite"),
+                from_tag=_tag("from"),
+                ack_branch=_branch("ack"),
+                timeout=self.config.timeout,
+                body=offer.to_sdp().encode("utf-8"),
+                content_type="application/sdp",
+                username=self.config.account.username,
+                password=self.config.account.password,
+                auth_branch=_branch("invite-auth"),
+            )
+        except Exception:
+            rtp.close()
+            raise
+        self._rtp_sinks[call.call_id] = rtp
         self._record(
             "call_confirmed", {"call_id": call.call_id, "target": str(target_uri)}
         )
@@ -201,11 +241,23 @@ class NativeSoftphone:
         local_tag: str | None = None,
     ) -> NativeSipCall:
         self._require_started()
-        call = await self.backend.accept_call(
-            local_tag=local_tag or _tag("local"),
-            contact=self.contact,
-            timeout=self.config.timeout,
-        )
+        rtp = await self._open_rtp_sink()
+        try:
+            call = await self.backend.accept_call(
+                local_tag=local_tag or _tag("local"),
+                contact=self.contact,
+                timeout=self.config.timeout,
+                media_port=rtp.local_address[1],
+                supported_codecs=self.config.codecs,
+                telephone_event=self.config.telephone_event,
+            )
+        except Exception:
+            rtp.close()
+            raise
+        if call.local_sdp is None:
+            rtp.close()
+        else:
+            self._rtp_sinks[call.call_id] = rtp
         self._record("inbound_answered", {"call_id": call.call_id})
         return call
 
@@ -218,7 +270,36 @@ class NativeSoftphone:
             branch=_branch("bye"),
             timeout=self.config.timeout,
         )
+        self._close_rtp_sink(call.call_id)
         self._record("call_hungup", {"call_id": call.call_id})
+
+    async def send_dtmf(
+        self,
+        call: NativeSipCall,
+        digits: str,
+        *,
+        duration_ms: int = 160,
+    ) -> None:
+        self._require_started()
+        await self.backend.send_dtmf_info(
+            call,
+            digits,
+            duration_ms=duration_ms,
+            timeout=self.config.timeout,
+        )
+        self._record(
+            "dtmf_sent",
+            {"call_id": call.call_id, "digits": digits, "transport": "sip-info"},
+        )
+
+    async def _open_rtp_sink(self) -> _RtpSink:
+        host = self.config.media_host or self.local_address[0]
+        return await _RtpSink.open(host=host, port=self.config.media_port)
+
+    def _close_rtp_sink(self, call_id: str) -> None:
+        sink = self._rtp_sinks.pop(call_id, None)
+        if sink is not None:
+            sink.close()
 
     def _require_started(self) -> None:
         if not self._started:
@@ -247,3 +328,30 @@ def _branch(prefix: str) -> str:
 
 def _tag(prefix: str) -> str:
     return f"{prefix}-{uuid4().hex}"
+
+
+class _RtpSink:
+    def __init__(self, transport: asyncio.DatagramTransport) -> None:
+        self._transport = transport
+
+    @classmethod
+    async def open(cls, *, host: str, port: int) -> _RtpSink:
+        loop = asyncio.get_running_loop()
+        transport, _protocol = await loop.create_datagram_endpoint(
+            _RtpSinkProtocol,
+            local_addr=(host, port),
+        )
+        return cls(transport)  # type: ignore[arg-type]
+
+    @property
+    def local_address(self) -> UdpAddress:
+        host, port = self._transport.get_extra_info("sockname")
+        return str(host), int(port)
+
+    def close(self) -> None:
+        self._transport.close()
+
+
+class _RtpSinkProtocol(asyncio.DatagramProtocol):
+    def datagram_received(self, data: bytes, addr: object) -> None:
+        return None

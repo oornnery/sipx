@@ -48,6 +48,28 @@ def create_bye_request(
     return SipRequest(method="BYE", uri=request_uri, headers=headers)
 
 
+def create_info_request(
+    *,
+    dialog: Dialog,
+    request_uri: SipUri,
+    via_host: str,
+    branch: str,
+    body: bytes = b"",
+    content_type: str | None = None,
+    max_forwards: int = 70,
+) -> SipRequest:
+    headers = HeaderMap()
+    headers.add("Via", f"SIP/2.0/UDP {via_host};branch={branch}")
+    headers.add("From", dialog.local_uri)
+    headers.add("To", dialog.remote_uri)
+    headers.add("Call-ID", dialog.dialog_id.call_id)
+    headers.add("CSeq", dialog.next_local_cseq("INFO"))
+    headers.add("Max-Forwards", str(max_forwards))
+    if content_type is not None:
+        headers.add("Content-Type", content_type)
+    return SipRequest(method="INFO", uri=request_uri, headers=headers, body=body)
+
+
 def create_invite_request(
     *,
     target: SipUri,

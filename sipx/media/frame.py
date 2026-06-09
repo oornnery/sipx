@@ -7,7 +7,7 @@ from typing import Literal
 AudioSource = Literal["rtp", "tts", "file", "tone", "silence", "websocket"]
 
 
-@dataclass(slots=True)
+@dataclass(init=False, slots=True)
 class AudioFrame:
     pcm: memoryview
     sample_rate: int
@@ -16,8 +16,25 @@ class AudioFrame:
     timestamp_ns: int
     source: AudioSource
 
+    def __init__(
+        self,
+        *,
+        pcm: bytes | bytearray | memoryview,
+        sample_rate: int,
+        channels: int,
+        duration_ms: int,
+        timestamp_ns: int,
+        source: AudioSource,
+    ) -> None:
+        self.pcm = memoryview(pcm)
+        self.sample_rate = sample_rate
+        self.channels = channels
+        self.duration_ms = duration_ms
+        self.timestamp_ns = timestamp_ns
+        self.source = source
+        self.__post_init__()
+
     def __post_init__(self) -> None:
-        self.pcm = memoryview(self.pcm)
         if self.sample_rate <= 0:
             raise ValueError("sample_rate must be positive")
         if self.channels <= 0:

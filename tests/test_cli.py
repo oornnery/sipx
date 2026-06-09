@@ -6,6 +6,7 @@ import pytest
 
 from sipx.cli.main import main
 from sipx.sip import HeaderMap, SipResponse
+from sipx.sip.transport import SipWireDirection, SipWireEvent
 
 
 def test_pyproject_defines_installable_sipx_console_script() -> None:
@@ -333,6 +334,150 @@ def test_cli_generic_request_supports_data_and_include(monkeypatch, capsys) -> N
     assert output.endswith("pong")
 
 
+def test_cli_request_retries_digest_challenge(monkeypatch, capsys) -> None:
+    requests = []
+    receives = 0
+
+    class FakeNativeSipBackend:
+        def __init__(self, **kwargs) -> None:
+            self.local_address = ("127.0.0.1", 45003)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def send_request(self, request, remote) -> None:
+            requests.append(request)
+
+        async def receive_event(self, *, timeout=None):
+            nonlocal receives
+            receives += 1
+            request = requests[-1]
+            headers = HeaderMap()
+            headers.add("Call-ID", request.headers.get("Call-ID"))
+            headers.add("CSeq", request.headers.get("CSeq"))
+            if receives == 1:
+                headers.add(
+                    "Proxy-Authenticate",
+                    'Digest realm="example.com", nonce="nonce-1", qop="auth"',
+                )
+                return SimpleNamespace(
+                    message=SipResponse(
+                        status_code=407,
+                        reason="Proxy Authentication Required",
+                        headers=headers,
+                    )
+                )
+            if receives == 2:
+                first_request = requests[0]
+                headers = HeaderMap()
+                headers.add("Call-ID", first_request.headers.get("Call-ID"))
+                headers.add("CSeq", first_request.headers.get("CSeq"))
+                headers.add(
+                    "Proxy-Authenticate",
+                    'Digest realm="example.com", nonce="nonce-1", qop="auth"',
+                )
+                return SimpleNamespace(
+                    message=SipResponse(
+                        status_code=407,
+                        reason="Proxy Authentication Required",
+                        headers=headers,
+                    )
+                )
+            return SimpleNamespace(
+                message=SipResponse(status_code=200, reason="OK", headers=headers)
+            )
+
+    monkeypatch.setattr("sipx.cli.main.NativeSipBackend", FakeNativeSipBackend)
+
+    code = main(
+        [
+            "request",
+            "OPTIONS",
+            "sip:pbx.example.com",
+            "--from",
+            "sip:alice@example.com",
+            "--username",
+            "alice",
+            "--password",
+            "secret-password",
+        ]
+    )
+
+    first, second = requests
+    assert code == 0
+    assert receives == 3
+    assert first.headers.get("Proxy-Authorization") is None
+    assert second.headers.get("CSeq") == "2 OPTIONS"
+    authorization = second.headers.get("Proxy-Authorization") or ""
+    assert 'username="alice"' in authorization
+    assert 'nonce="nonce-1"' in authorization
+    assert "secret-password" not in authorization
+    assert "< 200 OK" in capsys.readouterr().out
+
+
+def test_cli_request_debug_sip_prints_redacted_packets(monkeypatch, capsys) -> None:
+    class FakeNativeSipBackend:
+        def __init__(self, **kwargs) -> None:
+            self.local_address = ("127.0.0.1", 45004)
+            self.wire_event_handler = kwargs["wire_event_handler"]
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def send_request(self, request, remote) -> None:
+            self.wire_event_handler(
+                SipWireEvent(
+                    direction=SipWireDirection.TX,
+                    remote=remote,
+                    raw=(
+                        b"OPTIONS sip:pbx.example.com SIP/2.0\r\n"
+                        b"Proxy-Authorization: secret-password\r\n\r\n"
+                    ),
+                )
+            )
+            self.request = request
+
+        async def receive_event(self, *, timeout=None):
+            headers = HeaderMap()
+            headers.add("Call-ID", self.request.headers.get("Call-ID"))
+            headers.add("CSeq", self.request.headers.get("CSeq"))
+            response = SipResponse(status_code=200, reason="OK", headers=headers)
+            self.wire_event_handler(
+                SipWireEvent(
+                    direction=SipWireDirection.RX,
+                    remote=("203.0.113.10", 5060),
+                    raw=response.to_bytes(),
+                    message=response,
+                )
+            )
+            return SimpleNamespace(message=response)
+
+    monkeypatch.setattr("sipx.cli.main.NativeSipBackend", FakeNativeSipBackend)
+
+    code = main(
+        [
+            "options",
+            "sip:pbx.example.com",
+            "--from",
+            "sip:alice@example.com",
+            "--debug-sip",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "--- SIP TX pbx.example.com:5060" in captured.err
+    assert "--- SIP RX 203.0.113.10:5060" in captured.err
+    assert "Proxy-Authorization: [REDACTED]" in captured.err
+    assert "secret-password" not in captured.err
+
+
 def test_cli_request_requires_from_identity(monkeypatch, capsys) -> None:
     def fail_if_network_starts(**kwargs):
         raise AssertionError("NativeSipBackend must not be constructed")
@@ -356,6 +501,16 @@ def test_cli_request_help_shows_curl_like_flags(capsys) -> None:
     assert "--data" in output
     assert "--body-file" in output
     assert "examples:" in output
+
+
+def test_cli_call_help_shows_dtmf_flag(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["call", "--help"])
+
+    output = capsys.readouterr().out
+    assert exc_info.value.code == 0
+    assert "--dtmf" in output
+    assert "--dtmf-duration-ms" in output
 
 
 def test_cli_places_top_level_call(monkeypatch, capsys) -> None:
@@ -391,6 +546,12 @@ def test_cli_places_top_level_call(monkeypatch, capsys) -> None:
             "sip:example.com",
             "--duration",
             "0",
+            "--media-host",
+            "192.0.2.10",
+            "--media-port",
+            "41000",
+            "--codec",
+            "PCMA",
         ]
     )
 
@@ -402,8 +563,66 @@ def test_cli_places_top_level_call(monkeypatch, capsys) -> None:
     assert created["hungup_call"] == "call-1"
     assert str(phone_config.account.aor) == "sip:alice@example.com"
     assert phone_config.remote == ("example.com", 5060)
+    assert phone_config.media_host == "192.0.2.10"
+    assert phone_config.media_port == 41000
+    assert phone_config.codecs == ("PCMA",)
     assert "call confirmed: call-1" in output
     assert "call terminated: call-1" in output
+
+
+def test_cli_call_debug_sip_passes_wire_handler(monkeypatch, capsys) -> None:
+    class FakeNativeSipBackend:
+        def __init__(self, **kwargs) -> None:
+            self.mode = kwargs["mode"]
+            self.wire_event_handler = kwargs["wire_event_handler"]
+
+    class FakeSoftphone:
+        def __init__(self, config, *, backend=None) -> None:
+            assert backend is not None
+            self.wire_event_handler = backend.wire_event_handler
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, traceback) -> None:
+            return None
+
+        async def call(self, target):
+            self.wire_event_handler(
+                SipWireEvent(
+                    direction=SipWireDirection.TX,
+                    remote=("203.0.113.10", 5060),
+                    raw=b"INVITE sip:bob@example.com SIP/2.0\r\n"
+                    b"Authorization: secret-password\r\n\r\n",
+                )
+            )
+            return SimpleNamespace(call_id="call-1", remote=("203.0.113.10", 5060))
+
+        async def hangup(self, call) -> None:
+            return None
+
+    monkeypatch.setattr("sipx.cli.main.NativeSipBackend", FakeNativeSipBackend)
+    monkeypatch.setattr("sipx.cli.main.NativeSoftphone", FakeSoftphone)
+
+    code = main(
+        [
+            "call",
+            "sip:bob@example.com",
+            "--aor",
+            "sip:alice@example.com",
+            "--registrar",
+            "sip:example.com",
+            "--duration",
+            "0",
+            "--debug-sip",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert code == 0
+    assert "--- SIP TX 203.0.113.10:5060" in captured.err
+    assert "Authorization: [REDACTED]" in captured.err
+    assert "secret-password" not in captured.err
 
 
 def _write_profile_config(tmp_path: Path) -> Path:

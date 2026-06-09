@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `ruff format --check .` | formatting | not run yet |
 | `ruff check .` | lint | not run yet |
-| `ty check` | type check | not run yet |
+| `uv run ty check` | type check | pass after block `1.5.0` |
 | `pytest` | tests | not run yet |
 | `pre-commit run --all-files` | full local hooks | not run yet |
 
@@ -266,10 +266,80 @@
 | 2026-06-08 | `uv run ty check` | fail | 29 existing diagnostics remain; raw SIP CLI did not add a new diagnostic. |
 | 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors before final build. |
 | 2026-06-08 | `uv build --out-dir /tmp/opencode/sipx-build-1.2.0-final` | pass | Built final `1.2.0` sdist and wheel outside the repo. |
+| 2026-06-08 | focused Digest tests | pass | `tests/test_native_sip_backend.py::test_native_sip_backend_retries_invite_with_digest_auth` and `tests/test_cli.py::test_cli_request_retries_digest_challenge` passed. |
+| 2026-06-08 | real proxy `sipx call` with credentials | authenticated then declined | Retried the Digest challenge and reached `603 Declined` instead of previous `401 Unauthorized`; command secret was not persisted. |
+| 2026-06-08 | `uv lock` | pass | Updated lockfile project version from `1.2.0` to `1.2.1`. |
+| 2026-06-08 | `uv run sipx --help` | pass | Console script works after `1.2.1` bump. |
+| 2026-06-08 | `uv run sipx request --help` | pass | Help shows Digest auth flags `--username` and `--password`. |
+| 2026-06-08 | `python -m pytest` | pass | 113 passed, 2 skipped after Digest retry block. |
+| 2026-06-08 | `ruff check .` | pass | All lint checks passed after Digest retry block. |
+| 2026-06-08 | `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | `uv run ty check` | fail | 29 existing typing diagnostics remain; Digest retry block did not resolve the baseline. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors before validation log update. |
+| 2026-06-08 | secret/account/proxy grep | pass/no matches | Repo files do not contain the real proxy test password, account, destination, or proxy host. |
+| 2026-06-08 | `uv build --out-dir /tmp/opencode/sipx-build-1.2.1-final` | pass | Built final `1.2.1` sdist and wheel outside the repo. |
+| 2026-06-08 | focused stale Digest CSeq tests | pass | INVITE and raw request retries ignore stale pre-auth challenge retransmissions before accepting CSeq 2 responses. |
+| 2026-06-08 | `python -m pytest` | pass | 113 passed, 2 skipped after CSeq-scoped Digest retry matching. |
+| 2026-06-08 | `ruff check .` | pass | All lint checks passed after CSeq-scoped Digest retry matching. |
+| 2026-06-08 | `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | `uv run sipx --help` | pass | Console script still resolves after CSeq fix. |
+| 2026-06-08 | `uv run sipx request --help` | pass | Request help still shows Digest auth flags. |
+| 2026-06-08 | `uv run ty check` | fail | 29 existing typing diagnostics remain after CSeq fix; no new diagnostics remain from the test adjustment. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors after CSeq fix before state log update. |
+| 2026-06-08 | `uv build --out-dir /tmp/opencode/sipx-build-1.2.1-final` | pass | Rebuilt final `1.2.1` sdist and wheel after CSeq fix. |
+| 2026-06-08 | `python -m pytest tests/test_cli.py::test_cli_request_debug_sip_prints_redacted_packets tests/test_cli.py::test_cli_call_debug_sip_passes_wire_handler` | pass | Debug SIP output prints TX/RX packet markers and redacts authorization headers. |
+| 2026-06-08 | `ruff check sipx/backends/native.py sipx/cli/main.py tests/test_cli.py` | pass | Focused lint for strict-mode wire event callback and CLI debug output. |
+| 2026-06-08 | `ruff format --check sipx/backends/native.py sipx/cli/main.py tests/test_cli.py` | pass | Focused debug SIP files already formatted before state updates. |
+| 2026-06-08 | `uv run ty check` | fail | 29 existing typing diagnostics remain; debug SIP changes did not add a new diagnostic. |
+| 2026-06-08 | `uv lock` | pass | Updated lockfile project version from `1.2.1` to `1.3.0`. |
+| 2026-06-08 | `python -m pytest` | pass | 115 passed, 2 skipped after debug SIP block. |
+| 2026-06-08 | `ruff check .` | pass | All lint checks passed after debug SIP block. |
+| 2026-06-08 | `ruff format --check .` | pass | 70 files already formatted. |
+| 2026-06-08 | `uv run sipx --help` | pass | Console script works after `1.3.0` bump. |
+| 2026-06-08 | `uv run sipx request --help` | pass | Help shows `--debug-sip` for raw SIP commands. |
+| 2026-06-08 | `uv run sipx call --help` | pass | Help shows `--debug-sip` for phone call command. |
+| 2026-06-08 | `uv run ty check` | fail | 29 existing diagnostics remain after final debug SIP validation. |
+| 2026-06-08 | `git diff --check` | pass/no output | No whitespace errors before final build. |
+| 2026-06-08 | secret/account/proxy grep | pass/no matches | Repo files do not contain the real proxy test password, account, destination, or proxy host. |
+| 2026-06-08 | `uv build --out-dir /tmp/opencode/sipx-build-1.3.0-final` | pass | Built final `1.3.0` sdist and wheel outside the repo. |
+| 2026-06-08 | `python -m pytest tests/test_native_softphone.py::test_native_softphone_runs_outbound_call_and_hangup tests/test_native_softphone.py::test_native_softphone_rejects_missing_sdp_answer tests/test_cli.py::test_cli_places_top_level_call` | pass | Softphone outbound call negotiates SDP, missing SDP answer fails, and CLI media flags reach config. |
+| 2026-06-08 | `ruff check sipx/backends/native.py sipx/softphone/native.py sipx/cli/main.py tests/test_native_softphone.py tests/test_cli.py` | pass | Focused lint for SDP negotiation and media CLI changes. |
+| 2026-06-08 | `ruff format sipx/backends/native.py tests/test_native_softphone.py` | pass | Reflowed SDP backend/test changes. |
+| 2026-06-08 | `ruff format --check sipx/backends/native.py sipx/softphone/native.py sipx/cli/main.py tests/test_native_softphone.py tests/test_cli.py` | pass | Focused SDP files already formatted after reformat. |
+| 2026-06-08 | `uv run ty check` | fail | 29 existing typing diagnostics remain; SDP changes did not add a new diagnostic count. |
+| 2026-06-08 | `uv lock` | pass | Updated lockfile project version from `1.3.0` to `1.4.0`. |
+| 2026-06-08 | `python -m pytest tests/test_llm.py tests/test_examples_templates.py` | pass | Focused LLM/example tests; live LLM validation skipped unless `SIPX_LLM_API_KEY` is set. |
+| 2026-06-08 | focused LLM/template lint/format | pass | `ruff check` and `ruff format --check` passed for OpenAI-compatible/template files. |
+| 2026-06-08 | `uv lock` | pass | Updated lockfile project version from `1.4.0` to `1.5.0`. |
+| 2026-06-08 | `uv run ty check` | fail | 29 baseline diagnostics remained before type hardening; backpropagated as B8/V33. |
+| 2026-06-08 | focused type-hardening tests | pass | 34 passed across Asterisk backend, media, SDP, softphone, expectations, and recorder/profile tests. |
+| 2026-06-08 | `uv run ty check` | pass | Dynamic call, mapping, URI, SDP direction, and media-frame typing diagnostics fixed. |
+| 2026-06-08 | final `python -m pytest` | pass | 121 passed, 3 skipped after `1.5.0` LLM/template/type-hardening changes. |
+| 2026-06-08 | final `ruff check .` | pass | All lint checks passed after `1.5.0` changes. |
+| 2026-06-08 | final `ruff format --check .` | pass | 77 files already formatted after `1.5.0` changes. |
+| 2026-06-08 | final `uv run ty check` | pass | Configured type-check gate passes. |
+| 2026-06-08 | final `uv run sipx --help` | pass | Console script works after `1.5.0` changes. |
+| 2026-06-08 | final `uv run sipx call --help` | pass | Help shows media and debug SIP flags. |
+| 2026-06-08 | final `uv run sipx request --help` | pass | Help shows raw SIP auth/debug/body/header flags. |
+| 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors after `1.5.0` changes. |
+| 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.5.0-final` | pass | Built final `1.5.0` sdist and wheel outside the repo. |
+| 2026-06-08 | final secret-pattern scan | pass/no matches | Scanned code, tests, examples, docs, state, memory, TOML, and YAML for inline provider keys, SIP auth headers, and private proxy markers. |
+| 2026-06-08 | `docker --version` | blocked | Docker command is unavailable in this WSL environment; Asterisk integration remains opt-in and unrun. |
+| 2026-06-08 | `uv lock` | pass | Updated lockfile project version from `1.5.0` to `1.6.0`. |
+| 2026-06-08 | runnable examples smoke | pass | `uv run python examples/llm/semantic_smoke.py`, `examples/native/sip_cli_flow.py`, `call_with_dtmf.py --help`, `mizu_call.py register --help`, and `uv run sipx call --help` passed. |
+| 2026-06-08 | focused DTMF/LLM/examples tests | pass | `tests/test_native_softphone.py::test_native_softphone_runs_outbound_call_and_hangup`, CLI DTMF test, example tests, and LLM tests passed after B9 fix. |
+| 2026-06-08 | final `python -m pytest` | pass | 124 passed, 3 skipped after `1.6.0` generic LLM naming, runnable examples, and SIP INFO DTMF changes. |
+| 2026-06-08 | final `ruff check .` | pass | All lint checks passed after `1.6.0` changes. |
+| 2026-06-08 | final `ruff format --check .` | pass | 79 files already formatted after `1.6.0` changes. |
+| 2026-06-08 | final `uv run ty check` | pass | Configured type-check gate passes after `1.6.0` changes. |
+| 2026-06-08 | final `git diff --check` | pass/no output | No whitespace errors after `1.6.0` changes. |
+| 2026-06-08 | final `uv build --out-dir /tmp/opencode/sipx-build-1.6.0-final` | pass | Built final `1.6.0` sdist and wheel outside the repo. |
+| 2026-06-08 | final secret/provider-name scan | pass/no matches | No private proxy markers, inline LLM keys, SIP auth headers, or Mistral-specific names in code/tests/examples/docs/TOML/YAML. |
+| 2026-06-08 | final `docker --version` | blocked | Docker command is unavailable in this WSL environment; Asterisk integration remains opt-in and unrun. |
 
 ## Validation Policy
 
 - For docs-only edits, run `git diff --check` at minimum.
-- For Python code, run the narrow test first, then `ruff check .`, `ty check`, and relevant `pytest`.
+- For Python code, run the narrow test first, then `ruff check .`, `uv run ty check`, and relevant `pytest`.
 - For parser/protocol changes, add malformed and round-trip tests.
 - For Asterisk integration, guard tests behind explicit env/config and never require real secrets in repo.

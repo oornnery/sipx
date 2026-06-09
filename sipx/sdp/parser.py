@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from sipx.sdp.model import DIRECTIONS, AudioMedia, SdpCodec, SessionDescription
+from sipx.sdp.model import (
+    DIRECTIONS,
+    AudioMedia,
+    SdpCodec,
+    SdpDirection,
+    SessionDescription,
+)
 
 
 STATIC_PAYLOADS = {
@@ -72,20 +78,19 @@ def _parse_audio_media(value: str) -> AudioMedia:
 
 def _parse_audio_attribute(audio: AudioMedia, value: str) -> None:
     if value in DIRECTIONS:
-        audio.direction = value  # type: ignore[assignment]
+        audio.direction = _sdp_direction(value)
         return
     if value.startswith("rtpmap:"):
         payload_text, codec_text = value.removeprefix("rtpmap:").split(maxsplit=1)
         payload_type = int(payload_text)
         name, clock_rate, channels = _parse_rtpmap_codec(codec_text)
+        existing = audio.codecs.get(payload_type)
         audio.codecs[payload_type] = SdpCodec(
             payload_type=payload_type,
             name=name,
             clock_rate=clock_rate,
             channels=channels,
-            fmtp=audio.codecs.get(payload_type).fmtp
-            if payload_type in audio.codecs
-            else None,
+            fmtp=existing.fmtp if existing is not None else None,
         )
         return
     if value.startswith("fmtp:"):
@@ -114,3 +119,15 @@ def _parse_rtpmap_codec(value: str) -> tuple[str, int, int]:
     if len(parts) not in {2, 3}:
         raise SdpParseError(f"invalid rtpmap codec: {value!r}")
     return parts[0], int(parts[1]), int(parts[2]) if len(parts) == 3 else 1
+
+
+def _sdp_direction(value: str) -> SdpDirection:
+    if value == "sendrecv":
+        return "sendrecv"
+    if value == "sendonly":
+        return "sendonly"
+    if value == "recvonly":
+        return "recvonly"
+    if value == "inactive":
+        return "inactive"
+    raise SdpParseError(f"unsupported SDP direction: {value!r}")

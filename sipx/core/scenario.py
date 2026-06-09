@@ -35,15 +35,19 @@ class Scenario:
 
 
 def scenario(name: str | ScenarioFunc | None = None, **metadata: Any):
-    if callable(name):
+    if callable(name) and not isinstance(name, str):
         func = name
-        return Scenario(name=func.__name__, func=func, metadata=dict(metadata))
+        return Scenario(name=_scenario_name(func), func=func, metadata=dict(metadata))
 
     def decorate(func: ScenarioFunc) -> Scenario:
         return Scenario(
-            name=str(name or func.__name__),
+            name=str(name or _scenario_name(func)),
             func=func,
             metadata=dict(metadata),
         )
 
     return decorate
+
+
+def _scenario_name(func: ScenarioFunc) -> str:
+    return str(getattr(func, "__name__", "scenario"))

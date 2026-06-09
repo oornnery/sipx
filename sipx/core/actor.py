@@ -43,14 +43,18 @@ class Call:
         return self.legs[0].leg_id if self.legs else None
 
     async def hangup(self) -> None:
-        if not hasattr(self.backend, "hangup"):
+        hangup = getattr(self.backend, "hangup", None)
+        if not callable(hangup):
             raise UnsupportedExpectation(BackendCapability.CALL_CONTROL, self.backend)
-        await self.backend.hangup(self)  # type: ignore[attr-defined]
+        await hangup(self)
 
     async def send_dtmf(self, digits: str) -> None:
         if not target_supports(self.backend, BackendCapability.DTMF):
             raise UnsupportedExpectation(BackendCapability.DTMF, self.backend)
-        await self.backend.send_dtmf(self, digits)  # type: ignore[attr-defined]
+        send_dtmf = getattr(self.backend, "send_dtmf", None)
+        if not callable(send_dtmf):
+            raise UnsupportedExpectation(BackendCapability.DTMF, self.backend)
+        await send_dtmf(self, digits)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -96,7 +100,10 @@ class Actor:
         backend = self.backend
         if not target_supports(backend, BackendCapability.CALL_CONTROL):
             raise UnsupportedExpectation(BackendCapability.CALL_CONTROL, backend)
-        return await backend.call(self, target, **metadata)  # type: ignore[attr-defined]
+        call = getattr(backend, "call", None)
+        if not callable(call):
+            raise UnsupportedExpectation(BackendCapability.CALL_CONTROL, backend)
+        return await call(self, target, **metadata)
 
     def _clone(
         self,

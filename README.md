@@ -223,7 +223,7 @@ Expected validation commands:
 ```bash
 ruff format --check .
 ruff check .
-ty check
+uv run ty check
 pytest
 ```
 
@@ -244,14 +244,91 @@ sipx phone listen lab --config harness.toml --duration 30
 sipx register lab --config harness.toml
 sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password secret
 sipx call sip:6000@pbx.lab --profile lab --duration 5
+sipx call sip:6000@pbx.lab --aor sip:1001@pbx.lab --registrar sip:pbx.lab --username 1001 --password secret --media-port 40000
+sipx call sip:6000@pbx.lab --aor sip:1001@pbx.lab --registrar sip:pbx.lab --username 1001 --password secret --codec PCMU --dtmf '123#' --debug-sip
 sipx options sip:pbx.lab --from sip:1001@example.com -i
 sipx message sip:1002@pbx.lab 'hello' --from sip:1001@example.com
-sipx request INFO sip:1002@pbx.lab --from sip:1001@example.com -H 'Content-Type: application/dtmf-relay' -d 'Signal=1'
+sipx request INFO sip:1002@pbx.lab --from sip:1001@example.com --username 1001 --password secret --debug-sip -H 'Content-Type: application/dtmf-relay' -d $'Signal=1\r\nDuration=160\r\n'
 ```
 
 Phone commands that touch the network require either a profile or explicit `--aor` and `--registrar` flags. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the registrar host and port.
 
 Raw SIP request commands require `--from`/`--aor` or a profile with `account.aor`. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the target URI host/port, falling back to registrar/profile remote settings when provided.
+
+When `--username` and `--password` are provided, calls and raw SIP request commands retry one `401` or `407` Digest challenge without persisting the password.
+
+Use `--debug-sip` on phone and raw SIP commands to print redacted SIP datagrams to stderr as they are sent and received. `Authorization` and `Proxy-Authorization` lines are redacted before printing.
+
+Outbound native softphone calls send an SDP audio offer by default, open the advertised RTP UDP port while the call exists, and validate the `2xx` SDP answer before reporting the call as confirmed. Use `--media-host`, `--media-port`, and repeatable `--codec` to adjust the offered media address and codecs. Use `--dtmf` to send in-dialog SIP INFO DTMF after confirmation.
+
+## Examples
+
+Use `uv run` from the repository root so the local package is importable.
+
+Native operation examples live under `examples/native`:
+
+```bash
+sipx register lab --config harness.toml --debug-sip --keepalive 10
+sipx options sip:pbx.example.com --from sip:1001@example.com --include --debug-sip
+sipx message sip:1002@example.com 'hello from sipx' --from sip:1001@example.com --debug-sip
+sipx call sip:ivr@example.com --profile lab --config harness.toml --codec PCMU --dtmf '123#' --duration 3 --debug-sip
+sipx request INFO sip:ivr@example.com --from sip:1001@example.com -H 'Content-Type: application/dtmf-relay' -d $'Signal=1\r\nDuration=160\r\n' --include --debug-sip
+```
+
+Python templates:
+
+```python
+from examples.native.call_with_dtmf import call_with_dtmf
+
+call_id = await call_with_dtmf("sip:ivr@example.com", digits="123#")
+```
+
+More command examples are in `examples/native/README.md`. `examples/native/sip_cli_flow.py` builds reusable command arrays for register, OPTIONS, MESSAGE, raw INFO DTMF, and call-with-DTMF flows.
+
+Runnable example files:
+
+```bash
+uv run python examples/native/sip_cli_flow.py
+
+SIPX_AOR=sip:1001@example.com \
+SIPX_REGISTRAR=sip:pbx.example.com \
+SIPX_USERNAME=1001 \
+SIPX_PASSWORD=... \
+uv run python examples/native/call_with_dtmf.py sip:ivr@example.com --digits '123#'
+
+uv run python examples/native/mizu_call.py register --local-host <your-local-ip>
+uv run python examples/native/mizu_call.py call sip:<target>@demo.mizu-voip.com:37075 --local-host <your-local-ip> --digits '123#'
+```
+
+Scenario examples are run with the harness CLI:
+
+```bash
+uv run sipx scenario run examples/llm/semantic_smoke.py --artifacts-dir artifacts
+```
+
+You can also run the LLM scenario file directly:
+
+```bash
+uv run python examples/llm/semantic_smoke.py
+```
+
+The public Mizu demo server profile lives at `examples/mizu/harness.toml`:
+
+```bash
+sipx register mizu_demo --config examples/mizu/harness.toml --local-host <your-local-ip> --keepalive 5 --debug-sip
+sipx call sip:<target>@demo.mizu-voip.com:37075 --profile mizu_demo --config examples/mizu/harness.toml --local-host <your-local-ip> --dtmf '123#' --duration 5 --debug-sip
+```
+
+LLM examples use a generic OpenAI-compatible `/chat/completions` provider and read provider settings only from runtime environment variables:
+
+```bash
+export SIPX_LLM_API_KEY=...
+export SIPX_LLM_BASE_URL=https://api.openai.com/v1
+export SIPX_LLM_MODEL=gpt-4o-mini
+uv run sipx scenario run examples/llm/semantic_smoke.py --artifacts-dir artifacts
+```
+
+Templates live under `examples/llm`, `examples/asterisk`, and `examples/native`. The live LLM smoke test is skipped unless `SIPX_LLM_API_KEY` is set.
 
 GitHub automation lives under `.github/workflows`:
 

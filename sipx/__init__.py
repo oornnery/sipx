@@ -66,6 +66,7 @@ from sipx.media import (
     TranscriptEvent,
     TtsEngine,
 )
+from sipx.llm import LLMChatClient, LLMClientError
 from sipx.security import Redactor, default_redactor
 from sipx.softphone import (
     NativeSoftphone,
@@ -123,6 +124,7 @@ from sipx.sip import (
     build_digest_authorization,
     create_ack_request,
     create_bye_request,
+    create_info_request,
     create_invite_request,
     create_register_request,
     create_response_for_request,
@@ -173,6 +175,8 @@ __all__ = [
     "MediaOverrides",
     "MixedActorSpec",
     "MixedScenario",
+    "LLMChatClient",
+    "LLMClientError",
     "MockBackend",
     "NativeSipBackend",
     "NativeSipCall",
@@ -232,6 +236,7 @@ __all__ = [
     "build_digest_authorization",
     "create_ack_request",
     "create_bye_request",
+    "create_info_request",
     "create_invite_request",
     "create_audio_answer",
     "create_audio_offer",

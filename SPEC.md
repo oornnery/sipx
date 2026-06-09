@@ -105,6 +105,12 @@ V25: operational softphone CLI ! build `NativeSoftphoneConfig` from profile or e
 V26: GitHub workflows ! use current project metadata/commands; ⊥ old `_version.py`, old Python pin, or task-only aliases.
 V27: phone CLI network commands ! fail before network unless profile or explicit SIP identity exists; help must show required account flags/examples.
 V28: curl-like SIP CLI ! require explicit From identity, support headers/body flags, and derive remote from target/registrar/profile without silent localhost default.
+V29: SIP auth ! INVITE/raw request receiving `401|407` retries once with Digest when credentials exist; retry waits for current CSeq response; secrets ⊥ logs/docs/artifacts.
+V30: SIP debug CLI ! packet visibility shows every sent/received datagram; Authorization secrets redacted; works in strict mode.
+V31: operational softphone call ! outbound INVITE includes SDP audio offer, opens advertised RTP UDP port, and validates `2xx` SDP answer before confirmed.
+V32: LLM integrations ! external provider keys only via environment/runtime injection; tests/examples ⊥ hardcoded private keys or proxy data.
+V33: validation gate ! `uv run ty check` passes before an implementation block is complete; system-interpreter tool absence is reported separately.
+V34: operational DTMF ! confirmed native calls can send DTMF via SIP INFO `application/dtmf-relay`; CLI examples show call, OPTIONS, MESSAGE, INFO, and DTMF flows without hardcoded private secrets.
 
 ## §T
 
@@ -146,6 +152,12 @@ T33|x|add operational softphone/profile CLI commands plus no-network CLI tests|V
 T34|x|adapt GitHub CI, Asterisk integration, draft release, and PyPI publish workflows|V24,V26,I.ci
 T35|x|backprop phone CLI missing-config UX: no silent localhost network defaults|V25,V27,I.cmd
 T36|x|add curl-like SIP `options`, `message`, and generic `request` CLI|V24,V27,V28,I.cmd
+T37|x|add Digest retry for INVITE calls and raw SIP request CLI with CSeq-scoped response matching|V27,V28,V29,I.cmd
+T38|x|add redacted `--debug-sip` packet visibility for phone and raw SIP CLI|V13,V24,V25,V28,V30,I.cmd
+T39|x|add native softphone SDP offer/answer negotiation and media CLI flags|V17,V25,V31,I.cmd
+T40|x|add opt-in generic OpenAI-compatible LLM client/tests and LLM/native/Asterisk examples|V13,V23,V32,I.api
+T41|x|clear baseline type-check diagnostics for current implementation surfaces|V33,I.ci
+T42|x|add in-dialog SIP INFO DTMF support plus richer native CLI/Python examples|V13,V25,V30,V31,V34,I.cmd
 
 ## §B
 
@@ -156,3 +168,7 @@ B2|2026-06-08|redaction regex replacement assumed every secret pattern had captu
 B3|2026-06-08|retransmission timer code used `asyncio` without module import|focused runtime tests caught it; no new §V, mechanical import failure
 B4|2026-06-08|`uv run sipx` had no installable build backend, so uv ran `sipx/__main__.py` directly and imports failed|V24
 B5|2026-06-08|`sipx register` without profile/flags silently used localhost defaults and timed out|V27
+B6|2026-06-08|real proxy INVITE returned `401 Unauthorized`; call path accepted credentials but never retried Digest auth|V29
+B7|2026-06-08|authenticated real proxy INVITE reached `603 Declined`; outbound softphone INVITE had no SDP offer or open RTP port|V31
+B8|2026-06-08|`uv run ty check` baseline had 29 diagnostics from dynamic call, mapping, URI, SDP, and media frame typing|V33
+B9|2026-06-08|DTMF implementation added helper/softphone call path but backend method/import was incomplete during focused validation|V34

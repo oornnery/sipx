@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## 1.6.0 - 2026-06-08
+
+- Renamed the LLM provider client to simple `LLMChatClient` with `SIPX_LLM_*` runtime environment settings.
+- Added in-dialog SIP INFO DTMF support to native calls and `sipx call --dtmf`.
+- Added richer native examples for register, OPTIONS, MESSAGE, raw INFO DTMF, call-with-DTMF, Mizu, and reusable CLI command arrays.
+- Updated README example usage for native SIP operations and OpenAI-compatible LLM templates.
+- Bumped package version to `1.6.0`.
+
+## 1.5.0 - 2026-06-08
+
+- Added dependency-free LLM client for opt-in scenario/template use.
+- Added fake-transport LLM unit tests and a live smoke test skipped unless provider credentials are set.
+- Added LLM harness, Asterisk+LLM, and native Mizu example templates that do not hardcode private secrets.
+- Added template tests that import examples without requiring external credentials and scan examples for inline secret patterns.
+- Fixed the existing 29-diagnostic `uv run ty check` baseline so the configured type-check gate now passes.
+- Bumped package version to `1.5.0`.
+
+## 1.4.0 - 2026-06-08
+
+- Added SDP offer generation for native softphone outbound calls using configurable local RTP host/port and codecs.
+- Added SDP answer generation for inbound native calls when the INVITE contains an audio offer.
+- Added SDP answer validation on successful outbound INVITE responses before confirming a call.
+- Added a lightweight local RTP UDP sink so offered RTP ports are open while the call exists.
+- Added phone CLI media flags: `--media-host/--rtp-host`, `--media-port/--rtp-port`, and repeatable `--codec`.
+- Added a Mizu demo profile under `examples/mizu/harness.toml` using the public demo server details.
+- Recorded SPEC B7 and invariant V31 for operational softphone SDP negotiation.
+- Bumped package version to `1.4.0`.
+
+## 1.3.0 - 2026-06-08
+
+- Added `--debug-sip` to phone and raw SIP CLI commands to print redacted SIP datagrams as they are sent and received.
+- Added a strict-mode native wire event callback so debug visibility does not require lab-mode mutation hooks.
+- Added no-network CLI tests that verify SIP debug output includes RX/TX packets and redacts authorization headers.
+- Bumped package version to `1.3.0`.
+
+## 1.2.1 - 2026-06-08
+
+- Added Digest retry for `INVITE` calls and raw SIP request commands after `401` or `407` challenges when credentials are provided.
+- Matched authenticated retry responses by current `CSeq` so stale challenge retransmissions are ignored.
+- Added loopback Native SIP test for INVITE Digest auth retry.
+- Added no-network CLI test for raw SIP request Digest auth retry.
+- Recorded SPEC B6 and invariant V29 for challenged INVITE authentication.
+- Bumped package version to `1.2.1`.
+
 ## 1.2.0 - 2026-06-08
 
 - Added curl-like SIP CLI commands: `sipx options`, `sipx message`, and generic `sipx request <method> <target>`.

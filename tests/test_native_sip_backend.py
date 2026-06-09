@@ -369,6 +369,97 @@ async def _strict_call_flow() -> None:
     assert callee_call_events == ["invite_received", "confirmed", "terminated"]
 
 
+def test_native_sip_backend_retries_invite_with_digest_auth() -> None:
+    asyncio.run(_invite_with_digest_auth())
+
+
+async def _invite_with_digest_auth() -> None:
+    caller_timeline = Timeline(run_id="digest-caller")
+    caller = NativeSipBackend(timeline=caller_timeline, actor_id="caller")
+    proxy = NativeSipBackend(actor_id="proxy")
+    try:
+        await caller.start()
+        await proxy.start()
+        proxy_task = asyncio.create_task(_digest_invite_responder(proxy))
+
+        call = await caller.initiate_call(
+            remote=proxy.local_address,
+            target=SipUri.parse("sip:bob@example.com"),
+            caller=SipUri.parse("sip:alice@example.com"),
+            contact=SipUri.parse(f"sip:alice@127.0.0.1:{caller.local_address[1]}"),
+            call_id="digest-call-1",
+            branch="z9hG4bK-digest-invite",
+            from_tag="caller-tag",
+            ack_branch="z9hG4bK-digest-ack",
+            username="alice",
+            password="secret-password",
+            auth_branch="z9hG4bK-digest-invite-auth",
+            cnonce="cnonce-1",
+            timeout=1.0,
+        )
+        authorization = await proxy_task
+
+        assert call.state == NativeSipCallState.CONFIRMED
+        assert 'username="alice"' in authorization
+        assert 'nonce="nonce-1"' in authorization
+        assert "secret-password" not in authorization
+    finally:
+        await caller.stop()
+        await proxy.stop()
+
+    caller_call_events = [
+        event.name for event in caller_timeline.events if event.category == "call"
+    ]
+    assert caller_call_events == ["invite_sent", "auth_challenged", "confirmed"]
+
+
+async def _digest_invite_responder(proxy: NativeSipBackend) -> str:
+    first = await proxy.receive_event(timeout=1.0)
+    first_request = first.message
+    assert isinstance(first_request, SipRequest)
+    assert first_request.method == "INVITE"
+
+    challenge = create_response_for_request(
+        request=first_request,
+        status_code=407,
+        reason="Proxy Authentication Required",
+    )
+    challenge.headers.add(
+        "Proxy-Authenticate",
+        'Digest realm="example.com", nonce="nonce-1", qop="auth"',
+    )
+    await proxy.send_response(challenge, first.remote)
+
+    challenge_ack = await proxy.receive_event(timeout=1.0)
+    challenge_ack_request = challenge_ack.message
+    assert isinstance(challenge_ack_request, SipRequest)
+    assert challenge_ack_request.method == "ACK"
+
+    second = await proxy.receive_event(timeout=1.0)
+    second_request = second.message
+    assert isinstance(second_request, SipRequest)
+    assert second_request.method == "INVITE"
+    assert second_request.headers.get("CSeq") == "2 INVITE"
+    authorization = second_request.headers.get("Proxy-Authorization") or ""
+
+    await proxy.send_response(challenge, second.remote)
+
+    ok = create_response_for_request(
+        request=second_request,
+        status_code=200,
+        reason="OK",
+        to_tag="proxy-tag",
+        contact=SipUri.parse("sip:bob@127.0.0.1:5060"),
+    )
+    await proxy.send_response(ok, second.remote)
+
+    final_ack = await proxy.receive_event(timeout=1.0)
+    final_ack_request = final_ack.message
+    assert isinstance(final_ack_request, SipRequest)
+    assert final_ack_request.method == "ACK"
+    return authorization
+
+
 def test_native_sip_backend_cancels_pending_invite_over_udp() -> None:
     asyncio.run(_cancel_pending_invite())
 
@@ -464,6 +555,12 @@ async def _digest_register_responder(registrar: NativeSipBackend) -> str:
     first_request = first.message
     assert isinstance(first_request, SipRequest)
     assert first_request.method == "REGISTER"
+    trying = create_response_for_request(
+        request=first_request,
+        status_code=100,
+        reason="Trying",
+    )
+    await registrar.send_response(trying, first.remote)
     challenge = create_response_for_request(
         request=first_request,
         status_code=401,
@@ -478,7 +575,16 @@ async def _digest_register_responder(registrar: NativeSipBackend) -> str:
     second = await registrar.receive_event(timeout=1.0)
     second_request = second.message
     assert isinstance(second_request, SipRequest)
+    assert second_request.headers.get("CSeq") == "2 REGISTER"
     authorization = second_request.headers.get("Authorization") or ""
+    trying = create_response_for_request(
+        request=second_request,
+        status_code=100,
+        reason="Trying",
+    )
+    await registrar.send_response(trying, second.remote)
+    with pytest.raises(SipUdpError, match="timed out"):
+        await registrar.receive_event(timeout=0.05)
     ok = create_response_for_request(
         request=second_request,
         status_code=200,

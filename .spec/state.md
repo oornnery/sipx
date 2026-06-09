@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.2.0` adds curl-like raw SIP CLI commands on top of `NativeSipBackend`.
+Implement `sipx` in verified commit blocks. Block `1.6.0` adds generic OpenAI-compatible LLM templates, in-dialog SIP INFO DTMF, and richer native SIP examples.
 
 ## Sources Read
 
@@ -176,6 +176,37 @@ Implement `sipx` in verified commit blocks. Block `1.2.0` adds curl-like raw SIP
 - Added raw SIP request flags: `--from/--aor`, `--registrar`, `--remote-host`, `--remote-port`, `-H/--header`, `-d/--data`, `--body-file`, `--content-type`, `--include`, and `--no-wait`.
 - Raw SIP request commands build minimal Via/From/To/Call-ID/CSeq/Contact/Max-Forwards headers, send via `NativeSipBackend`, and match responses by Call-ID/CSeq.
 - Added no-network tests for OPTIONS, MESSAGE, generic INFO request, missing From identity, and request help output.
+- Recorded SPEC B6 and V29 after a real proxy returned `401 Unauthorized` to INVITE and the call path did not retry Digest.
+- Added Digest retry for INVITE calls and raw SIP request commands after `401` or `407` when credentials exist.
+- Added loopback Native SIP test for INVITE Digest retry and no-network CLI test for raw request Digest retry.
+- Bumped `pyproject.toml` version from `1.2.0` to `1.2.1`.
+- Retested the real proxy call without persisting secrets; the challenge was retried and the proxy returned `603 Declined` instead of the previous `401 Unauthorized`.
+- Added current-`CSeq` response matching for authenticated retries so stale pre-auth challenge retransmissions are ignored.
+- Bumped `pyproject.toml` version from `1.2.1` to `1.3.0`.
+- Added a strict-mode `NativeSipBackend` wire event callback for packet visibility without lab-mode mutation hooks.
+- Added `--debug-sip` to phone and raw SIP request CLI commands; debug output prints redacted SIP datagrams to stderr.
+- Added no-network CLI tests that verify debug output includes TX/RX packets and redacts authorization headers.
+- Recorded SPEC B7 and V31 after an authenticated real proxy INVITE reached `603 Declined` while the softphone INVITE had no SDP offer or open RTP port.
+- Bumped `pyproject.toml` version from `1.3.0` to `1.4.0`.
+- Added outbound SDP audio offers for native softphone calls using configurable media host, media port, codecs, and telephone-event support.
+- Added inbound SDP answer generation for INVITEs with audio offers.
+- Added outbound `2xx` SDP answer validation before call confirmation.
+- Added a lightweight local RTP UDP sink so the advertised RTP port is open while a call exists.
+- Added phone CLI flags `--media-host/--rtp-host`, `--media-port/--rtp-port`, and repeatable `--codec`.
+- Added public Mizu demo profile at `examples/mizu/harness.toml`; private proxy data remains excluded from repo files.
+- Bumped `pyproject.toml` version from `1.4.0` to `1.5.0`.
+- Added dependency-free LLM client with injectable stdlib HTTP transport.
+- Added fake-transport LLM tests and a live smoke test skipped unless runtime provider credentials are set.
+- Added LLM harness, Asterisk+LLM, and native Mizu example templates.
+- Added tests that import templates without external secrets and scan examples for inline secret patterns.
+- Backpropagated the type-check baseline as `SPEC.md` B8 and V33.
+- Fixed dynamic call, mapping, URI, SDP direction, and media-frame typing so `uv run ty check` passes.
+- Bumped `pyproject.toml` version from `1.5.0` to `1.6.0`.
+- Renamed the LLM client to `LLMChatClient` and switched live env settings to `SIPX_LLM_*`.
+- Added in-dialog SIP INFO DTMF support through `NativeSoftphone.send_dtmf()` and `sipx call --dtmf`.
+- Added native examples for REGISTER, OPTIONS, MESSAGE, raw INFO DTMF, call-with-DTMF, Mizu call helpers, and reusable CLI command arrays.
+- Updated README with concrete example commands and Python template usage.
+- Recorded `SPEC.md` B9 after focused validation caught incomplete DTMF backend wiring; V34 already covered the behavior.
 
 ## Active Decision
 
@@ -186,10 +217,10 @@ Maintained English files in the current structure are the source of truth. `IDEA
 ## Next
 
 1. Decide license before public distribution and Asterisk/commercial positioning.
-2. Decide whether to fix the 29 diagnostics from `uv run ty check` or defer type checking as a later hardening block.
-3. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest tests/test_asterisk_integration.py` after starting `docker/asterisk`.
-4. Add richer fake media events, recording/transcript artifacts, and retention policy.
-5. Add live SIP inspector and advanced RTP/media runtime behavior.
+2. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest tests/test_asterisk_integration.py` after starting `docker/asterisk`.
+3. Add richer fake media events, recording/transcript artifacts, and retention policy.
+4. Add RTP media send/receive, RFC4733 DTMF over RTP, then live SIP inspector and advanced RTP/media runtime behavior.
+5. Decide whether generic OpenAI-compatible LLM support is enough for the next AI block or whether to add a provider protocol before vendor-specific adapters.
 
 ## Risks
 
@@ -197,15 +228,18 @@ Maintained English files in the current structure are the source of truth. `IDEA
 - Asterisk can hide raw SIP details; do not use it for conformance claims without capture or NativeSipBackend.
 - AI semantic assertions are probabilistic; do not make them sole critical-pass criterion.
 - Recordings/transcripts are sensitive; design redaction/retention before real deployments.
-- `python -m ty check` is unavailable in the system interpreter; `uv run ty check` runs but currently reports 29 typing diagnostics.
+- `python -m ty check` is unavailable in the system interpreter; configured validation uses `uv run ty check`, which passes.
 - Redaction exists but retention policy and transcript/recording-specific metadata handling are still open.
 - T21-T23 native SIP signaling, headless softphone, and lab hooks are complete; advanced media wiring and runtime behavior remain pending.
 - T9-T11, T15, and T28 Asterisk ARI control-plane, timeline mapping, WebSocket media MVP, inbound Stasis example, and Docker lab are complete; real Asterisk integration tests are guarded by env and not run by default.
 - GitHub workflows are added but not executed locally; local validation covered their referenced Python commands, while Docker remains unavailable in this WSL environment.
 - RTP and DTMF primitives exist, but jitter buffer, RTCP, impairment, and media clock are not implemented yet.
+- SIP INFO DTMF is implemented for confirmed native calls; RTP RFC4733 DTMF send from the softphone remains future media runtime work.
+- LLM live validation requires `SIPX_LLM_API_KEY`; default local tests deliberately skip real provider calls.
 
 ## Open Questions
 
 - License choice before public release is still open.
 - Next advanced media/runtime priority is still open: recordings/transcripts, jitter/RTCP/impairment, or AI slow-path behavior.
 - GitHub release draft policy after `1.2.0` should keep only the latest draft release before publishing.
+- LLM provider scope after the OpenAI-compatible template is still open.

@@ -31,7 +31,11 @@ def test_unsupported_capability_fails_loud() -> None:
 def test_within_reports_rich_failure() -> None:
     async def run() -> None:
         with pytest.raises(ExpectationFailure) as failure:
-            await expect(False).truthy(lambda value: value, name="false check").within()
+            await (
+                expect(False)
+                .truthy(lambda value: bool(value), name="false check")
+                .within()
+            )
 
         assert failure.value.result.name == "false check"
         assert failure.value.result.status == "failed"

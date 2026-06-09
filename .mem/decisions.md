@@ -49,3 +49,10 @@
 | D45 | 2026-06-08 | GitHub workflows read version from `pyproject.toml`. | The new project uses hatchling metadata and has no old `sipx/_version.py`. |
 | D46 | 2026-06-08 | Phone CLI must not use silent localhost network defaults. | Missing account/registrar input should be a local UX error, not a SIP timeout. |
 | D47 | 2026-06-08 | Raw SIP CLI uses `NativeSipBackend` directly. | OPTIONS, MESSAGE, and generic request behavior should share the native wire path without adding new runtime dependencies. |
+| D48 | 2026-06-08 | Digest auth retries are one-shot for now. | Avoids infinite auth loops while supporting real proxy `401/407` challenges. |
+| D49 | 2026-06-08 | CLI packet debug uses a strict-mode wire event callback, not lab hooks. | Users need to inspect real interop traffic without enabling mutation/fault-injection mode. |
+| D50 | 2026-06-08 | Native softphone offers audio SDP by default on outbound calls. | Real SIP providers commonly reject authenticated INVITEs that do not advertise media. |
+| D51 | 2026-06-08 | LLM provider keys are runtime environment input only. | Keeps examples/tests useful without persisting user-supplied API keys. |
+| D52 | 2026-06-08 | Use `uv run ty check` as the type-check validation gate. | `ty` is available through the project dev environment even though the system interpreter lacks `python -m ty`. |
+| D53 | 2026-06-08 | LLM client is generic OpenAI-compatible, not provider-named. | Lets users point templates at OpenAI-compatible APIs without renaming code per vendor. |
+| D54 | 2026-06-08 | CLI DTMF starts with SIP INFO for confirmed native calls. | It is minimal, testable, and useful before full RTP RFC4733 media send is implemented. |

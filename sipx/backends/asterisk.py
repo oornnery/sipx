@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import inspect
 import json
 import secrets
 import ssl as ssl_module
@@ -10,7 +11,7 @@ from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, M
 from dataclasses import dataclass, field
 from enum import StrEnum
 import time
-from typing import Any
+from typing import Any, cast
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -68,8 +69,9 @@ class AsteriskMediaPortConfig:
             raise ValueError("codec is required")
 
     def to_timeline_data(self) -> dict[str, int | str]:
+        path = AsteriskMediaPath(self.path)
         return {
-            "path": self.path.value,
+            "path": path.value,
             "codec": self.codec,
             "sample_rate": self.sample_rate,
             "channels": self.channels,
@@ -389,15 +391,17 @@ class AsteriskAriClient:
             body = json.dumps(json_body, sort_keys=True).encode("utf-8")
             headers["Content-Type"] = "application/json"
 
-        response = self._transport(
+        response_result = self._transport(
             method.upper(),
             self.config.rest_url(path, query),
             body,
             headers,
             self.config.timeout,
         )
-        if isinstance(response, Awaitable):
-            response = await response
+        if inspect.isawaitable(response_result):
+            response = cast(AsteriskAriHttpResponse, await response_result)
+        else:
+            response = cast(AsteriskAriHttpResponse, response_result)
         if not 200 <= response.status_code < 300:
             raise AsteriskAriError(
                 f"ARI request failed with HTTP {response.status_code}",
@@ -685,10 +689,11 @@ class AsteriskBackend:
         self._record_timeline(name, _ari_event_timeline_data(event))
 
     def _ensure_websocket_media_path(self, config: AsteriskMediaPortConfig) -> None:
-        if config.path is AsteriskMediaPath.WEBSOCKET:
+        path = AsteriskMediaPath(config.path)
+        if path is AsteriskMediaPath.WEBSOCKET:
             return
         raise AsteriskAriError(
-            f"Asterisk media path {config.path.value!r} is planned; "
+            f"Asterisk media path {path.value!r} is planned; "
             "MVP path is 'websocket_media'"
         )
 
@@ -948,7 +953,7 @@ async def _write_websocket_frame(
 
 def _decode_event_payload(payload: str | bytes | Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(payload, Mapping):
-        return dict(payload)
+        return {str(key): value for key, value in payload.items()}
     if isinstance(payload, bytes):
         payload = payload.decode("utf-8")
     data = json.loads(payload)
@@ -984,7 +989,7 @@ def _copy_nested(
 def _require_mapping(payload: object, name: str) -> Mapping[str, Any]:
     if not isinstance(payload, Mapping):
         raise AsteriskAriError(f"ARI {name} response must be a JSON object")
-    return payload
+    return cast(Mapping[str, Any], payload)
 
 
 def _required_id(payload: Mapping[str, Any], name: str) -> str:
@@ -997,7 +1002,7 @@ def _required_id(payload: Mapping[str, Any], name: str) -> str:
 def _nested_id(value: object) -> str | None:
     if not isinstance(value, Mapping):
         return None
-    return _string_or_none(value.get("id"))
+    return _string_or_none(cast(Mapping[str, Any], value).get("id"))
 
 
 def _string_or_none(value: object) -> str | None:

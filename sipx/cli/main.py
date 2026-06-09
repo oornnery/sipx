@@ -22,7 +22,16 @@ from sipx.core import (
     load_profiles,
     render_text_report,
 )
-from sipx.sip import HeaderMap, SipRequest, SipResponse, SipUri
+from sipx.security.redaction import default_redactor
+from sipx.sip import (
+    HeaderMap,
+    SipRequest,
+    SipResponse,
+    SipUri,
+    build_digest_authorization,
+    parse_digest_challenge,
+)
+from sipx.sip.transport import SipWireEvent
 from sipx.softphone import (
     NativeSoftphone,
     NativeSoftphoneAccount,
@@ -36,6 +45,9 @@ class PhoneCommandConfig:
     target: str | None = None
     duration: float = 0.0
     keepalive: float = 0.0
+    debug_sip: bool = False
+    dtmf: tuple[str, ...] = ()
+    dtmf_duration_ms: int = 160
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,11 +62,14 @@ class SipRequestCommandConfig:
     timeout: float
     actor_id: str
     contact_user: str | None = None
+    username: str | None = None
+    password: str | None = None
     headers: tuple[tuple[str, str], ...] = ()
     body: bytes = b""
     content_type: str | None = None
     include_headers: bool = False
     no_wait: bool = False
+    debug_sip: bool = False
 
 
 class PhoneCommandError(RuntimeError):
@@ -83,7 +98,7 @@ async def run_scenario_file(path: str | Path, *, artifacts_dir: str | Path) -> V
 
 async def run_phone_register(args: argparse.Namespace) -> int:
     command = _phone_command_config(args)
-    async with NativeSoftphone(command.config) as phone:
+    async with _native_softphone(command) as phone:
         state = await phone.register()
         print(f"registered: {state.value}")
         print(f"contact: {phone.contact}")
@@ -95,7 +110,7 @@ async def run_phone_register(args: argparse.Namespace) -> int:
 
 async def run_phone_unregister(args: argparse.Namespace) -> int:
     command = _phone_command_config(args)
-    async with NativeSoftphone(command.config) as phone:
+    async with _native_softphone(command) as phone:
         state = await phone.unregister()
         print(f"unregistered: {state.value}")
         print(f"contact: {phone.contact}")
@@ -106,10 +121,13 @@ async def run_phone_call(args: argparse.Namespace) -> int:
     command = _phone_command_config(args)
     if command.target is None:
         raise ValueError("target is required")
-    async with NativeSoftphone(command.config) as phone:
+    async with _native_softphone(command) as phone:
         call = await phone.call(command.target)
         print(f"call confirmed: {call.call_id}")
         print(f"remote: {_format_address(call.remote)}")
+        for digits in command.dtmf:
+            await phone.send_dtmf(call, digits, duration_ms=command.dtmf_duration_ms)
+            print(f"dtmf sent: {digits}")
         if command.duration > 0:
             await asyncio.sleep(command.duration)
         await phone.hangup(call)
@@ -119,7 +137,7 @@ async def run_phone_call(args: argparse.Namespace) -> int:
 
 async def run_phone_listen(args: argparse.Namespace) -> int:
     command = _phone_command_config(args)
-    async with NativeSoftphone(command.config) as phone:
+    async with _native_softphone(command) as phone:
         print(f"listening: {_format_address(phone.local_address)}")
         call = await phone.answer_inbound()
         print(f"inbound answered: {call.call_id}")
@@ -139,6 +157,7 @@ async def run_sip_request(args: argparse.Namespace) -> int:
         local_port=command.local_port,
         mode=command.mode,
         actor_id=command.actor_id,
+        wire_event_handler=_debug_sip_event if command.debug_sip else None,
     ) as backend:
         contact = _contact_uri(
             command.aor,
@@ -146,7 +165,13 @@ async def run_sip_request(args: argparse.Namespace) -> int:
             backend.local_address,
         )
         call_id = _id("request")
-        request = _build_cli_request(command, contact=contact, call_id=call_id)
+        from_tag = _tag("from")
+        request = _build_cli_request(
+            command,
+            contact=contact,
+            call_id=call_id,
+            from_tag=from_tag,
+        )
 
         await backend.send_request(request, command.remote)
         print(f"> {request.method} {request.uri}")
@@ -159,7 +184,37 @@ async def run_sip_request(args: argparse.Namespace) -> int:
             call_id=call_id,
             method=request.method,
             timeout=command.timeout,
+            cseq=1,
         )
+        challenge = _response_digest_challenge(response)
+        if challenge is not None and _has_request_credentials(command):
+            auth_header_name, challenge_value = challenge
+            request = _build_cli_request(
+                command,
+                contact=contact,
+                call_id=call_id,
+                from_tag=from_tag,
+                cseq=2,
+                auth_header=(
+                    auth_header_name,
+                    build_digest_authorization(
+                        username=command.username or "",
+                        password=command.password or "",
+                        method=command.method,
+                        uri=str(command.target),
+                        challenge=parse_digest_challenge(challenge_value),
+                    ),
+                ),
+            )
+            await backend.send_request(request, command.remote)
+            print(f"> {request.method} {request.uri}")
+            response = await _receive_cli_response(
+                backend,
+                call_id=call_id,
+                method=request.method,
+                timeout=command.timeout,
+                cseq=2,
+            )
         _print_response(response, include_headers=command.include_headers)
     return 0
 
@@ -308,6 +363,8 @@ def _add_sip_request_common(parser: argparse.ArgumentParser) -> None:
         "--registrar",
         help="Registrar/proxy URI; used for default remote host/port.",
     )
+    parser.add_argument("--username", help="Digest auth username.")
+    parser.add_argument("--password", help="Digest auth password.")
     parser.add_argument(
         "--contact-user", help="User part for the generated Contact URI."
     )
@@ -357,6 +414,11 @@ def _add_sip_request_common(parser: argparse.ArgumentParser) -> None:
         "--no-wait",
         action="store_true",
         help="Send the request and exit without waiting for a response.",
+    )
+    parser.add_argument(
+        "--debug-sip",
+        action="store_true",
+        help="Print redacted SIP datagrams to stderr as they are sent and received.",
     )
 
 
@@ -421,6 +483,29 @@ def _add_phone_common(parser: argparse.ArgumentParser) -> None:
         "--expires", type=int, default=3600, help="REGISTER expiration in seconds."
     )
     parser.add_argument("--actor-id", default="softphone", help="Timeline actor id.")
+    parser.add_argument(
+        "--media-host",
+        "--rtp-host",
+        dest="media_host",
+        help="Local RTP address advertised in SDP; defaults to the SIP bind address.",
+    )
+    parser.add_argument(
+        "--media-port",
+        "--rtp-port",
+        dest="media_port",
+        type=int,
+        help="Local RTP UDP port advertised in SDP; defaults to an ephemeral port.",
+    )
+    parser.add_argument(
+        "--codec",
+        action="append",
+        help="Audio codec to offer; repeatable. Defaults to profile codecs or PCMU,PCMA.",
+    )
+    parser.add_argument(
+        "--debug-sip",
+        action="store_true",
+        help="Print redacted SIP datagrams to stderr as they are sent and received.",
+    )
 
 
 def _add_phone_register_parser(parser: argparse.ArgumentParser) -> None:
@@ -449,6 +534,18 @@ def _add_phone_call_parser(parser: argparse.ArgumentParser) -> None:
         default=5.0,
         help="Seconds to hold the call before sending BYE.",
     )
+    parser.add_argument(
+        "--dtmf",
+        action="append",
+        default=[],
+        help="Send DTMF digits over SIP INFO after the call is confirmed; repeatable.",
+    )
+    parser.add_argument(
+        "--dtmf-duration-ms",
+        type=int,
+        default=160,
+        help="Duration advertised for each SIP INFO DTMF digit.",
+    )
 
 
 def _add_phone_listen_parser(parser: argparse.ArgumentParser) -> None:
@@ -474,13 +571,34 @@ def _phone_command_config(args: argparse.Namespace) -> PhoneCommandConfig:
         local_port=args.local_port,
         actor_id=args.actor_id,
         timeout=args.timeout,
+        media_host=args.media_host,
+        media_port=args.media_port or 0,
+        codecs=_phone_codecs(args, profile),
     )
     return PhoneCommandConfig(
         config=config,
         target=getattr(args, "target", None),
         duration=float(getattr(args, "duration", 0.0)),
         keepalive=float(getattr(args, "keepalive", 0.0)),
+        debug_sip=args.debug_sip,
+        dtmf=tuple(getattr(args, "dtmf", ()) or ()),
+        dtmf_duration_ms=int(getattr(args, "dtmf_duration_ms", 160)),
     )
+
+
+def _native_softphone(command: PhoneCommandConfig) -> NativeSoftphone:
+    if not command.debug_sip:
+        return NativeSoftphone(command.config)
+    backend = NativeSipBackend(
+        local_host=command.config.local_host,
+        local_port=command.config.local_port,
+        mode=command.config.mode,
+        actor_id=command.config.actor_id,
+        retransmission_policy=command.config.retransmission_policy,
+        lab_hooks=command.config.lab_hooks,
+        wire_event_handler=_debug_sip_event,
+    )
+    return NativeSoftphone(command.config, backend=backend)
 
 
 def _load_selected_profile(args: argparse.Namespace) -> Profile | None:
@@ -541,6 +659,14 @@ def _phone_remote(
     return host, port
 
 
+def _phone_codecs(args: argparse.Namespace, profile: Profile | None) -> tuple[str, ...]:
+    if args.codec:
+        return tuple(str(codec) for codec in args.codec)
+    if profile is not None:
+        return profile.media.codecs
+    return ("PCMU", "PCMA")
+
+
 def _sip_request_command_config(args: argparse.Namespace) -> SipRequestCommandConfig:
     profile = _load_selected_profile(args)
     target = SipUri.parse(args.target)
@@ -560,11 +686,14 @@ def _sip_request_command_config(args: argparse.Namespace) -> SipRequestCommandCo
         timeout=args.timeout,
         actor_id=args.actor_id,
         contact_user=_arg_or_profile(args, profile, "contact_user"),
+        username=_arg_or_profile(args, profile, "username"),
+        password=_arg_or_profile(args, profile, "password"),
         headers=tuple(_parse_header(header) for header in args.header),
         body=body,
         content_type=content_type,
         include_headers=args.include,
         no_wait=args.no_wait,
+        debug_sip=args.debug_sip,
     )
 
 
@@ -645,16 +774,21 @@ def _build_cli_request(
     *,
     contact: SipUri,
     call_id: str,
+    from_tag: str,
+    cseq: int = 1,
+    auth_header: tuple[str, str] | None = None,
 ) -> SipRequest:
     branch = _branch(command.method.lower())
     headers = HeaderMap()
     headers.add("Via", f"SIP/2.0/UDP {contact.host}:{contact.port};branch={branch}")
-    headers.add("From", f"<{command.aor}>;tag={_tag('from')}")
+    headers.add("From", f"<{command.aor}>;tag={from_tag}")
     headers.add("To", f"<{command.target}>")
     headers.add("Call-ID", call_id)
-    headers.add("CSeq", f"1 {command.method}")
+    headers.add("CSeq", f"{cseq} {command.method}")
     headers.add("Contact", f"<{contact}>")
     headers.add("Max-Forwards", "70")
+    if auth_header is not None:
+        headers.add(auth_header[0], auth_header[1])
     if command.body and command.content_type is not None:
         headers.add("Content-Type", command.content_type)
     for name, value in command.headers:
@@ -673,6 +807,7 @@ async def _receive_cli_response(
     call_id: str,
     method: str,
     timeout: float,
+    cseq: int,
 ) -> SipResponse:
     deadline = time.monotonic() + timeout
     while True:
@@ -687,6 +822,8 @@ async def _receive_cli_response(
             continue
         if _cseq_method(message.headers.get("CSeq")) != method:
             continue
+        if _cseq_number(message.headers.get("CSeq")) != cseq:
+            continue
         return message
 
 
@@ -695,6 +832,16 @@ def _cseq_method(value: str | None) -> str | None:
         return None
     _number, _separator, method = value.partition(" ")
     return method or None
+
+
+def _cseq_number(value: str | None) -> int | None:
+    if value is None:
+        return None
+    number, _separator, _method = value.partition(" ")
+    try:
+        return int(number)
+    except ValueError:
+        return None
 
 
 def _print_response(response: SipResponse, *, include_headers: bool) -> None:
@@ -707,6 +854,34 @@ def _print_response(response: SipResponse, *, include_headers: bool) -> None:
             print()
     if response.body:
         print(response.body.decode("utf-8", errors="replace"), end="")
+
+
+def _debug_sip_event(event: SipWireEvent) -> None:
+    direction = event.direction.value.upper()
+    print(
+        f"--- SIP {direction} {_format_address(event.remote)} {len(event.raw)} bytes ---",
+        file=sys.stderr,
+    )
+    if event.error is not None:
+        print(f"# parse-error: {event.error}", file=sys.stderr)
+    text = event.raw.decode("utf-8", errors="replace").replace("\r\n", "\n")
+    text = default_redactor.redact_text(text)
+    print(text, end="" if text.endswith("\n") else "\n", file=sys.stderr)
+    print(f"--- END SIP {direction} ---", file=sys.stderr)
+
+
+def _response_digest_challenge(response: SipResponse) -> tuple[str, str] | None:
+    if response.status_code == 401:
+        value = response.headers.get("WWW-Authenticate")
+        return ("Authorization", value) if value is not None else None
+    if response.status_code == 407:
+        value = response.headers.get("Proxy-Authenticate")
+        return ("Proxy-Authorization", value) if value is not None else None
+    return None
+
+
+def _has_request_credentials(command: SipRequestCommandConfig) -> bool:
+    return bool(command.username and command.password)
 
 
 def _contact_uri(

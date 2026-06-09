@@ -32,17 +32,23 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.2.0`.
+- Current implementation version: `1.6.0`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
 - Minimum scenario artifacts now written: `timeline.jsonl`, `verdict.json`, `report.txt`, and `report.html`.
 - CLI exists: `sipx scenario run <file>`, `sipx scenario export <timeline.jsonl>`, `sipx replay <timeline.jsonl>`, `sipx profile list|show`, `sipx phone register|unregister|call|listen`, top-level `sipx register|unregister|call|listen`, and raw SIP `sipx options|message|request` commands.
+- Phone and raw SIP CLI commands support `--debug-sip`, which prints redacted SIP datagrams to stderr in strict or lab mode.
+- Native softphone outbound calls now send SDP audio offers, validate 2xx SDP answers, and keep the advertised RTP UDP port open while the call exists.
+- Public Mizu demo profile is in `examples/mizu/harness.toml`; private proxy test data must not be committed.
+- `LLMChatClient` exists in `sipx.llm`; live LLM validation is opt-in via `SIPX_LLM_API_KEY` and secrets must not be committed.
+- Native softphone calls can send in-dialog SIP INFO DTMF via `NativeSoftphone.send_dtmf()` and CLI `sipx call --dtmf`.
 - Phone CLI network commands require a profile or explicit `--aor` and `--registrar`; without config they fail before opening sockets.
 - Phone CLI derives default remote host/port from `--registrar` when `--remote-host/--remote-port` are omitted.
-- Raw SIP request CLI supports `--from/--aor`, `-H/--header`, `-d/--data`, `--body-file`, `--content-type`, `--include`, and `--no-wait`.
+- Raw SIP request CLI supports `--from/--aor`, `--username`, `--password`, `-H/--header`, `-d/--data`, `--body-file`, `--content-type`, `--include`, and `--no-wait`.
+- Calls and raw SIP requests retry one `401` or `407` Digest challenge when username/password are supplied; retry responses are matched by current `CSeq`; passwords must not be persisted.
 - Tests currently run with plain `pytest`; async tests use `asyncio.run` because active `pytest` lacks `pytest-asyncio` plugin.
-- `ty` is declared as a dev dependency but unavailable in the active interpreter used during block `0.2.0`.
+- `ty` is declared as a dev dependency; configured validation should use `uv run ty check`.
 - Media primitives now exist: `AudioFrame`, `MediaPort`, `TranscriptEvent`, STT/TTS protocols, `BargeInPolicy`.
 - Central redaction now exists in `sipx.security.redaction`; `ArtifactStore` redacts JSON/text writes by default.
 - `sipx.sip` now has sans-I/O primitives: `SipUri`, `HeaderMap`, `SipRequest`, `SipResponse`, `SipParseError`, `parse_sip_message`.
@@ -53,6 +59,7 @@
 - `sipx.sip` now has non-INVITE client transaction, REGISTER request/flow, Digest auth, UAS INVITE server transaction, UAS dialog creation, BYE request helpers, and real UDP wire transport.
 - `NativeSipBackend` now has real UDP start/stop, send_request, send_response, lab raw datagrams, strict raw-send rejection, typed receive events, and timeline recording.
 - `NativeSipBackend` now has strict real UDP INVITE/ACK/BYE call flow with `NativeSipCall` states and call timeline events.
+- `NativeSipBackend` now retries challenged INVITEs once with Digest auth when credentials exist.
 - `NativeSipBackend` now has real UDP CANCEL runtime for pending INVITE attempts.
 - `NativeSipBackend` now has real UDP REGISTER/unregister orchestration with Digest challenge retry and no backend password storage.
 - `NativeSipBackend` now has configurable retransmission timers for native SIP transactions and final INVITE responses.
@@ -68,7 +75,7 @@
 - `MixedScenario` binds native, Asterisk, and mock actors onto one shared harness timeline.
 - `docker/asterisk` provides an Asterisk 22 lab for opt-in ARI and Native SIP integration tests.
 - `uv run sipx --help` works after adding hatchling build metadata and committing `uv.lock`.
-- `python -m ty check` is still blocked on the system interpreter; `uv run ty check` runs but reports 29 existing typing diagnostics.
+- `python -m ty check` is still blocked on the system interpreter; `uv run ty check` passes after block `1.5.0` type hardening.
 - `.github/workflows/ci.yml` runs uv sync, `sipx --help`, ruff, pytest, and `uv build` on Python 3.14.
 - `.github/workflows/asterisk.yml` starts `docker/asterisk` and runs `SIPX_ASTERISK_INTEGRATION=1 uv run pytest tests/test_asterisk_integration.py`.
 - `.github/workflows/create-release.yml` reads `pyproject.toml` version and creates a draft `v<version>` release on `master` if missing.

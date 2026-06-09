@@ -39,6 +39,7 @@ from sipx.sip.transport import (
 from sipx.sip.requests import (
     create_ack_request,
     create_bye_request,
+    create_info_request,
     create_invite_request,
     create_register_request,
     create_response_for_request,
@@ -77,6 +78,7 @@ __all__ = [
     "build_digest_authorization",
     "create_ack_request",
     "create_bye_request",
+    "create_info_request",
     "create_invite_request",
     "create_register_request",
     "create_response_for_request",

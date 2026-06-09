@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from sipx.core.capabilities import BackendCapability
 from sipx.core.timeline import Timeline
+from sipx.sip.auth import build_digest_authorization, parse_digest_challenge
 from sipx.sip.dialog import Dialog
 from sipx.sip.message import (
     DEFAULT_MAX_MESSAGE_SIZE,
@@ -18,6 +19,7 @@ from sipx.sip.message import (
 from sipx.sip.requests import (
     create_ack_request,
     create_bye_request,
+    create_info_request,
     create_invite_request,
     create_response_for_request,
 )
@@ -35,6 +37,12 @@ from sipx.sip.transport import (
     sip_wire_event_name,
 )
 from sipx.sip.uri import SipUri
+from sipx.sdp import (
+    SdpNegotiationError,
+    SessionDescription,
+    create_audio_answer,
+    parse_sdp,
+)
 
 
 class NativeSipCallError(RuntimeError):
@@ -95,6 +103,8 @@ class NativeSipCall:
     remote: UdpAddress
     request_uri: SipUri
     state: NativeSipCallState = NativeSipCallState.CONFIRMED
+    local_sdp: SessionDescription | None = None
+    remote_sdp: SessionDescription | None = None
 
 
 @dataclass(slots=True)
@@ -138,6 +148,7 @@ class NativeSipBackend:
         max_message_size: int = DEFAULT_MAX_MESSAGE_SIZE,
         retransmission_policy: NativeSipRetransmissionPolicy | None = None,
         lab_hooks: NativeSipLabHooks | None = None,
+        wire_event_handler: Callable[[SipWireEvent], None] | None = None,
     ) -> None:
         if mode not in {"strict", "lab"}:
             raise ValueError("mode must be strict or lab")
@@ -155,6 +166,7 @@ class NativeSipBackend:
             max_message_size=max_message_size,
         )
         self.lab_hooks = lab_hooks
+        self.wire_event_handler = wire_event_handler
 
     @property
     def local_address(self) -> UdpAddress:
@@ -202,6 +214,7 @@ class NativeSipBackend:
         self, request: SipRequest, remote: UdpAddress
     ) -> SipWireEvent:
         event = self._send_message(request, remote)
+        self._emit_wire_event(event)
         self._record_event(event)
         return event
 
@@ -211,6 +224,7 @@ class NativeSipBackend:
         remote: UdpAddress,
     ) -> SipWireEvent:
         event = self._send_message(response, remote)
+        self._emit_wire_event(event)
         self._record_event(event)
         return event
 
@@ -218,6 +232,7 @@ class NativeSipBackend:
         if self.mode != "lab":
             raise SipUdpError("send_raw is only allowed in lab mode")
         event = self.endpoint.send_raw(raw, remote)
+        self._emit_wire_event(event)
         self._record_event(event)
         return event
 
@@ -231,6 +246,7 @@ class NativeSipBackend:
             event = self._apply_after_receive_hook(event)
             if event is None:
                 continue
+            self._emit_wire_event(event)
             self._record_event(event)
             return event
 
@@ -276,8 +292,10 @@ class NativeSipBackend:
                 response = event.message
                 if not isinstance(response, SipResponse):
                     continue
-                await self._stop_retransmission(retransmission)
                 transaction.receive_response(response)
+                if response.status_code < 200:
+                    continue
+                await self._stop_retransmission(retransmission)
                 state = flow.receive_response(response)
                 if state is RegisterClientState.CHALLENGED:
                     if username is None or password is None:
@@ -360,6 +378,10 @@ class NativeSipBackend:
         timeout: float = 1.0,
         body: bytes = b"",
         content_type: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        auth_branch: str | None = None,
+        cnonce: str = "sipx",
     ) -> NativeSipCall:
         attempt = await self.start_invite(
             remote=remote,
@@ -376,6 +398,8 @@ class NativeSipBackend:
         transaction = attempt.transaction
         retransmission = self._start_retransmission(request, remote)
         retransmission_stopped = False
+        auth_attempted = False
+        cseq = 1
 
         try:
             while True:
@@ -385,6 +409,7 @@ class NativeSipBackend:
                         item,
                         call_id=call_id,
                         cseq_method="INVITE",
+                        cseq=cseq,
                     ),
                 )
                 response = event.message
@@ -397,6 +422,8 @@ class NativeSipBackend:
                 if response.status_code < 200:
                     continue
                 if 200 <= response.status_code < 300:
+                    local_sdp = _sdp_from_message(request)
+                    remote_sdp = _validate_sdp_answer(local_sdp, response)
                     dialog = Dialog.from_uac_invite_response(request, response)
                     ack = create_ack_request(
                         invite=request,
@@ -413,7 +440,57 @@ class NativeSipBackend:
                         dialog=dialog,
                         remote=remote,
                         request_uri=target,
+                        local_sdp=local_sdp,
+                        remote_sdp=remote_sdp,
                     )
+
+                if (
+                    response.status_code in {401, 407}
+                    and username is not None
+                    and password is not None
+                    and not auth_attempted
+                ):
+                    challenge = _digest_challenge(response)
+                    if challenge is None:
+                        raise NativeSipCallError(
+                            f"INVITE {response.status_code} missing Digest challenge"
+                        )
+                    ack = transaction.create_ack()
+                    await self.send_request(ack, remote)
+                    auth_header_name, challenge_value = challenge
+                    authorization = build_digest_authorization(
+                        username=username,
+                        password=password,
+                        method="INVITE",
+                        uri=str(target),
+                        challenge=parse_digest_challenge(challenge_value),
+                        cnonce=cnonce,
+                    )
+                    request = create_invite_request(
+                        target=target,
+                        caller=caller,
+                        contact=contact,
+                        call_id=call_id,
+                        branch=auth_branch or f"{branch}-auth",
+                        from_tag=from_tag,
+                        cseq=2,
+                        body=body,
+                        content_type=content_type,
+                    )
+                    request.headers.add(auth_header_name, authorization)
+                    transaction = InviteClientTransaction(request)
+                    retransmission = await self._send_with_retransmissions(
+                        request, remote
+                    )
+                    retransmission_stopped = False
+                    auth_attempted = True
+                    cseq = 2
+                    self._record_call(
+                        "auth_challenged",
+                        call_id=call_id,
+                        data={"status_code": response.status_code},
+                    )
+                    continue
 
                 ack = transaction.create_ack()
                 await self.send_request(ack, remote)
@@ -584,6 +661,9 @@ class NativeSipBackend:
         provisional_reason: str = "Ringing",
         final_body: bytes = b"",
         final_content_type: str | None = None,
+        media_port: int | None = None,
+        supported_codecs: tuple[str, ...] = ("PCMU", "PCMA"),
+        telephone_event: bool = True,
     ) -> NativeSipCall:
         incoming = await self.receive_invite(timeout=timeout)
         event_remote = incoming.remote
@@ -602,14 +682,29 @@ class NativeSipBackend:
             transaction.send_response(provisional)
             await self.send_response(provisional, event_remote)
 
+        local_sdp = _answer_sdp_for_invite(
+            request,
+            contact=contact,
+            local_address=self.local_address,
+            media_port=media_port,
+            supported_codecs=supported_codecs,
+            telephone_event=telephone_event,
+        )
+        remote_sdp = _sdp_from_message(request)
+        body = final_body
+        content_type = final_content_type
+        if body == b"" and content_type is None and local_sdp is not None:
+            body = local_sdp.to_sdp().encode("utf-8")
+            content_type = "application/sdp"
+
         final = create_response_for_request(
             request=request,
             status_code=200,
             reason="OK",
             to_tag=local_tag,
             contact=contact,
-            body=final_body,
-            content_type=final_content_type,
+            body=body,
+            content_type=content_type,
         )
         transaction.send_response(final)
         retransmission = await self._send_with_retransmissions(final, event_remote)
@@ -633,6 +728,8 @@ class NativeSipBackend:
             dialog=dialog,
             remote=event_remote,
             request_uri=_uri_from_name_addr(_required_header(request, "From")),
+            local_sdp=local_sdp,
+            remote_sdp=remote_sdp,
         )
 
     async def hangup_call(
@@ -682,6 +779,91 @@ class NativeSipBackend:
             f"BYE failed with {response.status_code} {response.reason}"
         )
 
+    async def send_info(
+        self,
+        call: NativeSipCall,
+        *,
+        body: bytes,
+        content_type: str,
+        branch: str,
+        timeout: float = 1.0,
+    ) -> SipResponse:
+        if call.state is not NativeSipCallState.CONFIRMED:
+            raise NativeSipCallError("INFO requires a confirmed call")
+        request = create_info_request(
+            dialog=call.dialog,
+            request_uri=call.request_uri,
+            via_host=self.local_address[0],
+            branch=branch,
+            body=body,
+            content_type=content_type,
+        )
+        cseq = _cseq_number(_required_header(request, "CSeq"))
+        transaction = NonInviteClientTransaction(request)
+        retransmission = await self._send_with_retransmissions(request, call.remote)
+        try:
+            event = await self._receive_matching(
+                timeout=timeout,
+                predicate=lambda item: _response_matches(
+                    item,
+                    call_id=call.call_id,
+                    cseq_method="INFO",
+                    cseq=cseq,
+                ),
+            )
+            response = event.message
+            if not isinstance(response, SipResponse):
+                raise NativeSipCallError("expected INFO response")
+        finally:
+            await self._stop_retransmission(retransmission)
+        transaction.receive_response(response)
+        if 200 <= response.status_code < 300:
+            self._record_call(
+                "info_sent",
+                call_id=call.call_id,
+                data={"content_type": content_type},
+            )
+            return response
+        self._record_call(
+            "failed",
+            call_id=call.call_id,
+            data={"status_code": response.status_code, "reason": response.reason},
+        )
+        raise NativeSipCallError(
+            f"INFO failed with {response.status_code} {response.reason}"
+        )
+
+    async def send_dtmf_info(
+        self,
+        call: NativeSipCall,
+        digits: str,
+        *,
+        duration_ms: int = 160,
+        timeout: float = 1.0,
+    ) -> tuple[SipResponse, ...]:
+        if not digits:
+            raise ValueError("digits are required")
+        if duration_ms <= 0:
+            raise ValueError("duration_ms must be positive")
+        responses: list[SipResponse] = []
+        for digit in digits:
+            _validate_dtmf_digit(digit)
+            body = f"Signal={digit}\r\nDuration={duration_ms}\r\n".encode("ascii")
+            response = await self.send_info(
+                call,
+                body=body,
+                content_type="application/dtmf-relay",
+                branch=f"z9hG4bK-info-{digit}-{time.monotonic_ns()}",
+                timeout=timeout,
+            )
+            responses.append(response)
+            self._record_call(
+                "dtmf_sent",
+                call_id=call.call_id,
+                data={"digit": digit, "transport": "sip-info"},
+            )
+        return tuple(responses)
+
     async def answer_bye(
         self,
         call: NativeSipCall,
@@ -728,6 +910,10 @@ class NativeSipBackend:
     def _record_event(self, event: SipWireEvent) -> None:
         self._record(sip_wire_event_name(event), data=_event_data(event))
 
+    def _emit_wire_event(self, event: SipWireEvent) -> None:
+        if self.wire_event_handler is not None:
+            self.wire_event_handler(event)
+
     def _send_message(self, message: SipMessage, remote: UdpAddress) -> SipWireEvent:
         outbound = self._apply_before_send_hooks(message, remote)
         if isinstance(outbound, bytes):
@@ -772,6 +958,7 @@ class NativeSipBackend:
         remote: UdpAddress,
     ) -> _RetransmissionHandle | None:
         event = self._send_message(message, remote)
+        self._emit_wire_event(event)
         self._record_event(event)
         return self._start_retransmission(message, remote)
 
@@ -827,6 +1014,7 @@ class NativeSipBackend:
             except TimeoutError:
                 pass
             event = self._send_message(message, remote)
+            self._emit_wire_event(event)
             self._record_event(event)
             self._record(
                 "retransmitted",
@@ -924,6 +1112,78 @@ def _is_sdp(message: SipMessage) -> bool:
     )
 
 
+def _sdp_from_message(message: SipMessage) -> SessionDescription | None:
+    if not _is_sdp(message):
+        return None
+    try:
+        return parse_sdp(message.body)
+    except ValueError as exc:
+        raise NativeSipCallError(f"invalid SDP body: {exc}") from exc
+
+
+def _validate_sdp_answer(
+    offer: SessionDescription | None,
+    response: SipResponse,
+) -> SessionDescription | None:
+    if offer is None:
+        return _sdp_from_message(response)
+    answer = _sdp_from_message(response)
+    if answer is None:
+        raise NativeSipCallError("INVITE 200 OK missing SDP answer")
+    if answer.audio is None:
+        raise NativeSipCallError("SDP answer has no audio media")
+    if answer.audio.port <= 0:
+        raise NativeSipCallError("SDP answer rejected audio media")
+    offered = _media_codec_names(offer)
+    answered = _media_codec_names(answer)
+    if offered and not offered.intersection(answered):
+        raise NativeSipCallError("SDP answer has no common audio codec")
+    return answer
+
+
+def _answer_sdp_for_invite(
+    request: SipRequest,
+    *,
+    contact: SipUri | None,
+    local_address: UdpAddress,
+    media_port: int | None,
+    supported_codecs: tuple[str, ...],
+    telephone_event: bool,
+) -> SessionDescription | None:
+    offer = _sdp_from_message(request)
+    if offer is None:
+        return None
+    port = media_port or contact_port(contact) or local_address[1]
+    try:
+        return create_audio_answer(
+            offer,
+            connection_address=(
+                contact.host if contact is not None else local_address[0]
+            ),
+            port=port,
+            supported_codecs=supported_codecs,
+            telephone_event=telephone_event,
+        )
+    except SdpNegotiationError as exc:
+        raise NativeSipCallError(f"SDP negotiation failed: {exc}") from exc
+
+
+def contact_port(contact: SipUri | None) -> int | None:
+    if contact is None:
+        return None
+    return contact.port
+
+
+def _media_codec_names(sdp: SessionDescription) -> set[str]:
+    if sdp.audio is None:
+        return set()
+    return {
+        codec.name.upper()
+        for codec in sdp.audio.codecs.values()
+        if codec.name.upper() != "TELEPHONE-EVENT"
+    }
+
+
 def _request_matches(
     event: SipWireEvent,
     *,
@@ -941,14 +1201,27 @@ def _response_matches(
     *,
     call_id: str,
     cseq_method: str,
+    cseq: int | None = None,
 ) -> bool:
     message = event.message
     if not isinstance(message, SipResponse):
         return False
+    cseq_header = message.headers.get("CSeq") or ""
     return (
         message.headers.get("Call-ID") == call_id
-        and _cseq_method(message.headers.get("CSeq") or "") == cseq_method
+        and _cseq_method(cseq_header) == cseq_method
+        and (cseq is None or _cseq_number(cseq_header) == cseq)
     )
+
+
+def _digest_challenge(response: SipResponse) -> tuple[str, str] | None:
+    if response.status_code == 401:
+        value = response.headers.get("WWW-Authenticate")
+        return ("Authorization", value) if value is not None else None
+    if response.status_code == 407:
+        value = response.headers.get("Proxy-Authenticate")
+        return ("Proxy-Authorization", value) if value is not None else None
+    return None
 
 
 def _required_header(message: SipRequest | SipResponse, name: str) -> str:
@@ -956,6 +1229,14 @@ def _required_header(message: SipRequest | SipResponse, name: str) -> str:
     if value is None:
         raise NativeSipCallError(f"missing required SIP header: {name}")
     return value
+
+
+def _cseq_number(value: str) -> int | None:
+    number, _separator, _method = value.partition(" ")
+    try:
+        return int(number)
+    except ValueError:
+        return None
 
 
 def _cseq_method(value: str) -> str:
@@ -969,3 +1250,8 @@ def _uri_from_name_addr(value: str) -> SipUri:
     if start >= 0 and end > start:
         return SipUri.parse(value[start + 1 : end])
     return SipUri.parse(value.split(";", maxsplit=1)[0].strip())
+
+
+def _validate_dtmf_digit(digit: str) -> None:
+    if digit not in "0123456789ABCDabcd*#":
+        raise ValueError(f"unsupported DTMF digit: {digit!r}")

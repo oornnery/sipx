@@ -11,8 +11,8 @@
 | O7 | Config format? | `harness.toml` profiles exist; YAML scenarios still optional | Before richer scenario runner UX. |
 | O8 | Native SIP next scope? | media wiring, live inspector, advanced dialogs | After current SPEC completion. |
 | O9 | PJSIP backend priority? | after native lab mode and Asterisk lab; only if interop demand appears | Before optional backend work. |
-| O10 | Type-check gate? | fix `uv run ty check` diagnostics, sync system `python -m ty`, or defer hard gate | Before claiming full type-check validation. |
 | O11 | Slow AI media behavior? | silence, comfort tone, waiting prompt, configurable policy | Before real STT/TTS/LLM runtime. |
 | O12 | Advanced RTP depth? | jitter buffer, RTCP, impairment, payload validation | After basic RTP/DTMF primitives. |
-| O13 | Next native SIP/softphone layer after 1.2.0? | media wiring, live inspector, recordings/transcripts, digest auth for raw requests | Before choosing work outside current SPEC table. |
+| O13 | Next native SIP/softphone layer after 1.4.0? | RTP media send/receive, DTMF over RTP, live inspector, recordings/transcripts, multi-challenge auth policies | Before choosing work outside current SPEC table. |
 | O14 | Release draft policy? | keep latest draft only, publish manually, automate cleanup | Before first public `sipx` release is published. |
+| O15 | LLM provider scope? | OpenAI-compatible client only, provider protocol, or vendor-specific adapters | Before building AI media agents beyond templates. |

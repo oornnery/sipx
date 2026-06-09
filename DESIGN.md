@@ -1465,6 +1465,12 @@ await expect(call.speech).to_mean(
 
 This is useful but probabilistic. Robust tests should combine it with deterministic assertions: SIP status, headers, SDP, RTP flow, DTMF, timing, regex, and audio presence.
 
+## LLM Provider Clients
+
+The implemented LLM provider surface starts with `LLMChatClient` in `sipx.llm`. It uses stdlib HTTP against an OpenAI-compatible `/chat/completions` endpoint with an injectable transport so unit tests do not call the network. Live validation is explicitly opt-in through `SIPX_LLM_API_KEY`, `SIPX_LLM_BASE_URL`, and `SIPX_LLM_MODEL`; no provider key belongs in examples, tests, logs, artifacts, or committed config.
+
+Example templates live in `examples/llm`, `examples/asterisk`, and `examples/native`. They are templates only: they import without secrets and skip or no-op when `SIPX_LLM_API_KEY` is absent.
+
 ## Voice Apps
 
 Contact-center and IVR applications should look like a small framework.
@@ -1584,9 +1590,12 @@ sipx phone listen lab_account --duration 30
 sipx register lab_account
 sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password secret
 sipx call sip:6000@pbx.lab --profile lab_account
+sipx call sip:6000@pbx.lab --aor sip:1001@pbx.lab --registrar sip:pbx.lab --username 1001 --password secret --media-port 40000
+sipx call sip:6000@pbx.lab --aor sip:1001@pbx.lab --registrar sip:pbx.lab --username 1001 --password secret --codec PCMU --debug-sip
 sipx options sip:pbx.lab --from sip:1001@example.com -i
 sipx message sip:1002@pbx.lab 'hello' --from sip:1001@example.com
-sipx request INFO sip:1002@pbx.lab --from sip:1001@example.com -H 'Content-Type: application/dtmf-relay' -d 'Signal=1'
+sipx request INFO sip:1002@pbx.lab --from sip:1001@example.com --username 1001 --password secret --debug-sip -H 'Content-Type: application/dtmf-relay' -d 'Signal=1'
+sipx register mizu_demo --config examples/mizu/harness.toml --local-host <your-local-ip> --keepalive 5 --debug-sip
 sipx scenario run ivr_second_copy.py
 sipx scenario export timeline.jsonl --format python
 sipx replay timeline.jsonl
@@ -1595,6 +1604,11 @@ sipx replay timeline.jsonl
 Implemented profile inspection commands are `sipx profile list` and `sipx profile show <name>`.
 Implemented phone commands fail before network access unless a profile or explicit SIP account identity is provided.
 Implemented raw SIP request commands support curl-like `-H`, `-d`, `--body-file`, `--include`, and `--no-wait` flags.
+Implemented Digest auth retries one `401` or `407` challenge for calls and raw SIP requests when credentials are provided.
+Implemented `--debug-sip` prints redacted SIP datagrams for phone and raw SIP commands without requiring lab mode.
+Implemented native softphone calls generate SDP audio offers, open the advertised RTP UDP port, and validate `2xx` SDP answers before confirmation.
+Implemented `sipx call --dtmf` sends in-dialog SIP INFO `application/dtmf-relay` digits after confirmation.
+Implemented LLM examples use `LLMChatClient` with provider keys supplied only at runtime through `SIPX_LLM_API_KEY`.
 
 ## Technical Softphone Python Shape
 

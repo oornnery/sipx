@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone/raw-SIP commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, GitHub CI/release workflows adapted to the new project, and fail-fast phone CLI config validation.
+Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone/raw-SIP commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, INVITE Digest retry, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, GitHub CI/release workflows adapted to the new project, fail-fast phone CLI config validation, redacted SIP packet debug output, native softphone SDP offer/answer negotiation, in-dialog SIP INFO DTMF, opt-in generic OpenAI-compatible LLM examples/tests, and passing `uv run ty check` validation.
 
 ## Milestone 0 - Project Grounding
 
@@ -96,6 +96,8 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement strict mode UAC/UAS basic INVITE/ACK/BYE calls over UDP.
 - [x] Implement CANCEL runtime over UDP.
 - [x] Implement REGISTER runtime orchestration over UDP.
+- [x] Implement INVITE Digest auth retry over UDP.
+- [x] Implement SDP answer validation for successful INVITE calls.
 - [x] Implement transaction retransmission timers for strict runtime.
 - [x] Implement lab mode hooks for controlled malformed behavior.
 
@@ -107,6 +109,9 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Implement outbound call and inbound call handlers.
 - [x] Add operational CLI commands for profile inspection, register, unregister, call, and listen.
 - [x] Add curl-like raw SIP CLI commands for OPTIONS, MESSAGE, and generic requests.
+- [x] Add redacted SIP packet debug output for phone and raw SIP CLI commands.
+- [x] Add SDP offer generation and local RTP port binding for outbound softphone calls.
+- [x] Add in-dialog SIP INFO DTMF support for confirmed native calls.
 - [ ] Implement live SIP inspector events.
 - [x] Implement strict/lab profiles.
 - [x] Implement lab hooks for SIP headers, SDP, timers, and malformed behavior.
@@ -125,7 +130,7 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 
 - [x] `ruff format --check .`
 - [x] `ruff check .`
-- [ ] `python -m ty check` blocked on the system interpreter; `uv run ty check` currently reports typing diagnostics.
+- [x] `uv run ty check` passes; `python -m ty check` remains unavailable on the system interpreter.
 - [x] `pytest`
 - [x] Parser fuzz/property tests once SIP/SDP/RTP parsers exist.
 - [x] Asterisk integration tests only when explicit local config is present.
@@ -359,13 +364,62 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Added raw SIP request flags for From identity, profile/config, remote routing, headers, body, content type, response headers, and no-wait send.
 - [x] Added no-network tests for raw SIP request construction and help output.
 
+## Block 1.2.1 Done
+
+- [x] Bumped package version to `1.2.1`.
+- [x] Backpropagated challenged INVITE authentication as `SPEC.md` B6 and V29.
+- [x] Added Digest retry for challenged INVITE calls and raw SIP request commands.
+- [x] Matched authenticated retry responses by current `CSeq` to ignore stale challenge retransmissions.
+- [x] Added loopback Native SIP test for INVITE Digest auth retry.
+- [x] Added no-network CLI test for raw SIP request Digest auth retry.
+
+## Block 1.3.0 Done
+
+- [x] Bumped package version to `1.3.0`.
+- [x] Added strict-mode native SIP wire event callback for packet visibility.
+- [x] Added `--debug-sip` to phone and raw SIP request CLI commands.
+- [x] Printed redacted SIP TX/RX datagrams to stderr during debug runs.
+- [x] Added no-network CLI tests for packet debug output and authorization redaction.
+
+## Block 1.4.0 Done
+
+- [x] Bumped package version to `1.4.0`.
+- [x] Backpropagated authenticated `603 Declined` without SDP as `SPEC.md` B7 and V31.
+- [x] Added outbound SDP offer generation for native softphone calls.
+- [x] Added inbound SDP answer generation for INVITEs with audio offers.
+- [x] Added SDP answer validation before confirming outbound calls.
+- [x] Added lightweight local RTP UDP sink while calls exist.
+- [x] Added phone CLI media flags for RTP host, RTP port, and codecs.
+- [x] Added public Mizu demo profile example.
+
+## Block 1.5.0 Done
+
+- [x] Bumped package version to `1.5.0`.
+- [x] Added dependency-free LLM client with injectable transport.
+- [x] Added LLM unit tests using fake transport and live test skipped unless provider credentials exist.
+- [x] Added LLM harness scenario example using runtime environment key only.
+- [x] Added Asterisk + LLM Stasis template.
+- [x] Added Native + Mizu example helper.
+- [x] Added example import and inline-secret scan tests.
+- [x] Backpropagated and fixed the type-check baseline as `SPEC.md` B8 and V33.
+- [x] Fixed dynamic call, mapping, URI, SDP, and media-frame typing so `uv run ty check` passes.
+
+## Block 1.6.0 Done
+
+- [x] Bumped package version to `1.6.0`.
+- [x] Renamed LLM provider client to simple `LLMChatClient`.
+- [x] Switched live LLM settings to `SIPX_LLM_API_KEY`, `SIPX_LLM_BASE_URL`, `SIPX_LLM_MODEL`, and `SIPX_LLM_TIMEOUT`.
+- [x] Added native SIP INFO DTMF support and `sipx call --dtmf`.
+- [x] Added native examples for REGISTER, OPTIONS, MESSAGE, raw INFO DTMF, call-with-DTMF, and Mizu call helpers.
+- [x] Updated README with concrete example usage.
+
 ## Blocked Or Pending
 
-- [ ] `python -m ty check` needs the system interpreter environment synced, or validation should standardize on `uv run ty check` after fixing current typing diagnostics.
+- [ ] `python -m ty check` still needs the system interpreter environment synced; configured validation now uses passing `uv run ty check`.
 - [ ] Next Asterisk media path after WebSocket MVP remains open: AudioSocket or ExternalMedia RTP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and environment type-checking remain pending after 1.0.0.
+- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and system-interpreter tooling remain pending after 1.5.0.
 
 ## Open Questions
 

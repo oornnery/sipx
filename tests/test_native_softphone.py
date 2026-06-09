@@ -4,6 +4,7 @@ import pytest
 
 from sipx import (
     NativeSipBackend,
+    NativeSipCallError,
     NativeSipCallState,
     NativeSipLabHooks,
     NativeSoftphone,
@@ -14,6 +15,7 @@ from sipx import (
     SipRequest,
     SipUri,
     Timeline,
+    create_audio_offer,
     create_response_for_request,
 )
 
@@ -154,6 +156,16 @@ async def _run_outbound_call_and_hangup() -> None:
 
             assert call.state is NativeSipCallState.CONFIRMED
             assert callee_call.state is NativeSipCallState.CONFIRMED
+            assert call.local_sdp is not None
+            assert call.remote_sdp is not None
+            assert call.local_sdp.has_codec("PCMU")
+            assert call.remote_sdp.has_codec("PCMU")
+            assert callee_call.local_sdp is not None
+            assert callee_call.remote_sdp is not None
+
+            dtmf_task = asyncio.create_task(_answer_info_dtmf(callee, count=2))
+            await softphone.send_dtmf(call, "1#", duration_ms=200)
+            assert await dtmf_task == ["1", "#"]
 
             answer_bye = asyncio.create_task(
                 callee.answer_bye(callee_call, timeout=1.0)
@@ -167,6 +179,27 @@ async def _run_outbound_call_and_hangup() -> None:
             await softphone.stop()
     finally:
         await callee.stop()
+
+
+async def _answer_info_dtmf(callee: NativeSipBackend, *, count: int) -> list[str]:
+    digits: list[str] = []
+    for _ in range(count):
+        event = await callee.receive_event(timeout=1.0)
+        request = event.message
+        assert isinstance(request, SipRequest)
+        assert request.method == "INFO"
+        assert request.headers.get("Content-Type") == "application/dtmf-relay"
+        lines = request.body.decode("ascii").splitlines()
+        signal = lines[0].removeprefix("Signal=")
+        digits.append(signal)
+        assert lines[1] == "Duration=200"
+        response = create_response_for_request(
+            request=request,
+            status_code=200,
+            reason="OK",
+        )
+        await callee.send_response(response, event.remote)
+    return digits
 
 
 def test_native_softphone_answers_inbound_call() -> None:
@@ -213,3 +246,54 @@ async def _answer_inbound_call() -> None:
             await softphone.stop()
     finally:
         await caller.stop()
+
+
+def test_native_softphone_rejects_missing_sdp_answer() -> None:
+    asyncio.run(_reject_missing_sdp_answer())
+
+
+async def _reject_missing_sdp_answer() -> None:
+    caller = NativeSipBackend(actor_id="caller")
+    peer = NativeSipBackend(actor_id="peer")
+    try:
+        await caller.start()
+        await peer.start()
+        responder = asyncio.create_task(_ok_without_sdp(peer))
+        offer = create_audio_offer(
+            connection_address="127.0.0.1",
+            port=40000,
+        )
+
+        with pytest.raises(NativeSipCallError, match="missing SDP answer"):
+            await caller.initiate_call(
+                remote=peer.local_address,
+                target=SipUri.parse("sip:bob@example.com"),
+                caller=SipUri.parse("sip:alice@example.com"),
+                contact=SipUri.parse(f"sip:alice@127.0.0.1:{caller.local_address[1]}"),
+                call_id="missing-sdp-answer-1",
+                branch="z9hG4bK-missing-sdp-answer",
+                from_tag="caller-tag",
+                ack_branch="z9hG4bK-missing-sdp-answer-ack",
+                timeout=1.0,
+                body=offer.to_sdp().encode("utf-8"),
+                content_type="application/sdp",
+            )
+        await responder
+    finally:
+        await caller.stop()
+        await peer.stop()
+
+
+async def _ok_without_sdp(peer: NativeSipBackend) -> None:
+    event = await peer.receive_event(timeout=1.0)
+    request = event.message
+    assert isinstance(request, SipRequest)
+    assert request.method == "INVITE"
+    response = create_response_for_request(
+        request=request,
+        status_code=200,
+        reason="OK",
+        to_tag="peer-tag",
+        contact=SipUri.parse("sip:bob@127.0.0.1:5060"),
+    )
+    await peer.send_response(response, event.remote)
