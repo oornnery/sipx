@@ -25,6 +25,8 @@ C14: technical softphone ! built on `NativeSipBackend`, not on Asterisk.
 C15: PJSIP/PJSUA2 = optional future backend; not core harness foundation.
 C16: softphone engine ! headless first; UI/CLI/TUI clients later consume engine.
 C17: maintained English files in current structure are source of truth; `IDEA.md` = historical source only; no separate `docs/` tree.
+C18: root package `sipx` ! core-only: harness core, SIP/SDP/RTP/media/security primitives, and native SIP runtime; ⊥ app-specific LLM, softphone wrapper, Asterisk backend, CLI, or scenario examples.
+C19: app surfaces live under `apps/*` as independent `uv` workspace packages that import `sipx` via workspace dependency.
 
 ## §I
 
@@ -74,6 +76,13 @@ ci: `.github/workflows/create-release.yml` → draft `v<pyproject version>` rele
 ci: `.github/workflows/release.yml` → verify tag, test/build, PyPI trusted publish.
 proto: SIP RFC 3261, SDP RFC 8866, Offer/Answer RFC 3264, RTP/RTCP RFC 3550/3551, DTMF RFC 4733.
 proto: Asterisk ARI/Stasis, ExternalMedia, AudioSocket, chan_websocket, PJSIP.
+pkg: root `sipx` → core library package only.
+pkg: `apps/llm` → `sipx-llm` / `sipx_llm` generic LLM client and LLM examples/tests.
+pkg: `apps/softphone` → `sipx-softphone` / `sipx_softphone` headless native softphone wrapper and softphone examples/tests.
+pkg: `apps/asterisk` → `sipx-asterisk` / `sipx_asterisk` Asterisk ARI backend, Stasis helpers, Docker-facing tests/templates.
+pkg: `apps/cli` → `sipx-cli` / `sipx_cli` console command `sipx`.
+pkg: `apps/scenarios` → `sipx-scenarios` / `sipx_scenarios` runnable scenario/example library.
+pkg: `apps/stt`, `apps/tts` → adapter slots for future speech providers; core keeps protocols only.
 
 ## §V
 
@@ -115,6 +124,9 @@ V35: LLM env config ! missing optional `SIPX_LLM_*` vars use concrete defaults; 
 V36: LLM SIP audit examples ! runnable directly and via `sipx scenario run`; output structured behavior/risk/findings/actions while deterministic SIP checks remain separate from LLM judgment.
 V37: LLM SIP audit security ! redacted auth markers are accepted; unredacted `Authorization`/`Proxy-Authorization` values are flagged before LLM analysis.
 V38: SIP auth ! confirmed native calls receiving `401|407` to in-dialog `BYE` retry once with Digest when credentials exist; retry waits for current BYE CSeq response; secrets ⊥ logs/docs/artifacts.
+V39: package boundaries ! importing root `sipx` does not import LLM, softphone, Asterisk, CLI, or app examples.
+V40: workspace apps ! each `apps/*` package has own `pyproject.toml`, imports `sipx` as workspace dependency, and exposes app tests/examples without mutating root core package.
+V41: CLI ownership ! console command `sipx` belongs to `apps/cli`; root core package has no console script and no `sipx.cli` module.
 
 ## §T
 
@@ -166,6 +178,7 @@ T43|x|fix LLM env defaults for direct example execution|V32,V35,I.api
 T44|x|add richer runnable LLM SIP-flow audit example|V5,V13,V32,V36,I.cmd
 T45|x|fix SIP-flow audit auth redaction detection|V13,V36,V37,I.cmd
 T46|x|fix Digest retry for challenged native softphone BYE hangup|V29,V30,V38,I.cmd
+T47|x|split repo into root core `sipx` package plus `apps/*` uv workspace packages|C18,C19,V39,V40,V41,I.pkg
 
 ## §B
 

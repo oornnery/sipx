@@ -56,7 +56,7 @@ jobs:
       - name: Run Asterisk integration tests
         env:
           SIPX_ASTERISK_INTEGRATION: "1"
-        run: uv run pytest tests/test_asterisk_integration.py -v --tb=short
+        run: uv run pytest apps/asterisk/tests/test_asterisk_integration.py -v --tb=short
 
       - name: Print Asterisk logs on failure
         if: failure()

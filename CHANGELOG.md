@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.8.0 - 2026-06-09
+
+- Split the repo into a `uv` workspace with root `sipx` as the core library package.
+- Moved app-specific code into `apps/llm`, `apps/softphone`, `apps/asterisk`, `apps/cli`, `apps/scenarios`, `apps/stt`, and `apps/tts` packages.
+- Moved the `sipx` console command to `sipx-cli`; run it with `uv run --package sipx-cli sipx ...` from the workspace root.
+- Removed LLM, softphone, Asterisk, examples, and CLI imports from the root `sipx` public API.
+- Bumped package version to `1.8.0`.
+
 ## 1.7.1 - 2026-06-09
 
 - Fixed native softphone hangup against proxies that challenge in-dialog `BYE` with `401` or `407`.

@@ -19,7 +19,7 @@ Default lab-only ARI credentials are `sipx:sipx`.
 ## Run Opt-In Tests
 
 ```bash
-SIPX_ASTERISK_INTEGRATION=1 python -m pytest tests/test_asterisk_integration.py
+SIPX_ASTERISK_INTEGRATION=1 python -m pytest apps/asterisk/tests/test_asterisk_integration.py
 ```
 
 The default test suite does not require Docker or a running Asterisk instance.

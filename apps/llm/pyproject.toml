@@ -1,0 +1,13 @@
+[project]
+name = "sipx-llm"
+version = "0.1.0"
+description = "OpenAI-compatible LLM helpers for sipx scenarios"
+requires-python = ">=3.14"
+dependencies = ["sipx"]
+
+[tool.uv.sources]
+sipx = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

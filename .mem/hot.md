@@ -32,19 +32,21 @@
 - DTMF is media event; RFC4733 telephone-event primary.
 - G.711 PCMU/PCMA required early; do not depend on stdlib `audioop`.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.7.1`.
+- Current implementation version: `1.8.0`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - `sipx` package now exists with core modules for events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, and harness runtime.
 - `MockBackend` is the default no-network backend for `Harness()`.
 - Minimum scenario artifacts now written: `timeline.jsonl`, `verdict.json`, `report.txt`, and `report.html`.
+- Repo is now a `uv` workspace: root `sipx` is core-only; app packages live under `apps/*` and import root `sipx` as workspace dependency.
+- CLI command now belongs to `apps/cli` package `sipx-cli`; run from repo root as `uv run --package sipx-cli sipx ...`.
 - CLI exists: `sipx scenario run <file>`, `sipx scenario export <timeline.jsonl>`, `sipx replay <timeline.jsonl>`, `sipx profile list|show`, `sipx phone register|unregister|call|listen`, top-level `sipx register|unregister|call|listen`, and raw SIP `sipx options|message|request` commands.
 - Phone and raw SIP CLI commands support `--debug-sip`, which prints redacted SIP datagrams to stderr in strict or lab mode.
 - Native softphone outbound calls now send SDP audio offers, validate 2xx SDP answers, and keep the advertised RTP UDP port open while the call exists.
-- Public Mizu demo profile is in `examples/mizu/harness.toml`; private proxy test data must not be committed.
-- `LLMChatClient` exists in `sipx.llm`; live LLM validation is opt-in via `SIPX_LLM_API_KEY` and secrets must not be committed.
+- Public Mizu demo profile is in `apps/softphone/examples/mizu/harness.toml`; private proxy test data must not be committed.
+- `LLMChatClient` exists in app package `sipx_llm`; live LLM validation is opt-in via `SIPX_LLM_API_KEY` and secrets must not be committed.
 - `LLMChatClient.from_env()` works with only `SIPX_LLM_API_KEY`; optional base URL/model/timeout use concrete defaults.
-- `examples/llm/sip_flow_audit.py` is the richer runnable LLM example; it emits structured SIP behavior/risk/findings/actions JSON.
-- Native softphone calls can send in-dialog SIP INFO DTMF via `NativeSoftphone.send_dtmf()` and CLI `sipx call --dtmf`.
+- `apps/llm/examples/sip_flow_audit.py` is the richer runnable LLM example; it emits structured SIP behavior/risk/findings/actions JSON.
+- Native softphone calls can send in-dialog SIP INFO DTMF via `sipx_softphone.NativeSoftphone.send_dtmf()` and CLI `sipx call --dtmf`.
 - Phone CLI network commands require a profile or explicit `--aor` and `--registrar`; without config they fail before opening sockets.
 - Phone CLI derives default remote host/port from `--registrar` when `--remote-host/--remote-port` are omitted.
 - Raw SIP request CLI supports `--from/--aor`, `--username`, `--password`, `-H/--header`, `-d/--data`, `--body-file`, `--content-type`, `--include`, and `--no-wait`.
@@ -68,18 +70,18 @@
 - `AsteriskBackend` now has an async ARI REST client, injectable transport, ARI WebSocket event ingestion, and timeline recording for ARI requests/events.
 - `AsteriskBackend` now maps ARI channel/bridge/playback/hangup/DTMF control methods and known ARI events to timeline events.
 - `AsteriskWebSocketMediaPort` now provides async binary WebSocket media receive/send and `AudioFrame` conversion for Asterisk media MVP.
-- `sipx.examples.asterisk_stasis` now has an inbound `Stasis(sipx)` example with minimal config snippets and no-Asterisk tests.
-- `sipx.softphone.NativeSoftphone` now provides a headless technical softphone engine on `NativeSipBackend`.
+- `sipx_asterisk.stasis` now has an inbound `Stasis(sipx)` example with minimal config snippets and no-Asterisk tests.
+- `sipx_softphone.NativeSoftphone` now provides a headless technical softphone engine on `NativeSipBackend`.
 - `NativeSipBackend` now has lab-only `NativeSipLabHooks` for before-send message mutation/raw bytes, before-SDP-body mutation, after-receive observation/filtering, and retransmission interval overrides.
 - `NativeSoftphoneConfig` now passes lab hooks to the underlying native backend.
 - `ScenarioRecorder` exports timeline/user actions to Python or YAML; `Timeline.read_jsonl()` supports replay/export input.
 - `Profile` config loads strict/lab/account/SIP/media overrides from `harness.toml`.
 - `MixedScenario` binds native, Asterisk, and mock actors onto one shared harness timeline.
 - `docker/asterisk` provides an Asterisk 22 lab for opt-in ARI and Native SIP integration tests.
-- `uv run sipx --help` works after adding hatchling build metadata and committing `uv.lock`.
+- `uv run --package sipx-cli sipx --help` works after moving the console command into the CLI workspace package.
 - `python -m ty check` is still blocked on the system interpreter; `uv run ty check` passes after block `1.5.0` type hardening.
-- `.github/workflows/ci.yml` runs uv sync, `sipx --help`, ruff, pytest, and `uv build` on Python 3.14.
-- `.github/workflows/asterisk.yml` starts `docker/asterisk` and runs `SIPX_ASTERISK_INTEGRATION=1 uv run pytest tests/test_asterisk_integration.py`.
+- `.github/workflows/ci.yml` runs uv sync, `uv run --package sipx-cli sipx --help`, ruff, ty, pytest, and `uv build --all-packages` on Python 3.14.
+- `.github/workflows/asterisk.yml` starts `docker/asterisk` and runs `SIPX_ASTERISK_INTEGRATION=1 uv run pytest apps/asterisk/tests/test_asterisk_integration.py`.
 - `.github/workflows/create-release.yml` reads `pyproject.toml` version and creates a draft `v<version>` release on `master` if missing.
 - `.github/workflows/release.yml` verifies release tag vs `pyproject.toml`, tests/builds, and publishes to PyPI with trusted publishing.
 - `origin` is `https://github.com/oornnery/sipx.git`; old remote branches/tags/releases were removed during replacement.

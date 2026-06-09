@@ -2,6 +2,18 @@ version = 1
 revision = 3
 requires-python = ">=3.14"
 
+[manifest]
+members = [
+    "sipx",
+    "sipx-asterisk",
+    "sipx-cli",
+    "sipx-llm",
+    "sipx-scenarios",
+    "sipx-softphone",
+    "sipx-stt",
+    "sipx-tts",
+]
+
 [[package]]
 name = "cfgv"
 version = "3.5.0"
@@ -288,7 +300,7 @@ wheels = [
 
 [[package]]
 name = "sipx"
-version = "1.7.1"
+version = "1.8.0"
 source = { editable = "." }
 
 [package.dev-dependencies]
@@ -298,6 +310,13 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "sipx-asterisk" },
+    { name = "sipx-cli" },
+    { name = "sipx-llm" },
+    { name = "sipx-scenarios" },
+    { name = "sipx-softphone" },
+    { name = "sipx-stt" },
+    { name = "sipx-tts" },
     { name = "taskipy" },
     { name = "ty" },
 ]
@@ -311,9 +330,105 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1.4.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.15.16" },
+    { name = "sipx-asterisk", editable = "apps/asterisk" },
+    { name = "sipx-cli", editable = "apps/cli" },
+    { name = "sipx-llm", editable = "apps/llm" },
+    { name = "sipx-scenarios", editable = "apps/scenarios" },
+    { name = "sipx-softphone", editable = "apps/softphone" },
+    { name = "sipx-stt", editable = "apps/stt" },
+    { name = "sipx-tts", editable = "apps/tts" },
     { name = "taskipy", specifier = ">=1.14.1" },
     { name = "ty", specifier = ">=0.0.44" },
 ]
+
+[[package]]
+name = "sipx-asterisk"
+version = "0.1.0"
+source = { editable = "apps/asterisk" }
+dependencies = [
+    { name = "sipx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "sipx", editable = "." }]
+
+[[package]]
+name = "sipx-cli"
+version = "0.1.0"
+source = { editable = "apps/cli" }
+dependencies = [
+    { name = "sipx" },
+    { name = "sipx-softphone" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "sipx", editable = "." },
+    { name = "sipx-softphone", editable = "apps/softphone" },
+]
+
+[[package]]
+name = "sipx-llm"
+version = "0.1.0"
+source = { editable = "apps/llm" }
+dependencies = [
+    { name = "sipx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "sipx", editable = "." }]
+
+[[package]]
+name = "sipx-scenarios"
+version = "0.1.0"
+source = { editable = "apps/scenarios" }
+dependencies = [
+    { name = "sipx" },
+    { name = "sipx-asterisk" },
+    { name = "sipx-llm" },
+    { name = "sipx-softphone" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "sipx", editable = "." },
+    { name = "sipx-asterisk", editable = "apps/asterisk" },
+    { name = "sipx-llm", editable = "apps/llm" },
+    { name = "sipx-softphone", editable = "apps/softphone" },
+]
+
+[[package]]
+name = "sipx-softphone"
+version = "0.1.0"
+source = { editable = "apps/softphone" }
+dependencies = [
+    { name = "sipx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "sipx", editable = "." }]
+
+[[package]]
+name = "sipx-stt"
+version = "0.1.0"
+source = { editable = "apps/stt" }
+dependencies = [
+    { name = "sipx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "sipx", editable = "." }]
+
+[[package]]
+name = "sipx-tts"
+version = "0.1.0"
+source = { editable = "apps/tts" }
+dependencies = [
+    { name = "sipx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "sipx", editable = "." }]
 
 [[package]]
 name = "taskipy"

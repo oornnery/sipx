@@ -19,7 +19,7 @@ from sipx import (
     render_html_report,
     render_text_report,
 )
-from sipx.backends import AsteriskBackend, MockBackend
+from sipx.backends import MockBackend
 
 
 def test_scenario_recorder_exports_timeline_to_yaml_and_python() -> None:
@@ -125,7 +125,7 @@ def test_mixed_scenario_binds_native_asterisk_and_mock_actors() -> None:
     backends: dict[str, object] = {
         "mock": MockBackend(),
         "native": NativeSipBackend(timeline=timeline, actor_id="native"),
-        "asterisk": AsteriskBackend(timeline=timeline, actor_id="pbx"),
+        "asterisk": MockBackend(),
     }
     harness = Harness(run_id="mixed-run", backends=backends)
     harness.timeline = timeline

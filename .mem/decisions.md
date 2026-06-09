@@ -39,7 +39,7 @@
 | D35 | 2026-06-08 | Asterisk ARI control plane starts dependency-free with injectable transports. | Stdlib HTTP plus local WebSocket text-frame reader keeps first T9 block testable without syncing new runtime dependencies or requiring real Asterisk. |
 | D36 | 2026-06-08 | Asterisk control method mapping remains at ARI resource level first. | T10 needs timeline evidence for channels/bridges/playback/hangup/DTMF before higher-level call facades and media port decisions. |
 | D37 | 2026-06-08 | WebSocket media is the Asterisk MVP media path. | Best project-wide tradeoff: simpler bidirectional media and flow control now, while preserving AudioSocket and ExternalMedia RTP as later paths. |
-| D38 | 2026-06-08 | Inbound Stasis example lives in `sipx.examples`, not separate docs. | Current structure remains source of truth while keeping the example executable and testable without real Asterisk. |
+| D38 | 2026-06-08 | Inbound Stasis example lives with the Asterisk app package. | Current structure remains source of truth while keeping the example executable and testable without real Asterisk. |
 | D39 | 2026-06-08 | Native technical softphone starts as a headless engine wrapper over `NativeSipBackend`. | T22 needs programmable register/call/answer behavior now; CLI/TUI/GUI and profile loading remain later clients/features. |
 | D40 | 2026-06-08 | Native SIP protocol manipulation uses lab-only `NativeSipLabHooks`. | Keeps strict mode RFC-oriented while giving technical softphones and protocol tests controlled hooks for headers, SDP, timers, malformed bytes, and received events. |
 | D41 | 2026-06-08 | Asterisk integration tests are opt-in behind `SIPX_ASTERISK_INTEGRATION=1`. | Normal CI must stay no-secret/no-Docker; local lab can still validate ARI and Native SIP against Asterisk. |
@@ -57,3 +57,5 @@
 | D53 | 2026-06-08 | LLM client is generic OpenAI-compatible, not provider-named. | Lets users point templates at OpenAI-compatible APIs without renaming code per vendor. |
 | D54 | 2026-06-08 | CLI DTMF starts with SIP INFO for confirmed native calls. | It is minimal, testable, and useful before full RTP RFC4733 media send is implemented. |
 | D55 | 2026-06-09 | In-dialog BYE Digest retry follows the same one-shot policy as INVITE auth retry. | Real proxies can challenge hangup too; one retry fixes interop without risking infinite auth loops or storing passwords. |
+| D56 | 2026-06-09 | Root package `sipx` is core-only; app surfaces move to `apps/*` workspace packages. | Keeps protocol/harness core importable without CLI, LLM, Asterisk, or softphone app coupling. |
+| D57 | 2026-06-09 | Console command `sipx` belongs to workspace package `sipx-cli`. | The CLI composes app packages while root `sipx` remains a reusable library. |

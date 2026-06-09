@@ -1,6 +1,6 @@
 [project]
 name = "sipx"
-version = "1.7.1"
+version = "1.8.0"
 description = "Python programmable Voice/SIP harness for call automation, IVR testing, technical softphones, and media validation"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -10,9 +10,6 @@ dependencies = []
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[project.scripts]
-sipx = "sipx.cli.main:main"
-
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.0",
@@ -20,6 +17,36 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.16",
+    "sipx-asterisk",
+    "sipx-cli",
+    "sipx-llm",
+    "sipx-scenarios",
+    "sipx-softphone",
+    "sipx-stt",
+    "sipx-tts",
     "taskipy>=1.14.1",
     "ty>=0.0.44",
+]
+
+[tool.uv.sources]
+sipx-asterisk = { workspace = true }
+sipx-cli = { workspace = true }
+sipx-llm = { workspace = true }
+sipx-scenarios = { workspace = true }
+sipx-softphone = { workspace = true }
+sipx-stt = { workspace = true }
+sipx-tts = { workspace = true }
+
+[tool.uv.workspace]
+members = ["apps/*"]
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "apps/asterisk/src",
+    "apps/cli/src",
+    "apps/llm/src",
+    "apps/scenarios/src",
+    "apps/softphone/src",
+    "apps/stt/src",
+    "apps/tts/src",
 ]

@@ -24,7 +24,7 @@ The Harness is the product.
 | Technical Softphone | Native SIP/RTP endpoint for engineers, automation, inspection, negative tests, scenario recording. |
 | Asterisk Integration Backend | Asterisk as PBX/media/contact-center engine controlled by Python. |
 
-The headless native technical softphone engine lives in `sipx.softphone.NativeSoftphone`.
+The headless native technical softphone app lives in workspace package `apps/softphone` as `sipx_softphone.NativeSoftphone` and imports the root `sipx` core library.
 
 ## Main Use Cases
 
@@ -333,7 +333,7 @@ Suggested implementation order:
 
 ## Asterisk Inbound AI Flow
 
-The minimal inbound `Stasis(sipx)` example lives in `sipx.examples.asterisk_stasis`.
+The minimal inbound `Stasis(sipx)` example lives in workspace package `apps/asterisk` as `sipx_asterisk.stasis`.
 
 ```text
 1. Customer calls DID.
@@ -1467,9 +1467,9 @@ This is useful but probabilistic. Robust tests should combine it with determinis
 
 ## LLM Provider Clients
 
-The implemented LLM provider surface starts with `LLMChatClient` in `sipx.llm`. It uses stdlib HTTP against an OpenAI-compatible `/chat/completions` endpoint with an injectable transport so unit tests do not call the network. Live validation is explicitly opt-in through `SIPX_LLM_API_KEY`, `SIPX_LLM_BASE_URL`, and `SIPX_LLM_MODEL`; no provider key belongs in examples, tests, logs, artifacts, or committed config.
+The implemented LLM provider surface starts with `LLMChatClient` in workspace package `apps/llm` as `sipx_llm.LLMChatClient`. It uses stdlib HTTP against an OpenAI-compatible `/chat/completions` endpoint with an injectable transport so unit tests do not call the network. Live validation is explicitly opt-in through `SIPX_LLM_API_KEY`, `SIPX_LLM_BASE_URL`, and `SIPX_LLM_MODEL`; no provider key belongs in examples, tests, logs, artifacts, or committed config.
 
-Example templates live in `examples/llm`, `examples/asterisk`, and `examples/native`. They are templates only: they import without secrets and skip or no-op when `SIPX_LLM_API_KEY` is absent.
+Example templates live in `apps/llm/examples`, `apps/asterisk/examples`, and `apps/softphone/examples`. They are templates only: they import without secrets and skip or no-op when `SIPX_LLM_API_KEY` is absent.
 
 ## Voice Apps
 
@@ -1595,7 +1595,7 @@ sipx call sip:6000@pbx.lab --aor sip:1001@pbx.lab --registrar sip:pbx.lab --user
 sipx options sip:pbx.lab --from sip:1001@example.com -i
 sipx message sip:1002@pbx.lab 'hello' --from sip:1001@example.com
 sipx request INFO sip:1002@pbx.lab --from sip:1001@example.com --username 1001 --password secret --debug-sip -H 'Content-Type: application/dtmf-relay' -d 'Signal=1'
-sipx register mizu_demo --config examples/mizu/harness.toml --local-host <your-local-ip> --keepalive 5 --debug-sip
+uv run --package sipx-cli sipx register mizu_demo --config apps/softphone/examples/mizu/harness.toml --local-host <your-local-ip> --keepalive 5 --debug-sip
 sipx scenario run ivr_second_copy.py
 sipx scenario export timeline.jsonl --format python
 sipx replay timeline.jsonl
@@ -1608,7 +1608,7 @@ Implemented Digest auth retries one `401` or `407` challenge for calls and raw S
 Implemented `--debug-sip` prints redacted SIP datagrams for phone and raw SIP commands without requiring lab mode.
 Implemented native softphone calls generate SDP audio offers, open the advertised RTP UDP port, and validate `2xx` SDP answers before confirmation.
 Implemented `sipx call --dtmf` sends in-dialog SIP INFO `application/dtmf-relay` digits after confirmation.
-Implemented LLM examples use `LLMChatClient` with provider keys supplied only at runtime through `SIPX_LLM_API_KEY`.
+Implemented LLM examples use `sipx_llm.LLMChatClient` with provider keys supplied only at runtime through `SIPX_LLM_API_KEY`.
 
 ## Technical Softphone Python Shape
 
@@ -2124,7 +2124,7 @@ Optional backends:
 
 ## Asterisk Docker Lab
 
-`docker/asterisk` provides a local Asterisk 22 lab with ARI, PJSIP, RTP ports, simple UAS extensions, and a Stasis target. Tests in `tests/test_asterisk_integration.py` are skipped by default and run only with `SIPX_ASTERISK_INTEGRATION=1`.
+`docker/asterisk` provides a local Asterisk 22 lab with ARI, PJSIP, RTP ports, simple UAS extensions, and a Stasis target. Tests in `apps/asterisk/tests/test_asterisk_integration.py` are skipped by default and run only with `SIPX_ASTERISK_INTEGRATION=1`.
 
 ## Validation Gates
 

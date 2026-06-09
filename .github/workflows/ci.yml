@@ -31,7 +31,7 @@ jobs:
         run: uv sync --all-groups
 
       - name: Check console script
-        run: uv run sipx --help
+        run: uv run --package sipx-cli sipx --help
 
       - name: Format check
         run: uv run ruff format --check .
@@ -39,8 +39,11 @@ jobs:
       - name: Lint
         run: uv run ruff check .
 
+      - name: Type check
+        run: uv run ty check
+
       - name: Test
         run: uv run pytest
 
-      - name: Build package
-        run: uv build
+      - name: Build workspace packages
+        run: uv build --all-packages

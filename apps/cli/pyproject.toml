@@ -1,0 +1,17 @@
+[project]
+name = "sipx-cli"
+version = "0.1.0"
+description = "Command line interface for sipx workspace apps"
+requires-python = ">=3.14"
+dependencies = ["sipx", "sipx-softphone"]
+
+[project.scripts]
+sipx = "sipx_cli.main:main"
+
+[tool.uv.sources]
+sipx = { workspace = true }
+sipx-softphone = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

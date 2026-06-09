@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.7.1` fixes challenged in-dialog BYE Digest auth for real native softphone interop.
+Implement `sipx` in verified commit blocks. Block `1.8.0` splits the repo into a core-only root `sipx` package plus app-specific `uv` workspace packages under `apps/*`.
 
 ## Sources Read
 
@@ -217,6 +217,10 @@ Implement `sipx` in verified commit blocks. Block `1.7.1` fixes challenged in-di
 - Recorded `SPEC.md` B12 and V38 after a real confirmed call failed hangup when the proxy challenged BYE with `401 Unauthorized`.
 - Added one-shot Digest retry for in-dialog BYE and passed softphone account credentials into hangup.
 - Verified the real proxy flow reached authenticated BYE `200 OK`; no real account, proxy, number, or password values are persisted in repo files.
+- Bumped `pyproject.toml` version from `1.7.1` to `1.8.0`.
+- Added `apps/*` workspace packages for CLI, softphone, Asterisk, LLM, scenarios, STT, and TTS.
+- Moved app-specific LLM, softphone, Asterisk, examples, tests, and CLI code out of root `sipx`; root public API now exports core/protocol/native SIP surfaces only.
+- Marked `SPEC.md` T47 complete after workspace validation.
 
 ## Active Decision
 
@@ -227,7 +231,7 @@ Maintained English files in the current structure are the source of truth. `IDEA
 ## Next
 
 1. Decide license before public distribution and Asterisk/commercial positioning.
-2. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest tests/test_asterisk_integration.py` after starting `docker/asterisk`.
+2. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest apps/asterisk/tests/test_asterisk_integration.py` after starting `docker/asterisk`.
 3. Add richer fake media events, recording/transcript artifacts, and retention policy.
 4. Add RTP media send/receive, RFC4733 DTMF over RTP, then live SIP inspector and advanced RTP/media runtime behavior.
 5. Decide whether generic OpenAI-compatible LLM support is enough for the next AI block or whether to add a provider protocol before vendor-specific adapters.

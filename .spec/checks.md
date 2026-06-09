@@ -366,6 +366,18 @@
 | 2026-06-09 | final `git diff --check` | pass/no output | No whitespace errors after `1.7.1` fix. |
 | 2026-06-09 | final private marker/auth scan | pass/no matches | No real proxy/account/password/destination markers or unredacted SIP auth headers found in repo files. |
 | 2026-06-09 | final `uv build --out-dir /tmp/opencode/sipx-build-1.7.1-final` | pass | Built final `1.7.1` sdist and wheel outside the repo. |
+| 2026-06-09 | `uv init --package --build-backend hatch ... apps/*` | pass | Created `apps/llm`, `apps/softphone`, `apps/asterisk`, `apps/cli`, `apps/scenarios`, `apps/stt`, and `apps/tts` package skeletons, then replaced stubs with real package contents. |
+| 2026-06-09 | `uv lock` | pass | Updated lockfile for root `sipx` `1.8.0` and workspace app packages. |
+| 2026-06-09 | workspace CLI smoke | pass | `uv run --package sipx-cli sipx --help` and `sipx call --help` resolve through `apps/cli`. |
+| 2026-06-09 | moved examples smoke | pass | Moved LLM examples skip cleanly without key; moved native CLI flow prints `uv run --package sipx-cli sipx ...` commands. |
+| 2026-06-09 | root boundary smoke | pass | Root `sipx` import no longer exposes `LLMChatClient`, `AsteriskBackend`, or `NativeSoftphone`. |
+| 2026-06-09 | final `python -m pytest` | pass | 129 passed, 3 skipped after `1.8.0` workspace split. |
+| 2026-06-09 | final `ruff check .` | pass | All lint checks passed after workspace split. |
+| 2026-06-09 | final `ruff format --check .` | pass | 82 files already formatted after workspace split. |
+| 2026-06-09 | final `uv run ty check` | pass | Type-check gate passes after app packages were added to root dev workspace dependencies. |
+| 2026-06-09 | final `git diff --check` | pass/no output | No whitespace errors after workspace split. |
+| 2026-06-09 | final private marker/auth scan | pass/no matches | Scanned code, apps, tests, docs, and TOML for private proxy/account/password/destination markers, personal author stub, and unredacted SIP auth headers. |
+| 2026-06-09 | final `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.8.0-final-docs` | pass | Built root package plus all seven app package sdists/wheels outside the repo after docs/workflow updates. |
 
 ## Validation Policy
 

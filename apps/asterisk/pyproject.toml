@@ -1,0 +1,13 @@
+[project]
+name = "sipx-asterisk"
+version = "0.1.0"
+description = "Asterisk ARI backend and examples for sipx"
+requires-python = ">=3.14"
+dependencies = ["sipx"]
+
+[tool.uv.sources]
+sipx = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

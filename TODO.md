@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has harness core, mock backend, scenario artifacts, CLI run/export/replay/profile/phone/raw-SIP commands, reports, profiles, mixed actor binding, media protocol primitives, central redaction, SIP parser primitives, SDP audio offer/answer, RTP/DTMF primitives, SIP dialog/transaction skeletons, REGISTER request/helper flow, Digest auth helper, UAS INVITE skeleton, BYE helper, real UDP Native SIP transport/backend, strict UAC/UAS INVITE/ACK/BYE call flow, CANCEL runtime, REGISTER over-UDP orchestration, INVITE and BYE Digest retry, transaction retransmission timers, native parser fuzz tests, Asterisk ARI client/events, Asterisk channel/bridge/playback/hangup/DTMF timeline mapping, WebSocket media as the Asterisk media MVP path, inbound `Stasis(sipx)` example app, Docker Asterisk lab, headless native technical softphone engine, lab-only native SIP hooks for headers, SDP, receive events, timers, and malformed bytes, GitHub CI/release workflows adapted to the new project, fail-fast phone CLI config validation, redacted SIP packet debug output, native softphone SDP offer/answer negotiation, in-dialog SIP INFO DTMF, opt-in generic OpenAI-compatible LLM examples/tests, and passing `uv run ty check` validation.
+Implement `sipx` in small verified blocks. Current code now has root core `sipx` package for harness core, SIP/SDP/RTP/media/security primitives, MockBackend, and native SIP runtime, plus `uv` workspace app packages for CLI, softphone, Asterisk, LLM, scenarios, STT, and TTS. App packages import the root `sipx` core via workspace dependencies. The CLI command belongs to `apps/cli` and runs with `uv run --package sipx-cli sipx ...` from the repo root.
 
 ## Milestone 0 - Project Grounding
 
@@ -436,13 +436,24 @@ Implement `sipx` in small verified blocks. Current code now has harness core, mo
 - [x] Passed softphone account credentials from `NativeSoftphone.hangup()` into the backend hangup path.
 - [x] Added loopback regression coverage for challenged BYE retry without persisting passwords.
 
+## Block 1.8.0 Done
+
+- [x] Bumped root package version to `1.8.0`.
+- [x] Added `apps/*` as `uv` workspace packages with individual `pyproject.toml` files.
+- [x] Kept root `sipx` core-only and removed LLM, softphone, Asterisk, examples, and CLI exports from root public API.
+- [x] Moved LLM code/tests/examples to `apps/llm` as `sipx_llm`.
+- [x] Moved softphone code/tests/examples and Mizu profile to `apps/softphone` as `sipx_softphone`.
+- [x] Moved Asterisk backend/Stasis code/tests/templates to `apps/asterisk` as `sipx_asterisk`.
+- [x] Moved the console command implementation to `apps/cli` as `sipx_cli`; command is validated with `uv run --package sipx-cli sipx --help`.
+- [x] Added placeholder app packages for scenarios, STT, and TTS adapters.
+
 ## Blocked Or Pending
 
 - [ ] `python -m ty check` still needs the system interpreter environment synced; configured validation now uses passing `uv run ty check`.
 - [ ] Next Asterisk media path after WebSocket MVP remains open: AudioSocket or ExternalMedia RTP.
 - [ ] License decision remains open before public distribution and Asterisk/commercial positioning.
 - [ ] Silence/placeholder behavior when AI is slow remains pending.
-- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and system-interpreter tooling remain pending after 1.7.1.
+- [ ] Advanced media/runtime behavior, recordings/transcripts, UI, and system-interpreter tooling remain pending after 1.8.0.
 
 ## Open Questions
 
