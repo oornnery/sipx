@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.16.0 - 2026-06-09
+
+- Removed `SIPX_TARGET` requirement from invite examples; fallback to `s["aor"]` when unset.
+
 ## 1.15.0 - 2026-06-09
 
 - Removed `cast()` from `sipx/examples/manipulation.py` and `sipx/examples/smoke_tests.py`.

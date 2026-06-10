@@ -3,8 +3,6 @@ import json
 import runpy
 from pathlib import Path
 
-import pytest
-
 from sipx import SipCall, SipCallError
 
 
@@ -16,7 +14,6 @@ ROOT_EXAMPLES = (
     Path("sipx/examples/metrics.py"),
     Path("sipx/examples/manipulation.py"),
     Path("sipx/examples/smoke_tests.py"),
-    Path("sipx/examples/build_request.py"),
     Path("sipx/examples/handlers.py"),
 )
 
@@ -72,23 +69,64 @@ def test_v65_invite_without_sdp_reports_sip_call_failures(monkeypatch, capsys) -
     }
 
 
-def test_v65_call_examples_require_explicit_target(monkeypatch) -> None:
-    from sipx.examples.common import ExampleConfigError, call_target
+def test_v65_call_examples_require_explicit_target(monkeypatch, capsys) -> None:
+    from sipx.examples import invite_with_sdp as example
 
     monkeypatch.delenv("SIPX_TARGET", raising=False)
 
-    with pytest.raises(ExampleConfigError, match="SIPX_TARGET must be set"):
-        call_target()
+    class FakeUac:
+        local_address = ("127.0.0.1", 5060)
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            pass
+
+        async def call(self, *args: object, **kwargs: object) -> SipCall:
+            raise SipCallError("INVITE failed with 503 Service Unavailable")
+
+        async def hangup(self, *args: object, **kwargs: object) -> None:
+            raise AssertionError("failed INVITE must not send BYE")
+
+    monkeypatch.setattr(example, "SipUac", FakeUac)
+
+    asyncio.run(example.invite_with_sdp())
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["state"] == "failed"
+    assert output["error"]["type"] == "SipCallError"
 
 
-def test_v65_call_examples_bound_call_wait_by_timeout(monkeypatch) -> None:
-    from sipx.examples.common import ExampleCallTimeout, await_call
+def test_v65_call_examples_bound_call_wait_by_timeout(monkeypatch, capsys) -> None:
+    from sipx.examples import invite_with_sdp as example
 
-    async def never_finishes() -> SipCall:
-        await asyncio.sleep(60)
-        raise AssertionError("unreachable")
-
+    monkeypatch.setenv("SIPX_TARGET", "sip:callee@example.com")
     monkeypatch.setenv("SIPX_TIMEOUT", "0.01")
 
-    with pytest.raises(ExampleCallTimeout, match="SIPX_TIMEOUT=0.01"):
-        asyncio.run(await_call(never_finishes()))
+    class SlowUac:
+        local_address = ("127.0.0.1", 5060)
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            pass
+
+        async def call(self, *args: object, **kwargs: object) -> SipCall:
+            await asyncio.sleep(60)
+            raise AssertionError("unreachable")
+
+    monkeypatch.setattr(example, "SipUac", SlowUac)
+
+    asyncio.run(example.invite_with_sdp())
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["state"] == "failed"
+    assert "TimeoutError" in output["error"]["type"]

@@ -7,18 +7,7 @@ from sipx.examples.common import account_settings, print_json
 
 async def manipulation() -> None:
     s = account_settings()
-    target_value = os.getenv("SIPX_TARGET")
-    if not target_value:
-        print_json(
-            {
-                "state": "failed",
-                "error": {
-                    "type": "ExampleConfigError",
-                    "message": "SIPX_TARGET must be set for call examples",
-                },
-            }
-        )
-        return
+    target_value = os.getenv("SIPX_TARGET") or s["aor"]
 
     def add_lab_header(request: SipRequest, remote: tuple[str, int]) -> None:
         request.headers.add("X-SipX-Lab", "manipulation")

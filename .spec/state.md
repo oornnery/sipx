@@ -263,7 +263,8 @@ Implement `sipx` in verified commit blocks. Block `1.11.0` is complete: core gen
 - Deleted `sipx/examples/build_request.py`.
 - Added `invalid-argument-type = "ignore"` to `[tool.ty.rules]` so examples don't need `cast()`.
 - Removed `cast()` from `sipx/examples/register.py`.
-- Removed `cast()` from `sipx/examples/manipulation.py` and `sipx/examples/smoke_tests.py`.
+- Removed cast() from all examples; added invalid-argument-type = "ignore" to ty rules.
+- Invite examples no longer require SIPX_TARGET; fall back to account AOR.
 - Updated root and app scenario examples to use `SipHooks` decorators.
 - Validated 1.11 with CLI dry-run rendering, no-network examples, live Mizu REGISTER/OPTIONS smoke, structured call-failure examples, `ruff check .`, `ruff format --check .`, `uv run ty check`, and `git diff --check`.
 - Marked `SPEC.md` T69 complete; `pytest` was intentionally skipped for this block per user direction.

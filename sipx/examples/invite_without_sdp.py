@@ -7,18 +7,7 @@ from sipx.examples.common import account_settings, print_json
 
 async def invite_without_sdp() -> None:
     s = account_settings()
-    target_value = os.getenv("SIPX_TARGET")
-    if not target_value:
-        print_json(
-            {
-                "state": "failed",
-                "error": {
-                    "type": "ExampleConfigError",
-                    "message": "SIPX_TARGET must be set for call examples",
-                },
-            }
-        )
-        return
+    target_value = os.getenv("SIPX_TARGET") or s["aor"]
     aor = SipUri.parse(s["aor"])
     target = SipUri.parse(target_value)
     async with SipUserAgent(
