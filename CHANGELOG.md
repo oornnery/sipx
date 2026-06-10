@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.15.0 - 2026-06-09
+
+- Removed `cast()` from `sipx/examples/manipulation.py` and `sipx/examples/smoke_tests.py`.
+
 ## 1.14.0 - 2026-06-09
 
 - Removed `cast()` from `sipx/examples/invite_without_sdp.py`, `sipx/examples/invite_with_sdp.py`, and `sipx/examples/metrics.py`.
