@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -14,13 +14,12 @@ from sipx.rtp.sink import RtpSink
 from sipx.media import PyAudioInputSource, ensure_pyaudio_available
 from sipx.sdp import SessionDescription
 from sipx.sip.message import DEFAULT_MAX_MESSAGE_SIZE
-from sipx.sip.transport import SipWireEvent, UdpAddress
+from sipx.sip.transport import UdpAddress
 from sipx.sip.uri import SipUri
 from sipx.ua import (
+    EventHooks,
     SipCall,
     SipCallState,
-    SipHandlers,
-    SipHooks,
     SipProvisionalResponse,
     SipRetransmissionPolicy,
     SipUserAgent,
@@ -59,9 +58,7 @@ class SipUas(SipUserAgent):
         actor_id: str | None = None,
         max_message_size: int = DEFAULT_MAX_MESSAGE_SIZE,
         retransmission_policy: SipRetransmissionPolicy | None = None,
-        lab_hooks: SipHooks | None = None,
-        handlers: SipHandlers | None = None,
-        wire_event_handler: Callable[[SipWireEvent], None] | None = None,
+        event_hooks: EventHooks | None = None,
         compact_headers: bool = False,
     ) -> None:
         super().__init__(
@@ -72,9 +69,7 @@ class SipUas(SipUserAgent):
             actor_id=actor_id,
             max_message_size=max_message_size,
             retransmission_policy=retransmission_policy,
-            lab_hooks=lab_hooks,
-            handlers=handlers,
-            wire_event_handler=wire_event_handler,
+            event_hooks=event_hooks,
             compact_headers=compact_headers,
         )
         if timeout <= 0:
@@ -228,6 +223,9 @@ class SipUas(SipUserAgent):
     async def _open_rtp_session(self) -> RtpAudioSession:
         host = self.rtp_bind_host or self.local_address[0]
         codec = self.codecs[0].upper()
+        rtp_event_hooks: dict[str, list[Any]] | None = None
+        if "rtp" in self.event_hooks:
+            rtp_event_hooks = {"rtp": self.event_hooks.get("rtp", [])}
         return await RtpAudioSession.open(
             RtpAudioSessionConfig(
                 local_host=host,
@@ -236,6 +234,7 @@ class SipUas(SipUserAgent):
                 payload_type=_payload_type(codec),
                 jitter_buffer_ms=self.jitter_buffer_ms,
                 max_jitter_buffer_ms=max(200, self.jitter_buffer_ms),
+                event_hooks=rtp_event_hooks,
             )
         )
 

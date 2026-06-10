@@ -79,6 +79,6 @@
 | D75 | 2026-06-09 | Break old single-provisional UAS API in favor of `provisionals`. | No users depend on old params; `provisionals=None|()|(...)` is simpler, Pythonic, and closer to RFC 3261 `0+` provisional responses. |
 | D76 | 2026-06-09 | Direct SIP examples may live under `sipx.examples`. | Root examples use only SIP root APIs and env vars, while harness/app examples stay outside root package. |
 | D77 | 2026-06-09 | Root call examples require explicit `SIPX_TARGET` and bounded waits. | Public demo has no safe universal call target; examples should not call own AOR by default or hang after provisional-only behavior. |
-| D78 | 2026-06-09 | Use `SipHooks`/`SipHandlers` decorator APIs without compatibility aliases. | Hooks mutate lab traffic, handlers observe events, and the project does not keep old public names. |
+| D78 | 2026-06-09 | Use `event_hooks` httpx-style dict without compatibility aliases. | httpx pattern is simpler, well-known, and side-effect only. `SipHooks`/`SipHandlers` decorator APIs removed. |
 | D79 | 2026-06-09 | Summaries stay dataclasses; JSON conversion happens at CLI/example edge. | Keeps core Python API typed while preserving structured output for command-line users. |
 | D80 | 2026-06-09 | Compact headers and advertised capabilities are explicit opt-ins. | Avoids changing default canonical wire output or claiming unsupported SIP features. |

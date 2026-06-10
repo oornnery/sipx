@@ -21,7 +21,7 @@ from sipx.sip import (
 )
 from sipx.sdp import create_audio_offer
 from sipx.sip.transport import SipWireEvent
-from sipx.ua import SipHooks, SipRetransmissionPolicy, SipUserAgent
+from sipx.ua import EventHooks, SipRetransmissionPolicy, SipUserAgent
 from sipx.uac import SipUac
 from sipx.uas import SipUas
 
@@ -53,7 +53,7 @@ class PhoneCommandConfig:
     actor_id: str = "sip-client"
     timeout: float = 1.0
     retransmission_policy: SipRetransmissionPolicy | None = None
-    lab_hooks: SipHooks | None = None
+    event_hooks: EventHooks | None = None
     media_host: str | None = None
     rtp_bind_host: str | None = None
     rtp_advertise_host: str | None = None
@@ -201,7 +201,7 @@ async def run_sip_request(args: argparse.Namespace) -> int:
         local_port=command.local_port,
         mode=command.mode,
         actor_id=command.actor_id,
-        wire_event_handler=_debug_sip_event if command.debug_sip else None,
+        event_hooks=_build_event_hooks(command.debug_sip),
         compact_headers=command.compact_headers,
     ) as user_agent:
         contact = _contact_uri(
@@ -614,8 +614,7 @@ def _sip_uac(command: PhoneCommandConfig) -> SipUac:
         mode=command.mode,
         actor_id=command.actor_id,
         retransmission_policy=command.retransmission_policy,
-        lab_hooks=command.lab_hooks,
-        wire_event_handler=_debug_sip_event if command.debug_sip else None,
+        event_hooks=_build_event_hooks(command.debug_sip),
     )
 
 
@@ -638,8 +637,7 @@ def _sip_uas(command: PhoneCommandConfig) -> SipUas:
         mode=command.mode,
         actor_id=command.actor_id,
         retransmission_policy=command.retransmission_policy,
-        lab_hooks=command.lab_hooks,
-        wire_event_handler=_debug_sip_event if command.debug_sip else None,
+        event_hooks=_build_event_hooks(command.debug_sip),
     )
 
 
@@ -1010,6 +1008,12 @@ def _debug_sip_event(event: SipWireEvent) -> None:
     text = _redact_sip_text(text)
     print(text, end="" if text.endswith("\n") else "\n", file=sys.stderr)
     print(f"--- END SIP {direction} ---", file=sys.stderr)
+
+
+def _build_event_hooks(debug_sip: bool) -> EventHooks | None:
+    if not debug_sip:
+        return None
+    return {"wire": [_debug_sip_event]}
 
 
 def _redact_sip_text(text: str) -> str:

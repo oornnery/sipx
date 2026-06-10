@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.11.0` is complete: core generic request helpers, dataclass summaries, decorator `SipHooks`/`SipHandlers`, explicit capabilities, compact header serialization, CLI message dry-run, and extra direct examples.
+Implement `sipx` in verified commit blocks. Block `1.19.0` is complete: RTP wire event hooks (`RtpWireEvent`/`RtpWireDirection`), `event_hooks["rtp"]` support in `RtpAudioSessionConfig`, `debug_wire_rtp()` example helper with bordered SSRC/seq/ts/pt output, wired through `SipUac`/`SipUas`, and enabled in `metrics.py`/`invite_with_sdp.py` examples.
 
 ## Sources Read
 
@@ -288,6 +288,13 @@ Implement `sipx` in verified commit blocks. Block `1.11.0` is complete: core gen
 - Recorded `SPEC.md` V49/T55/B17 for root media boundary and V50/T56/B18 for redaction evidence shape.
 - Moved generic `Redactor`/`default_redactor` to `sipx_harness.redaction` and removed root `sipx.security`.
 - Recorded `SPEC.md` V51/T57/B19 for generic redaction leaking into root `sipx`.
+- Added `RtpWireEvent`/`RtpWireDirection` dataclasses and `event_hooks["rtp"]` on `RtpAudioSessionConfig`.
+- Added `debug_wire_rtp()` to `sipx.examples.common` for RTP packet tx/rx visibility with bordered output.
+- Wired `event_hooks["rtp"]` through `SipUac`/`SipUas` into `RtpAudioSession`.
+- Exported new RTP wire symbols from `sipx.rtp` and root `sipx.__init__`.
+- Enabled `debug_wire_rtp` in `metrics.py` and `invite_with_sdp.py` examples.
+- 90 core tests pass; ruff/type-check clean.
+- Bumped root package version to `1.19.0`.
 
 ## Active Decision
 

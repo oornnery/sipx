@@ -70,6 +70,10 @@ class SipCallState(StrEnum):
     TERMINATED = "terminated"
     FAILED = "failed"
 
+    @property
+    def is_established(self) -> bool:
+        return self is SipCallState.CONFIRMED
+
 
 @dataclass(frozen=True, slots=True)
 class SipRetransmissionPolicy:
@@ -145,139 +149,8 @@ class SipProvisionalResponse:
         )
 
 
-class SipHooks:
-    def __init__(
-        self,
-        *,
-        before_send_message: (
-            Callable[[SipMessage, UdpAddress], SipMessage | bytes | None] | None
-        ) = None,
-        before_sdp_body: Callable[[SipMessage, bytes], bytes | None] | None = None,
-        after_receive_event: Callable[[SipWireEvent], SipWireEvent | None]
-        | None = None,
-        retransmission_intervals: (
-            Callable[
-                [SipMessage, UdpAddress, tuple[float, ...]], tuple[float, ...] | None
-            ]
-            | None
-        ) = None,
-    ) -> None:
-        self._before_send_message = before_send_message
-        self._before_sdp_body = before_sdp_body
-        self._after_receive_event = after_receive_event
-        self._retransmission_intervals = retransmission_intervals
-
-    def before_send_message(
-        self,
-        handler: Callable[[SipMessage, UdpAddress], SipMessage | bytes | None]
-        | None = None,
-    ):
-        def register(
-            candidate: Callable[[SipMessage, UdpAddress], SipMessage | bytes | None],
-        ):
-            self._before_send_message = candidate
-            return candidate
-
-        return register if handler is None else register(handler)
-
-    def before_sdp_body(
-        self,
-        handler: Callable[[SipMessage, bytes], bytes | None] | None = None,
-    ):
-        def register(candidate: Callable[[SipMessage, bytes], bytes | None]):
-            self._before_sdp_body = candidate
-            return candidate
-
-        return register if handler is None else register(handler)
-
-    def after_receive_event(
-        self,
-        handler: Callable[[SipWireEvent], SipWireEvent | None] | None = None,
-    ):
-        def register(candidate: Callable[[SipWireEvent], SipWireEvent | None]):
-            self._after_receive_event = candidate
-            return candidate
-
-        return register if handler is None else register(handler)
-
-    def retransmission_intervals(
-        self,
-        handler: Callable[
-            [SipMessage, UdpAddress, tuple[float, ...]], tuple[float, ...] | None
-        ]
-        | None = None,
-    ):
-        def register(
-            candidate: Callable[
-                [SipMessage, UdpAddress, tuple[float, ...]], tuple[float, ...] | None
-            ],
-        ):
-            self._retransmission_intervals = candidate
-            return candidate
-
-        return register if handler is None else register(handler)
-
-    def run_before_send_message(
-        self, message: SipMessage, remote: UdpAddress
-    ) -> SipMessage | bytes | None:
-        if self._before_send_message is None:
-            return None
-        return self._before_send_message(message, remote)
-
-    def run_before_sdp_body(self, message: SipMessage, body: bytes) -> bytes | None:
-        if self._before_sdp_body is None:
-            return None
-        return self._before_sdp_body(message, body)
-
-    def run_after_receive_event(self, event: SipWireEvent) -> SipWireEvent | None:
-        if self._after_receive_event is None:
-            return event
-        return self._after_receive_event(event)
-
-    def run_retransmission_intervals(
-        self,
-        message: SipMessage,
-        remote: UdpAddress,
-        intervals: tuple[float, ...],
-    ) -> tuple[float, ...] | None:
-        if self._retransmission_intervals is None:
-            return None
-        return self._retransmission_intervals(message, remote, intervals)
-
-
-class SipHandlers:
-    def __init__(self) -> None:
-        self._wire_event_handlers: list[Callable[[SipWireEvent], None]] = []
-        self._request_handlers: list[Callable[[SipRequest, UdpAddress], None]] = []
-        self._response_handlers: list[Callable[[SipResponse, UdpAddress], None]] = []
-
-    def on_wire_event(
-        self, handler: Callable[[SipWireEvent], None]
-    ) -> Callable[[SipWireEvent], None]:
-        self._wire_event_handlers.append(handler)
-        return handler
-
-    def on_request(
-        self, handler: Callable[[SipRequest, UdpAddress], None]
-    ) -> Callable[[SipRequest, UdpAddress], None]:
-        self._request_handlers.append(handler)
-        return handler
-
-    def on_response(
-        self, handler: Callable[[SipResponse, UdpAddress], None]
-    ) -> Callable[[SipResponse, UdpAddress], None]:
-        self._response_handlers.append(handler)
-        return handler
-
-    def emit(self, event: SipWireEvent) -> None:
-        for handler in self._wire_event_handlers:
-            handler(event)
-        if isinstance(event.message, SipRequest):
-            for handler in self._request_handlers:
-                handler(event.message, event.remote)
-        elif isinstance(event.message, SipResponse):
-            for handler in self._response_handlers:
-                handler(event.message, event.remote)
+EventHooks = dict[str, list[Callable[..., None]]]
+LAB_ONLY_EVENTS = frozenset({"sdp", "retransmission"})
 
 
 @dataclass(slots=True)
@@ -289,6 +162,10 @@ class SipCall:
     state: SipCallState = SipCallState.CONFIRMED
     local_sdp: SessionDescription | None = None
     remote_sdp: SessionDescription | None = None
+
+    @property
+    def is_established(self) -> bool:
+        return self.state is SipCallState.CONFIRMED
 
     def summary(self, *, started: float | None = None):
         from sipx.summary import call_summary
@@ -468,15 +345,15 @@ class SipUserAgent(SipUacRuntime, SipUasRuntime):
         actor_id: str | None = None,
         max_message_size: int = DEFAULT_MAX_MESSAGE_SIZE,
         retransmission_policy: SipRetransmissionPolicy | None = None,
-        lab_hooks: SipHooks | None = None,
-        handlers: SipHandlers | None = None,
-        wire_event_handler: Callable[[SipWireEvent], None] | None = None,
+        event_hooks: EventHooks | None = None,
         compact_headers: bool = False,
     ) -> None:
         if mode not in {"strict", "lab"}:
             raise ValueError("mode must be strict or lab")
-        if mode != "lab" and lab_hooks is not None:
-            raise ValueError("lab_hooks require lab mode")
+        if mode != "lab" and event_hooks is not None:
+            for event_name in event_hooks:
+                if event_name in LAB_ONLY_EVENTS:
+                    raise ValueError(f"event_hooks['{event_name}'] requires lab mode")
         self.mode = mode
         self.timeline = timeline
         self.actor_id = actor_id
@@ -487,10 +364,7 @@ class SipUserAgent(SipUacRuntime, SipUasRuntime):
             max_message_size=max_message_size,
             compact_headers=compact_headers,
         )
-        self.lab_hooks = lab_hooks
-        self.handlers = handlers or SipHandlers()
-        if wire_event_handler is not None:
-            self.handlers.on_wire_event(wire_event_handler)
+        self.event_hooks: EventHooks = dict(event_hooks) if event_hooks else {}
 
     @property
     def local_address(self) -> UdpAddress:
@@ -558,18 +432,11 @@ class SipUserAgent(SipUacRuntime, SipUasRuntime):
         return event
 
     async def receive_event(self, *, timeout: float | None = None) -> SipWireEvent:
-        deadline = time.monotonic() + timeout if timeout is not None else None
-        while True:
-            remaining = None if deadline is None else deadline - time.monotonic()
-            if remaining is not None and remaining <= 0:
-                raise SipUdpError("timed out waiting for SIP datagram")
-            event = await self.endpoint.receive_event(timeout=remaining)
-            event = self._apply_after_receive_hook(event)
-            if event is None:
-                continue
-            self._emit_wire_event(event)
-            self._record_event(event)
-            return event
+        event = await self.endpoint.receive_event(timeout=timeout)
+        self._apply_after_receive_hooks(event)
+        self._emit_wire_event(event)
+        self._record_event(event)
+        return event
 
     async def receive_response(
         self,
@@ -1419,44 +1286,36 @@ class SipUserAgent(SipUacRuntime, SipUasRuntime):
         self._record(sip_wire_event_name(event), data=_event_data(event))
 
     def _emit_wire_event(self, event: SipWireEvent) -> None:
-        self.handlers.emit(event)
+        for hook in self.event_hooks.get("wire", []):
+            hook(event)
+        if isinstance(event.message, SipRequest):
+            for hook in self.event_hooks.get("request", []):
+                hook(event.message, event.remote)
+        elif isinstance(event.message, SipResponse):
+            for hook in self.event_hooks.get("response", []):
+                hook(event.message, event.remote)
 
     def _send_message(self, message: SipMessage, remote: UdpAddress) -> SipWireEvent:
         outbound = self._apply_before_send_hooks(message, remote)
-        if isinstance(outbound, bytes):
-            return self.endpoint.send_raw(outbound, remote)
         return self.endpoint.send_message(outbound, remote)
 
     def _apply_before_send_hooks(
         self,
         message: SipMessage,
         remote: UdpAddress,
-    ) -> SipMessage | bytes:
-        hooks = self.lab_hooks
-        if hooks is None:
-            return message
-
-        outbound: SipMessage | bytes = _copy_message(message)
-        hooked = hooks.run_before_send_message(outbound, remote)
-        if hooked is not None:
-            outbound = hooked
-        if isinstance(outbound, bytes):
-            return outbound
-
+    ) -> SipMessage:
+        outbound = _copy_message(message)
+        for hook in self.event_hooks.get("request", []):
+            hook(outbound, remote)
         if _is_sdp(outbound):
-            body = hooks.run_before_sdp_body(outbound, outbound.body)
-            if body is not None:
-                outbound.body = body
+            for hook in self.event_hooks.get("sdp", []):
+                hook(outbound, outbound.body)
         return outbound
 
-    def _apply_after_receive_hook(
-        self,
-        event: SipWireEvent,
-    ) -> SipWireEvent | None:
-        hooks = self.lab_hooks
-        if hooks is None:
-            return event
-        return hooks.run_after_receive_event(event)
+    def _apply_after_receive_hooks(self, event: SipWireEvent) -> None:
+        if isinstance(event.message, SipResponse):
+            for hook in self.event_hooks.get("response", []):
+                hook(event.message, event.remote)
 
     async def _send_with_retransmissions(
         self,
@@ -1487,15 +1346,12 @@ class SipUserAgent(SipUacRuntime, SipUasRuntime):
         message: SipMessage,
         remote: UdpAddress,
     ) -> tuple[float, ...]:
-        intervals = self.retransmission_policy.intervals()
-        hooks = self.lab_hooks
-        if hooks is not None:
-            hooked = hooks.run_retransmission_intervals(message, remote, intervals)
-            if hooked is not None:
-                intervals = hooked
+        intervals = list(self.retransmission_policy.intervals())
+        for hook in self.event_hooks.get("retransmission", []):
+            hook(message, remote, intervals)
         if any(interval <= 0 for interval in intervals):
             raise ValueError("retransmission intervals must be positive")
-        return intervals
+        return tuple(intervals)
 
     async def _stop_retransmission(
         self,

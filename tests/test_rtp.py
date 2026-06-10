@@ -3,7 +3,6 @@ import asyncio
 import pytest
 
 from sipx import (
-    G711Error,
     RtpAudioSession,
     RtpAudioSessionConfig,
     RtpJitterBuffer,
@@ -18,6 +17,7 @@ from sipx import (
     encode_pcmu,
     encode_dtmf_event,
 )
+from sipx.rtp import G711Error
 
 
 def test_rtp_packet_round_trip() -> None:

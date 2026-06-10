@@ -13,6 +13,6 @@
 | O9 | PJSIP runtime priority? | after SIP lab mode and Asterisk lab; only if interop demand appears | Before optional runtime work. |
 | O11 | Slow AI media behavior? | silence, comfort tone, waiting prompt, configurable policy | Before real STT/TTS/LLM runtime. |
 | O12 | Advanced RTP depth after fixed jitter buffer/session? | adaptive jitter, RTCP, impairment, payload validation | After CLI RTP metrics and basic audio modes prove operational behavior. |
-| O13 | Next SIP/UAC/UAS layer after 1.11.0? | live SIP inspector, RFC4733 RTP DTMF send, recording/transcript capture | After generic request helpers, summaries, hooks/handlers, and CLI dry-run are validated. |
+| O13 | Next SIP/UAC/UAS layer after 1.11.0? | live SIP inspector, RFC4733 RTP DTMF send, recording/transcript capture | After event_hooks, summaries, compact headers, and CLI dry-run are validated. |
 | O14 | Release draft policy? | keep latest draft only, publish manually, automate cleanup | Before first public `sipx` release is published. |
 | O15 | LLM provider scope? | OpenAI-compatible client only, provider protocol, or vendor-specific adapters | Before building AI media agents beyond templates. |

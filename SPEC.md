@@ -63,8 +63,7 @@ api: `SipUac` → high-level outbound `register`, `unregister`, `options`, `mess
 api: `SipUas` → high-level inbound `listen`, `answer`, `reject`, `answer_bye`, re-INVITE handling.
 api: `SipCall` → `hangup`, `send_dtmf`, `mute_send`, `unmute_send`, `hold`, `resume`, `metrics`.
 api: `SipProvisionalResponse` → configured INVITE `1xx` response: status/reason/body/content-type.
-api: `SipHooks` → decorator-style lab mutation hooks for outbound message, SDP body, received event, retransmission intervals.
-api: `SipHandlers` → decorator-style observation handlers for wire events, requests, and responses.
+api: `event_hooks` → httpx-style dict of event name to list of callables; events: `request`, `response`, `wire`, `sdp`, `retransmission`; side-effect only; `sdp` and `retransmission` require lab mode.
 api: `Sip*Summary` → dataclass snapshots for request/response/call/SDP output and JSON export.
 api: `SipCapabilities` → explicit `Accept`/`Allow`/`Allow-Events`/`Supported` header declaration; no implicit unsupported features.
 api: `RtpAudioSession` → UDP RTP send/receive, codec encode/decode, jitter buffer, metrics snapshot.
@@ -144,7 +143,7 @@ V38: SIP auth ! confirmed SIP calls receiving `401|407` to in-dialog `BYE` retry
 V39: package boundaries ! importing root `sipx` does not import/export Harness, Mock, Timeline, Scenario, LLM, softphone, Asterisk, CLI, or app examples.
 V40: workspace apps ! each `apps/*` package has own `pyproject.toml`, imports `sipx` as workspace dependency, and exposes app tests/examples without mutating root core package.
 V41: CLI ownership ! console command `sipx` belongs to `apps/cli`; root core package has no console script and no `sipx.cli` module.
-V42: public SIP runtime naming ! use `SipUserAgent`, `SipUac`, `SipUas`, `SipCall`, `SipHooks`, and `SipRetransmissionPolicy`; `Native*` runtime aliases ⊥.
+V42: public SIP runtime naming ! use `SipUserAgent`, `SipUac`, `SipUas`, `SipCall`, and `SipRetransmissionPolicy`; `Native*` runtime aliases ⊥.
 V43: INVITE UAC timeout ! before first matching `1xx|2xx|3xx|4xx|5xx`, `timeout` detects no response; after matching provisional `1xx`, call waits for final response or caller cancellation, not `SipUdpError` no-datagram timeout.
 V44: test boundary ! `python -m pytest`/`uv run pytest` from root runs core `sipx` tests only; app tests require explicit app path/package.
 V45: runtime contracts ! `MockRuntime` implements harness call-control/DTMF ABCs; `SipUserAgent` implements SIP wire/UAC/UAS ABCs; capability checks remain fail-loud.
@@ -172,7 +171,8 @@ V66: summaries ! return dataclass snapshots; JSON conversion happens at CLI/exam
 V67: SIP request auth/matching ! owned by `SipUserAgent.request`; CLI/examples ⊥ duplicate Digest challenge or CSeq response matching.
 V68: compact headers ! parser expands compact names; serializer ? compact when explicitly requested; default canonical.
 V69: SIP advertised capabilities ! explicit user/config input only; ⊥ claim unsupported `Allow`/`Allow-Events` features by default.
-V70: hooks/handlers split ! hooks mutate only in lab mode; handlers observe without mutation and work as decorators.
+V70: event_hooks ! httpx-style dict; `sdp` and `retransmission` events require lab mode; all hooks are side-effect only (return value ignored).
+V71: RTP wire events ! expose tx/rx `RtpWireEvent` with direction, remote, raw bytes, parsed packet, and optional parse error; `event_hooks["rtp"]` fire on every RTP send/receive across all audio modes.
 
 ## §T
 
@@ -246,7 +246,8 @@ T65|x|add CLI audio/jitter/metrics flags for `call` and `listen`|V54,V55,V56,V57
 T66|x|add optional PyAudio mode via lazy dependency path|C25,V55,I.api,I.cmd
 T67|x|add configurable INVITE provisional response API for UAS|V62,V63,I.api,I.proto
 T68|x|add direct root Mizu examples using generic SIP env vars, no argparse|C18,V64,I.pkg
-T69|x|add core request helpers, dataclass summaries, decorator hooks/handlers, compact headers, capabilities, and CLI dry-run message rendering|V29,V30,V33,V58,V66,V67,V68,V69,V70,I.api,I.cmd
+T69|x|add core request helpers, dataclass summaries, event_hooks httpx-style dict, compact headers, capabilities, and CLI dry-run message rendering|V29,V30,V33,V58,V66,V67,V68,V69,V70,I.api,I.cmd
+T70|x|add RTP wire event hooks and `debug_wire_rtp` example helper|V71,I.api
 
 ## §B
 

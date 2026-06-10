@@ -302,24 +302,23 @@ await uas.answer(
 )
 ```
 
-Hooks mutate SIP traffic only in `lab` mode. Handlers observe traffic and can be registered as decorators:
+Event hooks follow the httpx pattern: a dict mapping event names to lists of callables. Events `sdp` and `retransmission` require `mode="lab"`. All hooks are side-effect only (return value is ignored):
 
 ```python
-from sipx import SipHandlers, SipHooks, SipMessage, SipRequest
+from sipx import SipRequest, SipUac
 
-hooks = SipHooks()
+def add_header(request: SipRequest, remote: tuple[str, int]) -> None:
+    request.headers.add("X-Lab", "yes")
 
-@hooks.before_send_message
-def add_header(message: SipMessage, remote: tuple[str, int]) -> SipMessage:
-    if isinstance(message, SipRequest):
-        message.headers.add("X-Lab", "yes")
-    return message
-
-handlers = SipHandlers()
-
-@handlers.on_response
 def record_response(response, remote):
-    print(response.summary())
+    print(response.status_code)
+
+async with SipUac(
+    ...,
+    mode="lab",
+    event_hooks={"request": [add_header], "response": [record_response]},
+) as uac:
+    await uac.register()
 ```
 
 Summaries are dataclasses. Convert them to JSON at the CLI/example edge with `dataclasses.asdict()` or a JSON helper:

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from random import randrange
 from typing import Literal
 
@@ -17,6 +19,24 @@ from sipx.sip.transport import UdpAddress
 RtpAudioMode = Literal["silence", "noise"]
 
 
+class RtpWireDirection(StrEnum):
+    RX = "rx"
+    TX = "tx"
+
+
+@dataclass(frozen=True, slots=True)
+class RtpWireEvent:
+    direction: RtpWireDirection
+    remote: UdpAddress
+    raw: bytes
+    packet: RtpPacket | None = None
+    error: str | None = None
+
+    @property
+    def is_error(self) -> bool:
+        return self.error is not None
+
+
 @dataclass(frozen=True, slots=True)
 class RtpAudioSessionConfig:
     remote: UdpAddress | None = None
@@ -28,6 +48,7 @@ class RtpAudioSessionConfig:
     jitter_buffer_ms: int = 60
     max_jitter_buffer_ms: int = 200
     ssrc: int | None = None
+    event_hooks: dict[str, list[Callable[[RtpWireEvent], None]]] | None = None
 
     def __post_init__(self) -> None:
         if not self.local_host:
@@ -93,6 +114,9 @@ class RtpAudioSession:
             max_ms=config.max_jitter_buffer_ms,
             concealment_payload=self._silence_payload(),
         )
+        self._rtp_hooks: list[Callable[[RtpWireEvent], None]] = list(
+            (config.event_hooks or {}).get("rtp", [])
+        )
 
     @classmethod
     async def open(cls, config: RtpAudioSessionConfig) -> RtpAudioSession:
@@ -157,10 +181,12 @@ class RtpAudioSession:
             ssrc=self._ssrc,
             payload=payload,
         )
-        self._transport.sendto(packet.to_bytes(), target)
+        raw = packet.to_bytes()
+        self._transport.sendto(raw, target)
         self._metrics.record_tx(packet)
         self._sequence_number = (self._sequence_number + 1) & 0xFFFF
         self._timestamp = (self._timestamp + self._samples_per_frame()) & 0xFFFFFFFF
+        self._fire_rtp_hooks(RtpWireDirection.TX, raw, packet, remote=target)
         return packet
 
     async def send_synthetic(
@@ -196,8 +222,15 @@ class RtpAudioSession:
         datagram = await self._protocol.receive(timeout=timeout)
         try:
             packet = RtpPacket.parse(datagram.data)
-        except RtpParseError:
+        except RtpParseError as exc:
             self._metrics.rx.record_parse_error()
+            self._fire_rtp_hooks(
+                RtpWireDirection.RX,
+                datagram.data,
+                None,
+                remote=datagram.remote,
+                error=str(exc),
+            )
             raise
         self._metrics.record_rx(
             packet,
@@ -206,6 +239,12 @@ class RtpAudioSession:
         )
         if packet.payload_type == self.config.payload_type:
             self._jitter_buffer.push(packet)
+        self._fire_rtp_hooks(
+            RtpWireDirection.RX,
+            datagram.data,
+            packet,
+            remote=datagram.remote,
+        )
         return packet
 
     async def receive_frame(self, *, timeout: float = 1.0) -> AudioFrame:
@@ -240,6 +279,27 @@ class RtpAudioSession:
 
     def _samples_per_frame(self) -> int:
         return G711_SAMPLE_RATE * self.config.ptime_ms // 1000
+
+    def _fire_rtp_hooks(
+        self,
+        direction: RtpWireDirection,
+        raw: bytes,
+        packet: RtpPacket | None,
+        *,
+        remote: UdpAddress | None = None,
+        error: str | None = None,
+    ) -> None:
+        if not self._rtp_hooks:
+            return
+        event = RtpWireEvent(
+            direction=direction,
+            remote=(remote or self.config.remote or ("", 0)),
+            raw=raw,
+            packet=packet,
+            error=error,
+        )
+        for hook in self._rtp_hooks:
+            hook(event)
 
     def _silence_payload(self) -> bytes:
         pcm = bytes(self._samples_per_frame() * 2)

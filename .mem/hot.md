@@ -97,8 +97,7 @@
 - `sipx_asterisk.stasis` now has an inbound `Stasis(sipx)` example with minimal config snippets and no-Asterisk tests.
 - `sipx-softphone` / `sipx_softphone` public package was removed in block `1.9.0`; high-level SIP phone ergonomics live in root `SipUac`/`SipUas`.
 - SIP scenario templates live under `apps/scenarios/examples`; direct root SIP examples live under `sipx.examples`.
-- `SipHooks` is decorator-style, lab-only, and mutates before-send messages/raw bytes, before-SDP body, after-receive events, and retransmission intervals.
-- `SipHandlers` is decorator-style observation for wire events, requests, and responses; handlers do not mutate traffic.
+- `event_hooks` is httpx-style dict on `SipUserAgent`/`SipUac`/`SipUas`. Events: `request`, `response`, `wire`, `sdp`, `retransmission`. Side-effect only. `sdp`/`retransmission` require lab mode.
 - `SipCapabilities` declares only explicit `Accept`, `Allow`, `Allow-Events`, and `Supported` headers; root/CLI must not claim unsupported features by default.
 - SIP request/response/call/SDP summaries are dataclasses; JSON conversion happens at CLI/example edge.
 - `ScenarioRecorder` exports timeline/user actions to Python or YAML; `Timeline.read_jsonl()` supports replay/export input.

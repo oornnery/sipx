@@ -1,12 +1,17 @@
 import asyncio
 
 from sipx import SipCallError, SipUac
-from sipx.examples.common import account_settings, debug_wire, print_json
+from sipx.examples.common import (
+    account_settings,
+    debug_wire,
+    debug_wire_rtp,
+    print_json,
+)
 
 
 async def invite_with_sdp() -> None:
     s = account_settings()
-    target_value = s["target"]
+    target_value = "sip:2222@demo.mizu-voip.com:37075"
     audio = s["audio"]
     async with SipUac(
         aor=s["aor"],
@@ -18,7 +23,7 @@ async def invite_with_sdp() -> None:
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
-        event_hooks={"wire": [debug_wire]},
+        event_hooks={"wire": [debug_wire], "rtp": [debug_wire_rtp]},
     ) as uac:
         try:
             call = await asyncio.wait_for(
@@ -39,6 +44,8 @@ async def invite_with_sdp() -> None:
                 "state": call.state.value,
             }
         )
+        if call.state.is_established:
+            await asyncio.sleep(5)
         await uac.hangup(call)
 
 

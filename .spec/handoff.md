@@ -2,7 +2,7 @@
 
 ## Summary
 
-Block `1.11.0` is complete at `SPEC.md` T69. Root `sipx` is SIP/SDP/RTP/media primitives plus `SipUserAgent`/`SipUac`/`SipUas` and direct SIP-only examples; Harness/Mock/Timeline/Scenario/redaction live in `apps/harness` as `sipx_harness`. The `sipx` console command in `apps/cli` stays SIP/RTP-only with top-level `options`, `message`, `request`, `register`, `unregister`, `call`, and `listen`. UAS answer behavior uses `SipProvisionalResponse`. Optional PyAudio input remains lazy. Direct examples live under `sipx.examples`, use generic SIP env vars, default REGISTER/OPTIONS to public Mizu demo values, require explicit `SIPX_TARGET` for calls, bound call waits by `SIPX_TIMEOUT`, have no `argparse`, and report config/call/timeout errors as structured JSON. New 1.11 surfaces: `SipHooks`, `SipHandlers`, `SipCapabilities`, dataclass summaries, compact headers, and CLI `--print-message`.
+Block `1.19.0` added RTP wire event hooks: `RtpWireEvent`/`RtpWireDirection` dataclasses, `event_hooks["rtp"]` support in `RtpAudioSessionConfig`, `debug_wire_rtp()` example helper with bordered SSRC/seq/ts/pt/payload output, wired through `SipUac`/`SipUas`, and enabled in `metrics.py`/`invite_with_sdp.py`. All 90 core tests, ruff lint/format, and type check pass.
 
 ## Read First
 
@@ -22,6 +22,7 @@ Block `1.11.0` is complete at `SPEC.md` T69. Root `sipx` is SIP/SDP/RTP/media pr
 
 - Root `sipx` stays SIP protocol/runtime/RTP media core plus direct SIP-only examples.
 - `SipUac` and `SipUas` own high-level outbound/inbound SIP phone ergonomics.
+- RTP wire events expose tx/rx `RtpWireEvent` for all audio modes; `debug_wire_rtp()` available in `sipx.examples.common`.
 - `sipx-cli` owns the `sipx` console command, which stays SIP/RTP-only and curl/httpx-like.
 - `sipx-harness` remains product center for Harness/Actor/Scenario/Timeline/Verdict/Artifact APIs.
 - `AsteriskRuntime` remains the first Asterisk implementation path.
@@ -29,7 +30,7 @@ Block `1.11.0` is complete at `SPEC.md` T69. Root `sipx` is SIP/SDP/RTP/media pr
 
 ## Recommended Next Task
 
-After block `1.11.0`:
+After block `1.19.0`:
 
 1. Decide license before public distribution and Asterisk/commercial positioning.
 2. Start `docker/asterisk` and run opt-in Asterisk integration tests.
@@ -48,11 +49,7 @@ After block `1.11.0`:
 ## Latest Validation
 
 - `ruff check .`: pass.
-- `ruff format --check .`: pass, 114 files already formatted after targeted formatting of three files.
+- `ruff format --check .`: pass.
 - `uv run ty check`: pass.
 - `git diff --check`: pass/no output.
-- CLI dry-run rendering: `sipx request ... --print-message --compact-headers` and `sipx call ... --print-message --compact-headers` pass without opening sockets.
-- No-network examples: `sipx.examples.build_request` and `sipx.examples.handlers` pass.
-- Live root examples: REGISTER/OPTIONS smoke returned `registered` and `200 OK`; call examples with explicit `SIPX_TARGET` returned structured `SipCallError` for `502 Bad Gateway`; missing `SIPX_TARGET` returned structured `ExampleConfigError`.
-- `python -m pytest` skipped for block `1.11.0` per user direction; last full core test run was 92 pass after block `1.10.0`.
-- Docker remains unavailable in this WSL environment, so opt-in Asterisk integration was not run locally.
+- `pytest`: 90 pass.

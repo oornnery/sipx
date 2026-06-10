@@ -12,7 +12,6 @@ from uuid import uuid4
 from sipx import (
     HeaderMap,
     SipCall,
-    SipHooks,
     SipRequest,
     SipResponse,
     SessionDescription,
@@ -22,6 +21,7 @@ from sipx import (
     build_digest_authorization,
     parse_digest_challenge,
 )
+from sipx.ua import EventHooks
 
 
 PUBLIC_MIZU_AOR = "sip:1111@demo.mizu-voip.com:37075"
@@ -81,7 +81,7 @@ def mizu_uac(
     local_port: int = 0,
     timeout: float = 10.0,
     mode: str = "strict",
-    lab_hooks: SipHooks | None = None,
+    event_hooks: EventHooks | None = None,
     rtp_bind_host: str | None = None,
     rtp_advertise_host: str | None = None,
     jitter_buffer_ms: int = 60,
@@ -98,7 +98,7 @@ def mizu_uac(
         local_port=local_port,
         timeout=timeout,
         mode=mode,
-        lab_hooks=lab_hooks,
+        event_hooks=event_hooks,
         rtp_bind_host=rtp_bind_host,
         rtp_advertise_host=rtp_advertise_host,
         jitter_buffer_ms=jitter_buffer_ms,

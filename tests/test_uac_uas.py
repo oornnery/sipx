@@ -9,7 +9,6 @@ from sipx import (
     HeaderMap,
     RegisterClientState,
     SipCallState,
-    SipHooks,
     SipProvisionalResponse,
     SipRequest,
     SipResponse,
@@ -172,7 +171,7 @@ async def _uas_answer_can_skip_invite_provisionals() -> None:
     caller = SipUac(
         aor="sip:alice@example.com",
         timeout=1.0,
-        wire_event_handler=lambda event: _capture_invite_response(event, responses),
+        event_hooks={"wire": [lambda e: _capture_invite_response(e, responses)]},
     )
     callee = SipUas(aor="sip:bob@example.com", timeout=1.0)
     try:
@@ -205,7 +204,7 @@ async def _uas_answer_defaults_to_180_ringing() -> None:
     caller = SipUac(
         aor="sip:alice@example.com",
         timeout=1.0,
-        wire_event_handler=lambda event: _capture_invite_response(event, responses),
+        event_hooks={"wire": [lambda e: _capture_invite_response(e, responses)]},
     )
     callee = SipUas(aor="sip:bob@example.com", timeout=1.0)
     try:
@@ -236,7 +235,7 @@ async def _uas_answer_sends_configured_provisionals_with_sdp() -> None:
     caller = SipUac(
         aor="sip:alice@example.com",
         timeout=1.0,
-        wire_event_handler=lambda event: _capture_invite_response(event, responses),
+        event_hooks={"wire": [lambda e: _capture_invite_response(e, responses)]},
     )
     callee = SipUas(aor="sip:bob@example.com", timeout=1.0)
     try:
@@ -493,23 +492,22 @@ async def _reject_raw_send_in_strict_mode() -> None:
         await user_agent.stop()
 
 
-def test_sip_user_agent_rejects_lab_hooks_in_strict_mode() -> None:
-    with pytest.raises(ValueError, match="lab_hooks require lab mode"):
-        SipUserAgent(lab_hooks=SipHooks())
+def test_sip_user_agent_rejects_lab_event_hooks_in_strict_mode() -> None:
+    with pytest.raises(ValueError, match="requires lab mode"):
+        SipUserAgent(event_hooks={"sdp": [lambda m, b: None]})
 
 
-def test_sip_user_agent_lab_hook_mutates_outbound_headers() -> None:
-    asyncio.run(_lab_hook_mutates_outbound_headers())
+def test_sip_user_agent_event_hook_mutates_outbound_headers() -> None:
+    asyncio.run(_event_hook_mutates_outbound_headers())
 
 
-async def _lab_hook_mutates_outbound_headers() -> None:
-    def add_lab_header(message, remote):
-        message.headers.add("X-Sipx-Lab", "header-hook")
-        return message
+async def _event_hook_mutates_outbound_headers() -> None:
+    def add_lab_header(request: SipRequest, remote: tuple[str, int]) -> None:
+        request.headers.add("X-Sipx-Lab", "header-hook")
 
     sender = SipUserAgent(
         mode="lab",
-        lab_hooks=SipHooks(before_send_message=add_lab_header),
+        event_hooks={"request": [add_lab_header]},
     )
     receiver = SipUserAgent()
     try:
@@ -527,17 +525,18 @@ async def _lab_hook_mutates_outbound_headers() -> None:
         await receiver.stop()
 
 
-def test_sip_user_agent_lab_hook_mutates_sdp_body() -> None:
-    asyncio.run(_lab_hook_mutates_sdp_body())
+def test_sip_user_agent_event_hook_mutates_sdp_body() -> None:
+    asyncio.run(_event_hook_mutates_sdp_body())
 
 
-async def _lab_hook_mutates_sdp_body() -> None:
-    def add_sdp_attribute(message, body: bytes) -> bytes:
-        return body + b"a=sipx-lab:yes\r\n"
+async def _event_hook_mutates_sdp_body() -> None:
+    def add_sdp_attribute(message: object, body: bytes) -> None:
+        if isinstance(message, SipRequest):
+            message.body = body + b"a=sipx-lab:yes\r\n"
 
     sender = SipUserAgent(
         mode="lab",
-        lab_hooks=SipHooks(before_sdp_body=add_sdp_attribute),
+        event_hooks={"sdp": [add_sdp_attribute]},
     )
     receiver = SipUserAgent()
     try:
@@ -566,52 +565,21 @@ async def _lab_hook_mutates_sdp_body() -> None:
         await receiver.stop()
 
 
-def test_sip_user_agent_lab_hook_can_send_malformed_bytes() -> None:
-    asyncio.run(_lab_hook_can_send_malformed_bytes())
+def test_sip_user_agent_event_hook_observes_received_events() -> None:
+    asyncio.run(_event_hook_observes_received_events())
 
 
-async def _lab_hook_can_send_malformed_bytes() -> None:
-    def send_malformed(message, remote):
-        return b"OPTIONS sip:bob@example.com SIP/2.0\r\nContent-Length: 10\r\n\r\nx"
-
-    sender = SipUserAgent(
-        mode="lab",
-        lab_hooks=SipHooks(before_send_message=send_malformed),
-    )
-    receiver = SipUserAgent()
-    try:
-        await sender.start()
-        await receiver.start()
-
-        await sender.send_request(register_request(), receiver.local_address)
-        event = await receiver.receive_event(timeout=1.0)
-
-        assert event.is_error
-        assert event.message is None
-        assert "body length" in (event.error or "")
-    finally:
-        await sender.stop()
-        await receiver.stop()
-
-
-def test_sip_user_agent_lab_hook_observes_received_events() -> None:
-    asyncio.run(_lab_hook_observes_received_events())
-
-
-async def _lab_hook_observes_received_events() -> None:
+async def _event_hook_observes_received_events() -> None:
     seen: list[tuple[str, int, str]] = []
 
-    def observe(event):
-        method = event.message.method if isinstance(event.message, SipRequest) else ""
-        seen.append((event.remote[0], event.remote[1], method))
-        return event
+    def observe_request(request: SipRequest, remote: tuple[str, int]) -> None:
+        seen.append((remote[0], remote[1], request.method))
 
     timeline = EventRecorder(run_id="receive-hook")
     sender = SipUserAgent()
     receiver = SipUserAgent(
-        mode="lab",
         timeline=timeline,
-        lab_hooks=SipHooks(after_receive_event=observe),
+        event_hooks={"request": [observe_request]},
     )
     try:
         await sender.start()
@@ -627,37 +595,6 @@ async def _lab_hook_observes_received_events() -> None:
         await receiver.stop()
 
     assert any(event.name == "request_received" for event in timeline.events)
-
-
-def test_sip_user_agent_lab_hook_can_drop_received_events() -> None:
-    asyncio.run(_lab_hook_can_drop_received_events())
-
-
-async def _lab_hook_can_drop_received_events() -> None:
-    dropped: list[str] = []
-
-    def drop(event):
-        method = event.message.method if isinstance(event.message, SipRequest) else ""
-        dropped.append(method)
-        return None
-
-    sender = SipUserAgent()
-    receiver = SipUserAgent(
-        mode="lab",
-        lab_hooks=SipHooks(after_receive_event=drop),
-    )
-    try:
-        await sender.start()
-        await receiver.start()
-
-        await sender.send_request(register_request(), receiver.local_address)
-        with pytest.raises(SipUdpError, match="timed out"):
-            await receiver.receive_event(timeout=0.2)
-
-        assert dropped == ["REGISTER"]
-    finally:
-        await sender.stop()
-        await receiver.stop()
 
 
 def test_sip_user_agent_receive_timeout_raises_typed_error() -> None:
@@ -1105,21 +1042,24 @@ async def _retransmit_register_until_response() -> None:
         await registrar.stop()
 
 
-def test_sip_user_agent_lab_hook_overrides_retransmission_intervals() -> None:
-    asyncio.run(_lab_hook_overrides_retransmission_intervals())
+def test_sip_user_agent_event_hook_overrides_retransmission_intervals() -> None:
+    asyncio.run(_event_hook_overrides_retransmission_intervals())
 
 
-async def _lab_hook_overrides_retransmission_intervals() -> None:
+async def _event_hook_overrides_retransmission_intervals() -> None:
     defaults_seen: list[tuple[float, ...]] = []
 
-    def fast_intervals(message, remote, default_intervals):
-        defaults_seen.append(default_intervals)
-        return (0.01,)
+    def fast_intervals(
+        message: object, remote: tuple[str, int], intervals: list[float]
+    ) -> None:
+        defaults_seen.append(tuple(intervals))
+        intervals.clear()
+        intervals.append(0.01)
 
     client = SipUserAgent(
         mode="lab",
         actor_id="client",
-        lab_hooks=SipHooks(retransmission_intervals=fast_intervals),
+        event_hooks={"retransmission": [fast_intervals]},
     )
     registrar = SipUas(actor_id="registrar")
     try:

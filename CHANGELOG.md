@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.19.0 - 2026-06-10
+
+- Added `RtpWireDirection`, `RtpWireEvent` dataclass for RTP packet tx/rx visibility.
+- Added `event_hooks["rtp"]` support to `RtpAudioSessionConfig`; RTP hooks fire on every sent/received packet.
+- Added `debug_wire_rtp()` to `sipx.examples.common` with bordered SSRC/seq/ts/pt/payload format.
+- Wired `event_hooks["rtp"]` through `SipUac` and `SipUas` into `RtpAudioSession`.
+- Enabled `debug_wire_rtp` in `metrics.py` and `invite_with_sdp.py` examples.
+
 ## 1.18.0 - 2026-06-09
 
 - Redesigned example `debug_wire()` output to elegantly print raw, complete SIP packets formatted inside bordered blocks with Call-ID, direction, and IPs.

@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has root `sipx` package for SIP/SDP/RTP/media primitives, SIP UAC/UAS runtime, high-level `SipUac`/`SipUas` phone ergonomics, configurable INVITE provisional responses, G.711 helpers, RTP metrics, jitter buffer, synthetic audio sources, optional lazy PyAudio input, direct root Mizu examples, and a SIP/RTP-only `sipx` CLI in a curl/httpx-cli style. Harness concepts and generic redaction live in workspace package `apps/harness` as `sipx_harness`, with `MockRuntime` for deterministic scenarios. Asterisk, LLM, scenarios, STT, and TTS remain app packages.
+Implement `sipx` in small verified blocks. Current code now has root `sipx` package for SIP/SDP/RTP/media primitives, SIP UAC/UAS runtime, high-level `SipUac`/`SipUas` phone ergonomics, configurable INVITE provisional responses, G.711 helpers, RTP metrics, jitter buffer, synthetic audio sources, optional lazy PyAudio input, RTP wire event hooks, direct root Mizu examples, and a SIP/RTP-only `sipx` CLI in a curl/httpx-cli style. Harness concepts and generic redaction live in workspace package `apps/harness` as `sipx_harness`, with `MockRuntime` for deterministic scenarios. Asterisk, LLM, scenarios, STT, and TTS remain app packages.
 
 ## Milestone 0 - Project Grounding
 
@@ -528,6 +528,17 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 - [x] Removed `cast()` from `sipx/examples/register.py`.
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
+
+## Block 1.19.0 Done
+
+- [x] Added `RtpWireDirection`, `RtpWireEvent` dataclass for RTP packet tx/rx visibility.
+- [x] Added `event_hooks["rtp"]` support to `RtpAudioSessionConfig`; hooks fire on send/receive.
+- [x] Added `debug_wire_rtp()` to `sipx.examples.common` with bordered SSRC/seq/ts/pt/payload format.
+- [x] Wired `event_hooks["rtp"]` through `SipUac` and `SipUas` into `RtpAudioSession`.
+- [x] Exported `RtpWireDirection`/`RtpWireEvent` from `sipx.rtp` and root `sipx.__init__`.
+- [x] Enabled `debug_wire_rtp` in `metrics.py` and `invite_with_sdp.py` examples.
+- [x] All 90 core tests pass; ruff/type-check clean.
+- [x] Bumped root package version to `1.19.0`.
 
 ## Blocked Or Pending
 

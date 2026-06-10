@@ -4,6 +4,8 @@ from sipx.rtp.audio import (
     RtpAudioSession,
     RtpAudioSessionConfig,
     RtpAudioSessionSnapshot,
+    RtpWireDirection,
+    RtpWireEvent,
 )
 from sipx.rtp.dtmf import DtmfEvent, decode_dtmf_event, encode_dtmf_event
 from sipx.rtp.g711 import (
@@ -43,6 +45,8 @@ __all__ = [
     "RtpPlayoutFrame",
     "RtpSequenceStats",
     "RtpStatsSnapshot",
+    "RtpWireDirection",
+    "RtpWireEvent",
     "decode_g711",
     "decode_dtmf_event",
     "decode_pcma",

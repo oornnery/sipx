@@ -6,7 +6,7 @@ import sys
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
-from sipx import SipWireDirection, SipWireEvent
+from sipx import RtpWireDirection, RtpWireEvent, SipWireDirection, SipWireEvent
 
 
 def debug_wire(event: SipWireEvent) -> None:
@@ -62,6 +62,25 @@ def account_settings() -> dict[str, Any]:
         "audio": os.getenv("SIPX_AUDIO", "none"),
         "run_call": os.getenv("SIPX_RUN_CALL", "0"),
     }
+
+
+def debug_wire_rtp(event: RtpWireEvent) -> None:
+    ssrc = event.packet.ssrc if event.packet else 0
+    seq = event.packet.sequence_number if event.packet else 0
+    ts = event.packet.timestamp if event.packet else 0
+    pt = event.packet.payload_type if event.packet else 0
+    payload_len = len(event.packet.payload) if event.packet else len(event.raw)
+    marker = " M" if event.packet and event.packet.marker else ""
+
+    remote_str = f"{event.remote[0]}:{event.remote[1]}"
+    if event.direction is RtpWireDirection.TX:
+        header = f"RTP (SSRC: {ssrc:08x}) Local ===> {remote_str}"
+    else:
+        header = f"RTP (SSRC: {ssrc:08x}) {remote_str} <=== Local"
+
+    detail = f"seq={seq:5d}  ts={ts:10d}  pt={pt:3d}{marker}  payload={payload_len}B"
+    border = "=" * max(len(header), len(detail))
+    print(f"\n{border}\n{header}\n{border}\n{detail}\n{border}\n", file=sys.stderr)
 
 
 def print_json(data: object) -> None:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from sipx import SipHooks, SipMessage, SipRequest
+from sipx import SipRequest
 
 from mizu_common import (
     add_call_args,
@@ -31,28 +31,24 @@ async def manipulation(
     rtp_advertise: str | None,
     jitter_buffer_ms: int,
 ) -> None:
-    hooks = SipHooks()
+    def add_lab_header(request: SipRequest, remote: tuple[str, int]) -> None:
+        request.headers.add("X-SipX-Lab", "mizu-manipulation")
 
-    @hooks.before_send_message
-    def add_lab_header(message: SipMessage, remote: tuple[str, int]) -> SipMessage:
-        if isinstance(message, SipRequest):
-            message.headers.add("X-SipX-Lab", "mizu-manipulation")
-        return message
-
-    @hooks.before_sdp_body
-    def mark_sdp(message: SipMessage, body: bytes) -> bytes:
+    def mark_sdp(message: object, body: bytes) -> None:
         if isinstance(message, SipRequest) and message.method == "INVITE":
-            return body.replace(
+            message.body = body.replace(
                 b"a=sendrecv\r\n", b"a=sendrecv\r\na=x-sipx-lab: mizu\r\n"
             )
-        return body
 
     async with mizu_uac(
         local_host=local_host,
         local_port=local_port,
         timeout=timeout,
         mode="lab",
-        lab_hooks=hooks,
+        event_hooks={
+            "request": [add_lab_header],
+            "sdp": [mark_sdp],
+        },
         rtp_bind_host=rtp_bind,
         rtp_advertise_host=rtp_advertise,
         jitter_buffer_ms=jitter_buffer_ms,
