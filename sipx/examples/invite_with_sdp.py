@@ -1,14 +1,13 @@
 import asyncio
-import os
 
 from sipx import SipCallError, SipUac
-from sipx.examples.common import account_settings, print_json
+from sipx.examples.common import account_settings, debug_wire, print_json
 
 
 async def invite_with_sdp() -> None:
     s = account_settings()
-    target_value = os.getenv("SIPX_TARGET") or s["aor"]
-    audio = os.getenv("SIPX_AUDIO", "none")
+    target_value = s["target"]
+    audio = s["audio"]
     async with SipUac(
         aor=s["aor"],
         registrar=s["registrar"],
@@ -19,6 +18,7 @@ async def invite_with_sdp() -> None:
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
+        event_hooks={"wire": [debug_wire]},
     ) as uac:
         try:
             call = await asyncio.wait_for(

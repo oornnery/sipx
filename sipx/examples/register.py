@@ -1,7 +1,7 @@
 import asyncio
 
 from sipx import SipUac
-from sipx.examples.common import account_settings, print_json
+from sipx.examples.common import account_settings, debug_wire, print_json
 
 
 async def register() -> None:
@@ -16,6 +16,7 @@ async def register() -> None:
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
+        event_hooks={"wire": [debug_wire]},
     ) as uac:
         state = await uac.register()
         print_json(

@@ -1,13 +1,12 @@
 import asyncio
-import os
 
 from sipx import SipCallError, SipRequest, SipUac
-from sipx.examples.common import account_settings, print_json
+from sipx.examples.common import account_settings, debug_wire, print_json
 
 
 async def manipulation() -> None:
     s = account_settings()
-    target_value = os.getenv("SIPX_TARGET") or s["aor"]
+    target_value = s["target"]
 
     def add_lab_header(request: SipRequest, remote: tuple[str, int]) -> None:
         request.headers.add("X-SipX-Lab", "manipulation")
@@ -32,6 +31,7 @@ async def manipulation() -> None:
         event_hooks={
             "request": [add_lab_header],
             "sdp": [mark_sdp],
+            "wire": [debug_wire],
         },
     ) as uac:
         try:

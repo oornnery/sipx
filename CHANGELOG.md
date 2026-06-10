@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 1.17.0 - 2026-06-09
+
+- Added `debug_wire()` to `common.py`; all examples now show TX/RX SIP packets via `event_hooks={"wire": [debug_wire]}`.
+- Moved `target`, `audio`, `run_call` into `account_settings()`; removed `os.getenv("SIPX_*")` from all examples.
+
 ## 1.16.0 - 2026-06-09
 
 - Removed `SIPX_TARGET` requirement from invite examples; fallback to `s["aor"]` when unset.

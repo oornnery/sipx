@@ -1,7 +1,7 @@
 import asyncio
 
 from sipx import SipRequest, SipResponse, SipUac
-from sipx.examples.common import account_settings, print_json
+from sipx.examples.common import account_settings, debug_wire, print_json
 
 
 async def handlers() -> None:
@@ -29,6 +29,7 @@ async def handlers() -> None:
         event_hooks={
             "request": [log_request],
             "response": [log_response],
+            "wire": [debug_wire],
         },
     ) as uac:
         await uac.register()

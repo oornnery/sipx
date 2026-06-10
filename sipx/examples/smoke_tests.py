@@ -1,8 +1,7 @@
 import asyncio
-import os
 
 from sipx import SipCallError, SipUac, SipUdpError, SipUserAgent, SipUri
-from sipx.examples.common import account_settings, print_json
+from sipx.examples.common import account_settings, debug_wire, print_json
 
 
 async def smoke_tests() -> None:
@@ -19,6 +18,7 @@ async def smoke_tests() -> None:
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
+        event_hooks={"wire": [debug_wire]},
     ) as uac:
         state = await uac.register()
         results["register"] = state.value
@@ -28,6 +28,7 @@ async def smoke_tests() -> None:
         async with SipUserAgent(
             local_host=s["local_host"],
             local_port=s["local_port"],
+            event_hooks={"wire": [debug_wire]},
         ) as ua:
             response = await ua.request(
                 "OPTIONS",
@@ -54,18 +55,7 @@ async def smoke_tests() -> None:
             "error": {"type": type(exc).__name__, "message": str(exc)},
         }
 
-    if os.getenv("SIPX_RUN_CALL", "0") == "1":
-        target_value = os.getenv("SIPX_TARGET")
-        if not target_value:
-            results["call"] = {
-                "state": "failed",
-                "error": {
-                    "type": "ExampleConfigError",
-                    "message": "SIPX_TARGET must be set for call examples",
-                },
-            }
-            print_json(results)
-            return
+    if s["run_call"] == "1":
         async with SipUac(
             aor=s["aor"],
             registrar=s["registrar"],
@@ -76,10 +66,11 @@ async def smoke_tests() -> None:
             local_host=s["local_host"],
             local_port=s["local_port"],
             timeout=s["timeout"],
+            event_hooks={"wire": [debug_wire]},
         ) as uac:
             try:
                 call = await asyncio.wait_for(
-                    uac.call(target_value, audio="none"),
+                    uac.call(s["target"], audio="none"),
                     timeout=s["timeout"],
                 )
             except (SipCallError, TimeoutError) as exc:

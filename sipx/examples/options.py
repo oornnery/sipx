@@ -1,7 +1,7 @@
 import asyncio
 
 from sipx import SipUdpError, SipUserAgent, SipUri
-from sipx.examples.common import account_settings, print_json
+from sipx.examples.common import account_settings, debug_wire, print_json
 
 
 async def options() -> None:
@@ -12,6 +12,7 @@ async def options() -> None:
         async with SipUserAgent(
             local_host=s["local_host"],
             local_port=s["local_port"],
+            event_hooks={"wire": [debug_wire]},
         ) as ua:
             response = await ua.request(
                 "OPTIONS",

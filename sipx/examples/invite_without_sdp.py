@@ -1,18 +1,18 @@
 import asyncio
-import os
 
 from sipx import SipCallError, SipUri, SipUserAgent
-from sipx.examples.common import account_settings, print_json
+from sipx.examples.common import account_settings, debug_wire, print_json
 
 
 async def invite_without_sdp() -> None:
     s = account_settings()
-    target_value = os.getenv("SIPX_TARGET") or s["aor"]
+    target_value = s["target"]
     aor = SipUri.parse(s["aor"])
     target = SipUri.parse(target_value)
     async with SipUserAgent(
         local_host=s["local_host"],
         local_port=s["local_port"],
+        event_hooks={"wire": [debug_wire]},
     ) as ua:
         try:
             call = await asyncio.wait_for(
