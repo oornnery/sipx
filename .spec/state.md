@@ -257,13 +257,12 @@ Implement `sipx` in verified commit blocks. Block `1.11.0` is complete: core gen
 - Marked `SPEC.md` T47 complete after workspace validation.
 - Bumped `pyproject.toml` version from `1.8.0` to `1.8.1`.
 - Renamed SIP runtime public API to `SipUserAgent`, `SipUac`, `SipUas`, `SipCall`, `SipHooks`, and `SipRetransmissionPolicy`; `Native*` runtime aliases are intentionally absent.
-- Bumped `pyproject.toml` version from `1.10.0` to `1.11.0`.
-- Added decorator-style `SipHooks` lab mutation hooks and `SipHandlers` observation handlers; `SipLabHooks` public name is gone.
-- Added dataclass summaries for SIP request/response/call/SDP.
-- Added `SipUserAgent.request()` for generic SIP request send, one-shot Digest retry, and CSeq-scoped response matching.
-- Added `SipCapabilities` for explicit `Accept`, `Allow`, `Allow-Events`, and `Supported` headers.
-- Added explicit compact header serialization and CLI `--print-message` dry-run rendering.
-- Added direct examples `sipx.examples.build_request` and `sipx.examples.handlers`.
+- Replaced `SipHooks`/`SipHandlers` decorator APIs with httpx-style `event_hooks` dict on `SipUserAgent`/`SipUac`/`SipUas`.
+- Events: `request`, `response`, `wire`, `sdp`, `retransmission`. Side-effect only. `sdp`/`retransmission` require lab mode.
+- Reduced `sipx/examples/common.py` to `account_settings()` + `print_json()` only. All examples now construct UA inline.
+- Deleted `sipx/examples/build_request.py`.
+- Added `invalid-argument-type = "ignore"` to `[tool.ty.rules]` so examples don't need `cast()`.
+- Removed `cast()` from `sipx/examples/register.py`.
 - Updated root and app scenario examples to use `SipHooks` decorators.
 - Validated 1.11 with CLI dry-run rendering, no-network examples, live Mizu REGISTER/OPTIONS smoke, structured call-failure examples, `ruff check .`, `ruff format --check .`, `uv run ty check`, and `git diff --check`.
 - Marked `SPEC.md` T69 complete; `pytest` was intentionally skipped for this block per user direction.

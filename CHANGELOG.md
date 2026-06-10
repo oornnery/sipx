@@ -1,7 +1,16 @@
 # CHANGELOG
 
+## 1.12.0 - 2026-06-09
+
+- Added `invalid-argument-type = "ignore"` to `[tool.ty.rules]` to avoid requiring `cast()` in examples.
+- Removed `cast()` from `sipx/examples/register.py`.
+
 ## 1.11.0 - 2026-06-09
 
+- Replaced `SipHooks`/`SipHandlers` decorator APIs with httpx-style `event_hooks` dict on `SipUserAgent`/`SipUac`/`SipUas`.
+- Events: `request`, `response`, `wire`, `sdp`, `retransmission`. Side-effect only. `sdp`/`retransmission` require lab mode.
+- Reduced `sipx/examples/common.py` to `account_settings()` + `print_json()` only. All examples now construct UA inline.
+- Deleted `sipx/examples/build_request.py`.
 - Added `SipHooks` decorator-style lab hooks and removed the old `SipLabHooks` public name.
 - Added `SipHandlers` decorator-style observation handlers for wire events, requests, and responses.
 - Added dataclass summaries for SIP requests, responses, calls, and SDP.

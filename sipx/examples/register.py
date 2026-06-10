@@ -1,12 +1,22 @@
-# RFC 3261 REGISTER flow for the public Mizu demo account.
+import asyncio
 
-from __future__ import annotations
-
-from sipx.examples.common import mizu_uac, print_json, run
+from sipx import SipUac
+from sipx.examples.common import account_settings, print_json
 
 
 async def register() -> None:
-    async with mizu_uac() as uac:
+    s = account_settings()
+    async with SipUac(
+        aor=s["aor"],
+        registrar=s["registrar"],
+        remote=(s["remote_host"], s["remote_port"]),
+        username=s["username"],
+        password=s["credential"],
+        contact_user=s["contact_user"],
+        local_host=s["local_host"],
+        local_port=s["local_port"],
+        timeout=s["timeout"],
+    ) as uac:
         state = await uac.register()
         print_json(
             {
@@ -21,7 +31,7 @@ async def register() -> None:
 
 
 def main() -> None:
-    run(register())
+    asyncio.run(register())
 
 
 if __name__ == "__main__":

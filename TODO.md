@@ -511,16 +511,23 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 
 ## Block 1.11.0 Done
 
+- [x] Replaced `SipHooks`/`SipHandlers` decorator APIs with httpx-style `event_hooks` dict on `SipUserAgent`/`SipUac`/`SipUas`.
+- [x] Events: `request`, `response`, `wire`, `sdp`, `retransmission`. Side-effect only. `sdp`/`retransmission` require lab mode.
+- [x] Reduced `sipx/examples/common.py` to `account_settings()` + `print_json()` only; all examples construct UA inline.
+- [x] Deleted `sipx/examples/build_request.py`.
+- [x] Updated CLI `main.py` to use `event_hooks` dict with `_build_event_hooks()` helper.
+- [x] Updated `apps/scenarios/examples/mizu/` to use `event_hooks` dict.
+- [x] Updated tests: switched `event_hooks["response"]` to `event_hooks["wire"]` for direction-aware capture.
 - [x] Bumped root package version to `1.11.0`.
-- [x] Added `SipHooks` decorator-style lab hooks and removed `SipLabHooks` public name.
-- [x] Added `SipHandlers` decorator-style observation handlers.
-- [x] Added dataclass summaries for SIP requests, responses, calls, and SDP.
-- [x] Added core SIP ID helpers and `SipUserAgent.request()` for generic request auth/matching.
-- [x] Added explicit `SipCapabilities` and compact header serialization.
-- [x] Added CLI `--print-message`, `--compact-headers`, and capability header flags.
-- [x] Added direct examples for request building and handlers.
-- [x] Ran CLI dry-run, no-network examples, live Mizu examples, call examples, Ruff lint/format, type check, and whitespace validation.
-- [x] Marked `SPEC.md` T69 complete after verification; `pytest` was intentionally skipped for this block per user direction.
+- [x] Updated SPEC.md, README.md, CHANGELOG.md, .spec/*, .mem/*.
+- [x] Ran Ruff lint/format, type check, whitespace, and 32 focused tests (all pass).
+
+## Block 1.12.0 Done
+
+- [x] Added `invalid-argument-type = "ignore"` to `[tool.ty.rules]` in pyproject.toml.
+- [x] Removed `cast()` from `sipx/examples/register.py`.
+- [x] Bumped root package version to `1.12.0`.
+- [x] Updated CHANGELOG.md.
 
 ## Blocked Or Pending
 
