@@ -1,41 +1,68 @@
-# RFC 3550/3551 RTP metrics snapshot for a Mizu INVITE with SDP.
-
-from __future__ import annotations
-
 import asyncio
+import os
 
-from sipx import SipCallError
-from sipx.examples.common import (
-    ExampleCallTimeout,
-    ExampleConfigError,
-    audio_mode,
-    await_call,
-    call_duration,
-    call_summary,
-    call_target,
-    error_summary,
-    mizu_uac,
-    print_json,
-    rtp_summary,
-    run,
-)
+from sipx import SipCallError, SipUac
+from sipx.examples.common import account_settings, print_json
 
 
 async def metrics() -> None:
-    async with mizu_uac() as uac:
+    s = account_settings()
+    target_value = os.getenv("SIPX_TARGET")
+    if not target_value:
+        print_json(
+            {
+                "state": "failed",
+                "error": {
+                    "type": "ExampleConfigError",
+                    "message": "SIPX_TARGET must be set for call examples",
+                },
+            }
+        )
+        return
+    audio = os.getenv("SIPX_AUDIO", "noise")
+    async with SipUac(
+        aor=s["aor"],
+        registrar=s["registrar"],
+        remote=(s["remote_host"], s["remote_port"]),
+        username=s["username"],
+        password=s["credential"],
+        contact_user=s["contact_user"],
+        local_host=s["local_host"],
+        local_port=s["local_port"],
+        timeout=s["timeout"],
+    ) as uac:
         try:
-            call = await await_call(uac.call(call_target(), audio=audio_mode("noise")))
-        except (ExampleCallTimeout, ExampleConfigError, SipCallError) as exc:
-            print_json({"call": error_summary(exc), "rtp": None})
+            call = await asyncio.wait_for(
+                uac.call(target_value, audio=audio),
+                timeout=s["timeout"],
+            )
+        except (SipCallError, TimeoutError) as exc:
+            print_json(
+                {
+                    "call": {
+                        "state": "failed",
+                        "error": {"type": type(exc).__name__, "message": str(exc)},
+                    },
+                    "rtp": None,
+                }
+            )
             return
-        if call_duration() > 0:
-            await asyncio.sleep(call_duration())
-        print_json({"call": call_summary(call), "rtp": rtp_summary(uac, call)})
+        session = uac.rtp_session(call)
+        rtp_snapshot = session.snapshot() if session else None
+        print_json(
+            {
+                "call": {
+                    "call_id": call.call_id,
+                    "state": call.state.value,
+                },
+                "rtp": rtp_snapshot,
+            }
+        )
         await uac.hangup(call)
 
 
 def main() -> None:
-    run(metrics())
+    asyncio.run(metrics())
 
 
 if __name__ == "__main__":

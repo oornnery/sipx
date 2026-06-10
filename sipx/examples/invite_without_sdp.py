@@ -1,77 +1,79 @@
-# RFC 3261 INVITE without SDP; useful to observe proxy/PSTN behavior.
-# Valid SIP flow may be INVITE -> final response -> ACK with no 180/183.
-
-from __future__ import annotations
-
 import asyncio
+import os
 
 from sipx import SipCallError, SipUri, SipUserAgent
-from sipx.examples.common import (
-    ExampleCallTimeout,
-    ExampleConfigError,
-    account_settings,
-    await_call,
-    branch,
-    call_duration,
-    call_summary,
-    call_target,
-    contact_uri,
-    error_summary,
-    local_host,
-    local_port,
-    new_id,
-    print_json,
-    remote_address,
-    run,
-    tag,
-    timeout,
-)
+from sipx.examples.common import account_settings, print_json
 
 
 async def invite_without_sdp() -> None:
-    settings = account_settings()
-    aor = SipUri.parse(settings["aor"])
-    try:
-        request_target = SipUri.parse(call_target())
-    except ExampleConfigError as exc:
-        print_json(error_summary(exc))
+    s = account_settings()
+    target_value = os.getenv("SIPX_TARGET")
+    if not target_value:
+        print_json(
+            {
+                "state": "failed",
+                "error": {
+                    "type": "ExampleConfigError",
+                    "message": "SIPX_TARGET must be set for call examples",
+                },
+            }
+        )
         return
-    async with SipUserAgent(local_host=local_host(), local_port=local_port()) as ua:
+    aor = SipUri.parse(s["aor"])
+    target = SipUri.parse(target_value)
+    async with SipUserAgent(
+        local_host=s["local_host"],
+        local_port=s["local_port"],
+    ) as ua:
         try:
-            call = await await_call(
+            call = await asyncio.wait_for(
                 ua.initiate_call(
-                    remote=remote_address(),
-                    target=request_target,
+                    remote=(s["remote_host"], s["remote_port"]),
+                    target=target,
                     caller=aor,
-                    contact=contact_uri(aor, ua.local_address),
-                    call_id=new_id("invite-no-sdp"),
-                    branch=branch("invite"),
-                    from_tag=tag("from"),
-                    ack_branch=branch("ack"),
-                    timeout=timeout(),
-                    username=settings["username"],
-                    password=settings["credential"],
-                    auth_branch=branch("invite-auth"),
-                )
+                    contact=SipUri(
+                        scheme="sip",
+                        user=s["contact_user"] or aor.user or "sipx",
+                        host=ua.local_address[0],
+                        port=ua.local_address[1],
+                    ),
+                    call_id=f"invite-no-sdp-{id(ua):x}",
+                    branch=f"z9hG4bK-invite-{id(ua):x}",
+                    from_tag=f"from-{id(ua):x}",
+                    ack_branch=f"z9hG4bK-ack-{id(ua):x}",
+                    timeout=s["timeout"],
+                    username=s["username"],
+                    password=s["credential"],
+                    auth_branch=f"z9hG4bK-invite-auth-{id(ua):x}",
+                ),
+                timeout=s["timeout"],
             )
-        except (ExampleCallTimeout, SipCallError) as exc:
-            print_json(error_summary(exc))
+        except (SipCallError, TimeoutError) as exc:
+            print_json(
+                {
+                    "state": "failed",
+                    "error": {"type": type(exc).__name__, "message": str(exc)},
+                }
+            )
             return
-        if call_duration() > 0:
-            await asyncio.sleep(call_duration())
-        print_json(call_summary(call))
+        print_json(
+            {
+                "call_id": call.call_id,
+                "state": call.state.value,
+            }
+        )
         await ua.hangup_call(
             call,
-            branch=branch("bye"),
-            timeout=timeout(),
-            username=settings["username"],
-            password=settings["credential"],
-            auth_branch=branch("bye-auth"),
+            branch=f"z9hG4bK-bye-{id(ua):x}",
+            timeout=s["timeout"],
+            username=s["username"],
+            password=s["credential"],
+            auth_branch=f"z9hG4bK-bye-auth-{id(ua):x}",
         )
 
 
 def main() -> None:
-    run(invite_without_sdp())
+    asyncio.run(invite_without_sdp())
 
 
 if __name__ == "__main__":
