@@ -59,7 +59,7 @@ def account_settings() -> dict[str, Any]:
         "local_port": int(os.getenv("SIPX_LOCAL_PORT", "0")),
         "timeout": float(os.getenv("SIPX_TIMEOUT", "10")),
         "target": os.getenv("SIPX_TARGET") or os.getenv("SIPX_AOR", PUBLIC_MIZU_AOR),
-        "audio": os.getenv("SIPX_AUDIO", "none"),
+        "audio": os.getenv("SIPX_AUDIO", "silence"),
         "run_call": os.getenv("SIPX_RUN_CALL", "0"),
     }
 
