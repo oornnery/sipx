@@ -1,28 +1,52 @@
-# RFC 3261 OPTIONS probe for the public Mizu demo server.
+import asyncio
 
-from __future__ import annotations
-
-from sipx import SipUdpError
-from sipx.examples.common import (
-    error_summary,
-    print_json,
-    response_summary,
-    run,
-    send_stateless_request,
-)
+from sipx import SipUdpError, SipUserAgent, SipUri
+from sipx.examples.common import account_settings, print_json
 
 
 async def options() -> None:
+    s = account_settings()
+    aor = SipUri.parse(s["aor"])
+    target = SipUri.parse(s["aor"])
     try:
-        response = await send_stateless_request("OPTIONS")
+        async with SipUserAgent(
+            local_host=s["local_host"],
+            local_port=s["local_port"],
+        ) as ua:
+            response = await ua.request(
+                "OPTIONS",
+                target,
+                remote=(s["remote_host"], s["remote_port"]),
+                caller=aor,
+                contact=SipUri(
+                    scheme="sip",
+                    user=s["contact_user"] or aor.user or "sipx",
+                    host=ua.local_address[0],
+                    port=ua.local_address[1],
+                ),
+                timeout=s["timeout"],
+                username=s["username"],
+                password=s["credential"],
+            )
     except (SipUdpError, TimeoutError) as exc:
-        print_json(error_summary(exc))
+        print_json(
+            {
+                "state": "failed",
+                "error": {"type": type(exc).__name__, "message": str(exc)},
+            }
+        )
         return
-    print_json(response_summary(response))
+    print_json(
+        {
+            "status_code": response.status_code,
+            "reason": response.reason,
+            "headers": dict(response.headers.items()),
+        }
+    )
 
 
 def main() -> None:
-    run(options())
+    asyncio.run(options())
 
 
 if __name__ == "__main__":

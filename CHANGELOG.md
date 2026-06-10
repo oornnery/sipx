@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.13.0 - 2026-06-09
+
+- Removed `cast()` from `sipx/examples/options.py` and `sipx/examples/handlers.py`.
+
 ## 1.12.0 - 2026-06-09
 
 - Added `invalid-argument-type = "ignore"` to `[tool.ty.rules]` to avoid requiring `cast()` in examples.
