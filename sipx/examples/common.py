@@ -10,9 +10,33 @@ from sipx import SipWireDirection, SipWireEvent
 
 
 def debug_wire(event: SipWireEvent) -> None:
-    prefix = ">>>" if event.direction is SipWireDirection.TX else "<<<"
-    first_line = event.raw.decode("utf-8", errors="replace").split("\r\n")[0]
-    print(f"  SIP {prefix} {first_line}", file=sys.stderr)
+    call_id = "unknown"
+    is_request = True
+
+    if event.message:
+        is_request = type(event.message).__name__ == "SipRequest"
+        call_id = event.message.headers.get("Call-ID", "unknown")
+    else:
+        raw_text = event.raw.decode("utf-8", errors="replace")
+        is_request = not raw_text.startswith("SIP/")
+        for line in raw_text.split("\r\n"):
+            if line.lower().startswith("call-id:"):
+                parts = line.split(":", 1)
+                if len(parts) > 1:
+                    call_id = parts[1].strip()
+                break
+
+    msg_type = "REQUEST" if is_request else "RESPONSE"
+    remote_str = f"{event.remote[0]}:{event.remote[1]}"
+
+    if event.direction is SipWireDirection.TX:
+        header = f"{msg_type} (Call-ID: {call_id}) Local ===> {remote_str}"
+    else:
+        header = f"{msg_type} (Call-ID: {call_id}) {remote_str} <=== Local"
+
+    raw_text = event.raw.decode("utf-8", errors="replace").rstrip()
+    border = "=" * len(header)
+    print(f"\n{border}\n{header}\n{border}\n{raw_text}\n{border}\n", file=sys.stderr)
 
 
 PUBLIC_MIZU_AOR = "sip:1111@demo.mizu-voip.com:37075"

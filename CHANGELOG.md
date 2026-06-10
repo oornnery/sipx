@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 1.18.0 - 2026-06-09
+
+- Redesigned example `debug_wire()` output to elegantly print raw, complete SIP packets formatted inside bordered blocks with Call-ID, direction, and IPs.
+
 ## 1.17.0 - 2026-06-09
 
 - Added `debug_wire()` to `common.py`; all examples now show TX/RX SIP packets via `event_hooks={"wire": [debug_wire]}`.
