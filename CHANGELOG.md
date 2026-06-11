@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.22.0 - 2026-06-11
+
+- Added `sipx/models.py` with first-class `Request` and `Response` dataclasses.
+- Added `sipx/config.py` with `ClientConfig` dataclass for SIP client settings.
+- Added `Request.build()` builder pattern and `Response.from_request()` helper methods.
+- Added `tests/test_models.py` with 8 tests covering construction, serialization, and helpers.
+- Added `tests/test_config.py` with 5 tests covering config creation and defaults.
+
 ## 1.21.0 - 2026-06-11
 
 - Added `sipx/types.py` with core type aliases: `SipMethod`, `StatusCode`, `HeaderName`, `HeaderValue`, and `Uri`.

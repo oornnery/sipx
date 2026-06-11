@@ -529,6 +529,15 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 1.22.0 Done
+
+- [x] Bumped package version to `1.22.0`.
+- [x] Added `sipx/models.py` with first-class `Request` and `Response` dataclasses.
+- [x] Added `sipx/config.py` with `ClientConfig` dataclass.
+- [x] Added `Request.build()` and `Response.from_request()` helper methods.
+- [x] Added `tests/test_models.py` with 8 tests.
+- [x] Added `tests/test_config.py` with 5 tests.
+
 ## Block 1.21.0 Done
 
 - [x] Bumped root package version to `1.21.0`.
