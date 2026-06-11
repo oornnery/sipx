@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.23.0 - 2026-06-11
+
+- Added `sipx/exceptions.py` with typed exception hierarchy: `SipError`, `TransportError`, `TimeoutError`, `ProtocolError`, `AuthError`, `DialogError`, `TransactionError`.
+- Each exception has `message` (str), `details` (dict), and `rfc_ref` (optional str) attributes.
+- Added `tests/test_exceptions.py` with 7 tests covering construction, defaults, inheritance, and attributes for all exception types.
+
 ## 1.22.0 - 2026-06-11
 
 - Added `sipx/models.py` with first-class `Request` and `Response` dataclasses.

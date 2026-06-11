@@ -529,6 +529,13 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 1.23.0 Done
+
+- [x] Bumped package version to `1.23.0`.
+- [x] Added `sipx/exceptions.py` with typed exception hierarchy.
+- [x] Added `tests/test_exceptions.py` with 7 tests covering all exception types and attributes.
+- [x] Verified imports, attributes, and inheritance hierarchy via QA scenarios.
+
 ## Block 1.22.0 Done
 
 - [x] Bumped package version to `1.22.0`.
