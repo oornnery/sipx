@@ -2,6 +2,11 @@
 
 ## 1.21.0 - 2026-06-11
 
+- Added `sipx/types.py` with core type aliases: `SipMethod`, `StatusCode`, `HeaderName`, `HeaderValue`, and `Uri`.
+- Created new directory structure: `sipx/transport/`, `sipx/protocol/`, `sipx/rfc/`.
+- Added empty barrel `__init__.py` files with docstrings in new directories.
+- Exported new types from root `sipx.__init__` while preserving existing API.
+- Added `tests/test_types.py` with 3 tests verifying type alias correctness and root importability.
 - Added abstract `Transport` base class in `sipx.transport.base` with async `send`, `receive`, `close`, and `local_address`/`transport_type` properties.
 - Added `TransportConfig` dataclass with `local_host`, `local_port`, `timeout`, and `max_message_size` defaults.
 - Added `tests/test_transport_base.py` with mock transport implementation covering abstractness, config, send, receive, and close.

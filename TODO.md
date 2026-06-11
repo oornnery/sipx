@@ -532,6 +532,11 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 ## Block 1.21.0 Done
 
 - [x] Bumped root package version to `1.21.0`.
+- [x] Created `sipx/types.py` with core type aliases: `SipMethod` (str), `StatusCode` (int), `HeaderName` (str), `HeaderValue` (Union[str, list[str]]), `Uri` (str).
+- [x] Created new directory structure: `sipx/transport/`, `sipx/protocol/`, `sipx/rfc/`.
+- [x] Added empty barrel `__init__.py` files with docstrings in new directories.
+- [x] Exported new types from root `sipx.__init__` while preserving existing API.
+- [x] Added `tests/test_types.py` with 3 tests verifying type alias correctness and root importability.
 - [x] Added abstract `Transport` base class in `sipx.transport.base` with async `send`, `receive`, `close`, and properties `local_address`/`transport_type`.
 - [x] Added `TransportConfig` dataclass with `local_host`, `local_port`, `timeout`, and `max_message_size` defaults.
 - [x] Added `tests/test_transport_base.py` with mock transport covering abstractness, config defaults/overrides, send, receive, and close.

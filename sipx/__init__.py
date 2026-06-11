@@ -107,6 +107,13 @@ from sipx.ua import (
     SipUserAgent,
     SipWireRuntime,
 )
+from sipx.types import (
+    HeaderName,
+    HeaderValue,
+    SipMethod,
+    StatusCode,
+    Uri,
+)
 from sipx.summary import (
     SipCallSummary,
     SipRequestSummary,
@@ -122,6 +129,11 @@ from sipx.uas import SipUas, SipUasError
 
 __all__ = [
     "AudioFrame",
+    "HeaderName",
+    "HeaderValue",
+    "SipMethod",
+    "StatusCode",
+    "Uri",
     "AudioMedia",
     "BargeInPolicy",
     "BargeInSignal",
