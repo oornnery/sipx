@@ -2,7 +2,7 @@
 
 ## Summary
 
-Block `1.19.0` added RTP wire event hooks: `RtpWireEvent`/`RtpWireDirection` dataclasses, `event_hooks["rtp"]` support in `RtpAudioSessionConfig`, `debug_wire_rtp()` example helper with bordered SSRC/seq/ts/pt/payload output, wired through `SipUac`/`SipUas`, and enabled in `metrics.py`/`invite_with_sdp.py`. All 90 core tests, ruff lint/format, and type check pass.
+Block `1.21.0` added abstract `Transport` base class in `sipx.transport.base` with async `send`, `receive`, `close`, and properties `local_address`/`transport_type`; `TransportConfig` dataclass with common config defaults; mock transport tests in `tests/test_transport_base.py`. All 96 core tests (90 existing + 6 new), ruff lint/format, and type check pass.
 
 ## Read First
 

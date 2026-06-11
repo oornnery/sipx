@@ -7,7 +7,7 @@
 | `ruff format --check .` | formatting | pass |
 | `ruff check .` | lint | pass |
 | `uv run ty check` | type check | pass |
-| `pytest` | core tests | 90 pass |
+| `pytest tests/test_transport_base.py` | transport base tests | 6 pass |
 | `pre-commit run --all-files` | full local hooks | not run yet |
 
 ## Latest Results

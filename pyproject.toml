@@ -1,6 +1,6 @@
 [project]
 name = "sipx"
-version = "1.20.0"
+version = "1.21.0"
 description = "Python programmable Voice/SIP harness for call automation, IVR testing, technical softphones, and media validation"
 readme = "README.md"
 requires-python = ">=3.14"

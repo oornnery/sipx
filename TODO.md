@@ -529,6 +529,14 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 1.21.0 Done
+
+- [x] Bumped root package version to `1.21.0`.
+- [x] Added abstract `Transport` base class in `sipx.transport.base` with async `send`, `receive`, `close`, and properties `local_address`/`transport_type`.
+- [x] Added `TransportConfig` dataclass with `local_host`, `local_port`, `timeout`, and `max_message_size` defaults.
+- [x] Added `tests/test_transport_base.py` with mock transport covering abstractness, config defaults/overrides, send, receive, and close.
+- [x] Verified import, abstractness, and dataclass behavior via QA scenarios.
+
 ## Block 1.20.0 Done
 
 - [x] Bumped root package version to `1.20.0`.

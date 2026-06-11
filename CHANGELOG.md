@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.21.0 - 2026-06-11
+
+- Added abstract `Transport` base class in `sipx.transport.base` with async `send`, `receive`, `close`, and `local_address`/`transport_type` properties.
+- Added `TransportConfig` dataclass with `local_host`, `local_port`, `timeout`, and `max_message_size` defaults.
+- Added `tests/test_transport_base.py` with mock transport implementation covering abstractness, config, send, receive, and close.
+
 ## 1.20.0 - 2026-06-11
 
 - Added `.spec/rfc-compliance.md` with compliance matrix for all 10 targeted RFCs.

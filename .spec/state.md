@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.19.0` is complete: RTP wire event hooks (`RtpWireEvent`/`RtpWireDirection`), `event_hooks["rtp"]` support in `RtpAudioSessionConfig`, `debug_wire_rtp()` example helper with bordered SSRC/seq/ts/pt output, wired through `SipUac`/`SipUas`, and enabled in `metrics.py`/`invite_with_sdp.py` examples.
+Implement `sipx` in verified commit blocks. Block `1.21.0` is complete: abstract `Transport` base class in `sipx.transport.base` with async `send`, `receive`, `close`, and properties `local_address`/`transport_type`; `TransportConfig` dataclass with `local_host`, `local_port`, `timeout`, `max_message_size` defaults; mock transport tests in `tests/test_transport_base.py` covering abstractness, config, send, receive, and close.
 
 ## Sources Read
 
