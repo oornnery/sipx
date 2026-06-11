@@ -32,6 +32,46 @@ class SdpCodec:
         return f"{self.payload_type} {self.name}/{self.clock_rate}{channel_suffix}"
 
 
+@dataclass(frozen=True, slots=True)
+class Origin:
+    """Structured SDP origin (o= line)."""
+
+    username: str
+    session_id: str
+    session_version: str
+    nettype: str
+    addrtype: str
+    address: str
+
+
+@dataclass(frozen=True, slots=True)
+class Connection:
+    """Structured SDP connection (c= line)."""
+
+    nettype: str
+    addrtype: str
+    address: str
+
+
+@dataclass(frozen=True, slots=True)
+class Time:
+    """Structured SDP time (t= line)."""
+
+    start: int
+    stop: int
+
+
+@dataclass(slots=True)
+class MediaDescription:
+    """Structured SDP media description (m= line with attributes)."""
+
+    media_type: str
+    port: int
+    proto: str
+    fmt: list[str]
+    attributes: list[tuple[str, str | None]] = field(default_factory=list)
+
+
 @dataclass(slots=True)
 class AudioMedia:
     port: int
@@ -63,11 +103,16 @@ class AudioMedia:
 
 @dataclass(slots=True)
 class SessionDescription:
-    origin: str
-    session_name: str
-    connection_address: str
+    """SDP session description supporting both structured and legacy APIs."""
+
+    origin: str | Origin = ""
+    session_name: str = "-"
+    connection_address: str = ""
     audio: AudioMedia | None = None
     version: int = 0
+    connection: Connection | None = None
+    time: Time | None = None
+    media: list[MediaDescription] = field(default_factory=list)
 
     def has_codec(self, name: str) -> bool:
         return bool(self.audio and self.audio.has_codec(name))
@@ -76,14 +121,44 @@ class SessionDescription:
         return bool(self.audio and self.audio.has_dtmf_transport())
 
     def to_sdp(self) -> str:
-        lines = [
-            f"v={self.version}",
-            f"o={self.origin}",
-            f"s={self.session_name}",
-            f"c=IN IP4 {self.connection_address}",
-            "t=0 0",
-        ]
-        if self.audio:
+        """Generate SDP text from structured or legacy fields."""
+        lines = [f"v={self.version}"]
+
+        if isinstance(self.origin, Origin):
+            lines.append(
+                f"o={self.origin.username} {self.origin.session_id} "
+                f"{self.origin.session_version} {self.origin.nettype} "
+                f"{self.origin.addrtype} {self.origin.address}"
+            )
+        else:
+            lines.append(f"o={self.origin}")
+
+        lines.append(f"s={self.session_name}")
+
+        if self.connection is not None:
+            lines.append(
+                f"c={self.connection.nettype} {self.connection.addrtype} "
+                f"{self.connection.address}"
+            )
+        elif self.connection_address:
+            lines.append(f"c=IN IP4 {self.connection_address}")
+
+        if self.time is not None:
+            lines.append(f"t={self.time.start} {self.time.stop}")
+        else:
+            lines.append("t=0 0")
+
+        # Media lines: prefer structured media, fall back to legacy audio
+        if self.media:
+            for md in self.media:
+                fmt_str = " ".join(md.fmt)
+                lines.append(f"m={md.media_type} {md.port} {md.proto} {fmt_str}")
+                for attr_name, attr_value in md.attributes:
+                    if attr_value is not None:
+                        lines.append(f"a={attr_name}:{attr_value}")
+                    else:
+                        lines.append(f"a={attr_name}")
+        elif self.audio:
             payloads = " ".join(str(payload) for payload in self.audio.payload_types)
             lines.append(f"m=audio {self.audio.port} {self.audio.protocol} {payloads}")
             lines.append(f"a={self.audio.direction}")
@@ -94,4 +169,5 @@ class SessionDescription:
                 lines.append(f"a=rtpmap:{codec.rtpmap}")
                 if codec.fmtp:
                     lines.append(f"a=fmtp:{codec.payload_type} {codec.fmtp}")
+
         return "\r\n".join(lines) + "\r\n"

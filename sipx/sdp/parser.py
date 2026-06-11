@@ -3,9 +3,13 @@ from __future__ import annotations
 from sipx.sdp.model import (
     DIRECTIONS,
     AudioMedia,
+    Connection,
+    MediaDescription,
+    Origin,
     SdpCodec,
     SdpDirection,
     SessionDescription,
+    Time,
 )
 
 
@@ -21,9 +25,16 @@ class SdpParseError(ValueError):
 
 def parse_sdp(raw: str | bytes) -> SessionDescription:
     text = raw.decode("utf-8") if isinstance(raw, bytes) else raw
-    session = SessionDescription(
-        origin="- 0 0 IN IP4 0.0.0.0", session_name="-", connection_address="0.0.0.0"
-    )
+
+    version = 0
+    origin: str | Origin = ""
+    session_name = "-"
+    connection: Connection | None = None
+    connection_address = ""
+    time_desc: Time | None = None
+    media_list: list[MediaDescription] = []
+
+    current_media: MediaDescription | None = None
     current_audio: AudioMedia | None = None
 
     for raw_line in text.replace("\r\n", "\n").split("\n"):
@@ -35,34 +46,101 @@ def parse_sdp(raw: str | bytes) -> SessionDescription:
         value = raw_line[2:]
 
         if prefix == "v":
-            session.version = int(value)
+            version = int(value)
         elif prefix == "o":
-            session.origin = value
+            origin = _parse_origin(value)
         elif prefix == "s":
-            session.session_name = value
+            session_name = value
         elif prefix == "c":
-            session.connection_address = _parse_connection_address(value)
+            connection = _parse_connection(value)
+            connection_address = connection.address
+        elif prefix == "t":
+            time_desc = _parse_time(value)
         elif prefix == "m":
-            current_audio = _parse_audio_media(value)
-            session.audio = current_audio
-        elif prefix == "a" and current_audio is not None:
-            _parse_audio_attribute(current_audio, value)
+            current_media = _parse_media_description(value)
+            media_list.append(current_media)
+            if current_media.media_type == "audio":
+                try:
+                    current_audio = _parse_audio_media(value)
+                except SdpParseError:
+                    current_audio = None
+            else:
+                current_audio = None
+        elif prefix == "a":
+            if current_media is not None:
+                _parse_media_attribute(current_media, value)
+            if current_audio is not None:
+                _parse_audio_attribute(current_audio, value)
 
-    if session.audio is not None:
-        for payload_type in session.audio.payload_types:
+    if current_audio is not None:
+        for payload_type in current_audio.payload_types:
             if (
                 payload_type in STATIC_PAYLOADS
-                and payload_type not in session.audio.codecs
+                and payload_type not in current_audio.codecs
             ):
-                session.audio.codecs[payload_type] = STATIC_PAYLOADS[payload_type]
-    return session
+                current_audio.codecs[payload_type] = STATIC_PAYLOADS[payload_type]
+
+    return SessionDescription(
+        version=version,
+        origin=origin,
+        session_name=session_name,
+        connection_address=connection_address,
+        audio=current_audio,
+        connection=connection,
+        time=time_desc,
+        media=media_list,
+    )
 
 
-def _parse_connection_address(value: str) -> str:
+def _parse_origin(value: str) -> Origin:
+    parts = value.split()
+    if len(parts) != 6:
+        raise SdpParseError(f"invalid SDP origin: {value!r}")
+    return Origin(
+        username=parts[0],
+        session_id=parts[1],
+        session_version=parts[2],
+        nettype=parts[3],
+        addrtype=parts[4],
+        address=parts[5],
+    )
+
+
+def _parse_connection(value: str) -> Connection:
     parts = value.split()
     if len(parts) != 3 or parts[0] != "IN" or parts[1] not in {"IP4", "IP6"}:
         raise SdpParseError(f"unsupported SDP connection: {value!r}")
-    return parts[2]
+    return Connection(nettype=parts[0], addrtype=parts[1], address=parts[2])
+
+
+def _parse_time(value: str) -> Time:
+    parts = value.split()
+    if len(parts) != 2:
+        raise SdpParseError(f"invalid SDP time: {value!r}")
+    return Time(start=int(parts[0]), stop=int(parts[1]))
+
+
+def _parse_media_description(value: str) -> MediaDescription:
+    parts = value.split()
+    if len(parts) < 4:
+        raise SdpParseError(f"invalid SDP media: {value!r}")
+    return MediaDescription(
+        media_type=parts[0],
+        port=int(parts[1]),
+        proto=parts[2],
+        fmt=parts[3:],
+    )
+
+
+def _parse_media_attribute(media: MediaDescription, value: str) -> None:
+    if value in DIRECTIONS:
+        media.attributes.append((value, None))
+        return
+    if ":" in value:
+        attr_name, attr_value = value.split(":", 1)
+        media.attributes.append((attr_name, attr_value))
+    else:
+        media.attributes.append((value, None))
 
 
 def _parse_audio_media(value: str) -> AudioMedia:
