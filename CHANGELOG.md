@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.20.0 - 2026-06-11
+
+- Added `.spec/rfc-compliance.md` with compliance matrix for all 10 targeted RFCs.
+- Matrices cover RFC 3261, 3262, 3263, 3264, 3265, 3581, 3856, 3858, 3428, and 5626.
+- Each RFC table includes Requirement, MUST/SHOULD/MAY, Status (Planned), and Test Evidence columns.
+
 ## 1.19.0 - 2026-06-10
 
 - Added `RtpWireDirection`, `RtpWireEvent` dataclass for RTP packet tx/rx visibility.

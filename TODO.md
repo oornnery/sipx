@@ -529,6 +529,16 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 1.20.0 Done
+
+- [x] Bumped root package version to `1.20.0`.
+- [x] Created `.spec/rfc-compliance.md` with compliance matrix for all 10 targeted RFCs.
+- [x] Covered RFC 3261 (SIP core), RFC 3262 (PRACK), RFC 3263 (DNS), RFC 3264 (SDP offer/answer), RFC 3265 (event notification), RFC 3581 (rport), RFC 3856 (presence), RFC 3858 (PIDF), RFC 3428 (MESSAGE), and RFC 5626 (outbound).
+- [x] Each RFC has a table with Requirement, MUST/SHOULD/MAY, Status, and Test Evidence columns.
+- [x] All requirements start with "Planned" status for future task tracking.
+- [x] Included RFC citations with links to official documents.
+- [x] Verified file structure with QA scenarios.
+
 ## Block 1.19.0 Done
 
 - [x] Added `RtpWireDirection`, `RtpWireEvent` dataclass for RTP packet tx/rx visibility.
