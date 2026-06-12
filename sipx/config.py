@@ -1,4 +1,8 @@
-from dataclasses import dataclass
+from __future__ import annotations
+
+from copy import deepcopy
+from dataclasses import dataclass, fields
+from typing import Any
 
 
 @dataclass
@@ -6,7 +10,8 @@ class ClientConfig:
     """Configuration for SIP client behavior.
 
     Defaults match existing sipx behavior where applicable.
-    New httpx-like fields (user_agent) are added for the evolving API.
+    New httpx-like fields (user_agent, headers, params, cookies) are added
+    for the evolving API.
     """
 
     transport: str = "udp"
@@ -17,3 +22,58 @@ class ClientConfig:
     user_agent: str = "sipx/2.0"
     from_uri: str | None = None
     contact_uri: str | None = None
+    headers: dict[str, str] | None = None
+    params: dict[str, str] | None = None
+    cookies: dict[str, str] | None = None
+
+    def merge(self, overrides: dict[str, Any] | "ClientConfig" | None = None, **kwargs: Any) -> "ClientConfig":
+        """Merge overrides into this config and return a new ClientConfig.
+
+        Supports merging headers, params, cookies (dicts are shallow-merged).
+        Simple fields are overridden.  None values in overrides are ignored
+        so that ``merge(timeout=None)`` does not wipe the default.
+
+        Args:
+            overrides: Mapping or ClientConfig with override values.
+            **kwargs: Additional override keyword arguments.
+
+        Returns:
+            New ClientConfig with merged values.
+        """
+        if overrides is None:
+            overrides = {}
+
+        if isinstance(overrides, ClientConfig):
+            overrides = {
+                f.name: getattr(overrides, f.name)
+                for f in fields(ClientConfig)
+            }
+        else:
+            overrides = dict(overrides)
+
+        overrides.update(kwargs)
+
+        current = {
+            f.name: getattr(self, f.name)
+            for f in fields(ClientConfig)
+        }
+
+        merged: dict[str, Any] = {}
+        for f in fields(ClientConfig):
+            name = f.name
+            old = current[name]
+            new = overrides.get(name)
+
+            if name in ("headers", "params", "cookies"):
+                # Shallow-merge dict fields; None means "no addition".
+                left = old if old is not None else {}
+                right = new if new is not None else {}
+                merged[name] = {**left, **right}
+                if not merged[name]:
+                    merged[name] = None
+            elif new is not None:
+                merged[name] = new
+            else:
+                merged[name] = deepcopy(old)
+
+        return ClientConfig(**merged)
