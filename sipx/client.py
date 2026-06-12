@@ -654,14 +654,39 @@ class AsyncClient:
         return await self._send_request(request, remote)
 
     async def message(self, uri: str, body: str | bytes, **kwargs: Any) -> Response:
-        """Send a MESSAGE request (RFC 3428)."""
+        """Send a MESSAGE request (RFC 3428).
+
+        Args:
+            uri: Target SIP URI.
+            body: Message body as str or bytes.
+            **kwargs: Extra headers merged into the request.
+
+        Returns:
+            The SIP response.
+
+        Raises:
+            ProtocolError: If the response is a 4xx or 5xx error.
+        """
         if isinstance(body, str):
             body = body.encode("utf-8")
             kwargs.setdefault("Content-Type", "text/plain")
+        elif isinstance(body, bytes):
+            kwargs.setdefault("Content-Type", "application/octet-stream")
+
+        kwargs["Content-Length"] = str(len(body))
 
         request = self._build_request("MESSAGE", uri, body=body, **kwargs)
         remote = _parse_remote(uri)
-        return await self._send_request(request, remote)
+        response = await self._send_request(request, remote)
+
+        if 400 <= response.status_code < 600:
+            raise ProtocolError(
+                f"MESSAGE failed: {response.status_code} {response.reason}",
+                rfc_ref="RFC 3428",
+                details={"status_code": response.status_code, "reason": response.reason},
+            )
+
+        return response
 
     async def options(self, uri: str, **kwargs: Any) -> Response:
         """Send an OPTIONS request (RFC 3261 §11)."""
