@@ -21,9 +21,7 @@ from sipx.sip import (
 )
 from sipx.sdp import create_audio_offer
 from sipx.sip.transport import SipWireEvent
-from sipx.ua import EventHooks, SipRetransmissionPolicy, SipUserAgent
-from sipx.uac import SipUac
-from sipx.uas import SipUas
+from sipx.legacy import EventHooks, SipRetransmissionPolicy, SipUserAgent, SipUac, SipUas
 
 
 CallAudioMode = Literal["none", "silence", "noise", "pyaudio"]

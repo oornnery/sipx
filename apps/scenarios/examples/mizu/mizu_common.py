@@ -21,7 +21,7 @@ from sipx import (
     build_digest_authorization,
     parse_digest_challenge,
 )
-from sipx.ua import EventHooks
+from sipx.legacy import EventHooks
 
 
 PUBLIC_MIZU_AOR = "sip:1111@demo.mizu-voip.com:37075"

@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from sipx.uac import SipUac as ModuleSipUac
-from sipx.uas import SipUas as ModuleSipUas
+from sipx.legacy import SipUac as ModuleSipUac
+from sipx.legacy import SipUas as ModuleSipUas
 from sipx import (
     HeaderMap,
     RegisterClientState,
@@ -55,8 +55,8 @@ def test_sip_uac_uas_roles_implement_runtime_abcs() -> None:
 def test_sip_uac_uas_roles_live_in_split_modules() -> None:
     assert SipUac is ModuleSipUac
     assert SipUas is ModuleSipUas
-    assert SipUac.__module__ == "sipx.uac"
-    assert SipUas.__module__ == "sipx.uas"
+    assert SipUac.__module__ == "sipx.legacy"
+    assert SipUas.__module__ == "sipx.legacy"
 
 
 def test_sip_uac_uas_high_level_contact_requires_start() -> None:

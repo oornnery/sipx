@@ -16,7 +16,7 @@ from sipx.sip.message import DEFAULT_MAX_MESSAGE_SIZE
 from sipx.sip.register import RegisterClientState
 from sipx.sip.transport import UdpAddress
 from sipx.sip.uri import SipUri
-from sipx.ua import (
+from sipx.legacy import (
     EventHooks,
     SipCall,
     SipCallState,

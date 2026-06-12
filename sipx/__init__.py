@@ -93,7 +93,7 @@ from sipx.sip import (
     sip_wire_event_name,
 )
 from sipx.client import AsyncClient
-from sipx.ua import (
+from sipx.legacy import (
     EventHooks,
     SipCall,
     SipCallError,
@@ -125,8 +125,7 @@ from sipx.summary import (
     response_summary,
     sdp_summary,
 )
-from sipx.uac import SipUac, SipUacError
-from sipx.uas import SipUas, SipUasError
+from sipx.legacy import SipUac, SipUacError, SipUas, SipUasError
 
 __all__ = [
     "AsyncClient",
