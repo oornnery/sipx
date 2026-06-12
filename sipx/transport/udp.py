@@ -241,6 +241,8 @@ class UdpTransport(Transport):
             and received is the IP address string or None.
         """
         via = response.headers.get("Via", "")
+        if isinstance(via, list):
+            via = via[0] if via else ""
         if not via:
             return None, None
 

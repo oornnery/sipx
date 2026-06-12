@@ -23,8 +23,12 @@ class TcpTransport(Transport):
 
     def __init__(self, config: TransportConfig | None = None) -> None:
         self._config = config or TransportConfig()
-        self._connections: dict[tuple[str, int], tuple[asyncio.StreamReader, asyncio.StreamWriter]] = {}
-        self._receive_queue: asyncio.Queue[tuple[bytes, tuple[str, int]] | None] = asyncio.Queue()
+        self._connections: dict[
+            tuple[str, int], tuple[asyncio.StreamReader, asyncio.StreamWriter]
+        ] = {}
+        self._receive_queue: asyncio.Queue[tuple[bytes, tuple[str, int]] | None] = (
+            asyncio.Queue()
+        )
         self._closed = False
         self._receive_tasks: set[asyncio.Task] = set()
 
@@ -144,7 +148,9 @@ class TcpTransport(Transport):
         # Signal receive loop to stop
         await self._receive_queue.put(None)
 
-    async def _read_loop(self, reader: asyncio.StreamReader, remote: tuple[str, int]) -> None:
+    async def _read_loop(
+        self, reader: asyncio.StreamReader, remote: tuple[str, int]
+    ) -> None:
         """Read and frame SIP messages from a connection."""
         buffer = b""
         try:

@@ -8,10 +8,17 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-from sipx.client import AsyncClient, _new_branch, _new_call_id, _new_tag, _parse_remote, _parse_response
+from sipx.client import (
+    AsyncClient,
+    _new_branch,
+    _new_call_id,
+    _new_tag,
+    _parse_remote,
+    _parse_response,
+)
 from sipx.config import ClientConfig
 from sipx.exceptions import TimeoutError as SipTimeoutError
-from sipx.models import Request, Response
+from sipx.models import Request
 from sipx.protocol.auth import AuthFlow
 
 
@@ -43,7 +50,13 @@ class MockTransport:
     def local_address(self) -> tuple[str, int]:
         return ("127.0.0.1", 5060)
 
-    def add_response(self, status_code: int, reason: str, headers: dict | None = None, body: bytes | None = None):
+    def add_response(
+        self,
+        status_code: int,
+        reason: str,
+        headers: dict | None = None,
+        body: bytes | None = None,
+    ):
         """Add a response to be returned by the mock transport."""
         header_lines = []
         if headers:
@@ -262,7 +275,9 @@ class TestUACMethods:
         assert b"REGISTER sip:example.com SIP/2.0" in sent_data
 
     @pytest.mark.asyncio
-    async def test_message_sends_request_with_body(self, client_with_mock, mock_transport):
+    async def test_message_sends_request_with_body(
+        self, client_with_mock, mock_transport
+    ):
         """message() must send a MESSAGE request with body."""
         call_id = "test-call-id-message"
         mock_transport.add_response(
@@ -272,7 +287,9 @@ class TestUACMethods:
         )
 
         with patch("sipx.client._new_call_id", return_value=call_id):
-            response = await client_with_mock.message("sip:bob@example.com", "Hello, World!")
+            response = await client_with_mock.message(
+                "sip:bob@example.com", "Hello, World!"
+            )
 
         assert response.status_code == 200
         assert len(mock_transport.sent_data) == 1
@@ -281,7 +298,9 @@ class TestUACMethods:
         assert b"Hello, World!" in sent_data
 
     @pytest.mark.asyncio
-    async def test_subscribe_sends_request_with_event(self, client_with_mock, mock_transport):
+    async def test_subscribe_sends_request_with_event(
+        self, client_with_mock, mock_transport
+    ):
         """subscribe() must send a SUBSCRIBE request with Event header."""
         call_id = "test-call-id-subscribe"
         mock_transport.add_response(
@@ -291,7 +310,9 @@ class TestUACMethods:
         )
 
         with patch("sipx.client._new_call_id", return_value=call_id):
-            response = await client_with_mock.subscribe("sip:bob@example.com", event="presence")
+            response = await client_with_mock.subscribe(
+                "sip:bob@example.com", event="presence"
+            )
 
         assert response.status_code == 200
         assert len(mock_transport.sent_data) == 1
@@ -304,7 +325,9 @@ class TestTransactionManagement:
     """Tests for transaction management."""
 
     @pytest.mark.asyncio
-    async def test_transaction_created_for_request(self, client_with_mock, mock_transport):
+    async def test_transaction_created_for_request(
+        self, client_with_mock, mock_transport
+    ):
         """UAC methods must create ClientTransaction for state tracking."""
         call_id = "test-transaction"
         mock_transport.add_response(
@@ -319,7 +342,9 @@ class TestTransactionManagement:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_provisional_response_triggers_hook(self, client_with_mock, mock_transport):
+    async def test_provisional_response_triggers_hook(
+        self, client_with_mock, mock_transport
+    ):
         """Provisional responses (1xx) must trigger provisional hooks."""
         call_id = "test-provisional"
         provisional_called = []
@@ -355,7 +380,9 @@ class TestDialogManagement:
     """Tests for dialog management."""
 
     @pytest.mark.asyncio
-    async def test_dialog_created_on_invite_success(self, client_with_mock, mock_transport):
+    async def test_dialog_created_on_invite_success(
+        self, client_with_mock, mock_transport
+    ):
         """INVITE with 2xx response must create a Dialog."""
         call_id = "test-dialog"
         mock_transport.add_response(
@@ -499,7 +526,9 @@ class TestTimeoutHandling:
     """Tests for timeout handling."""
 
     @pytest.mark.asyncio
-    async def test_timeout_raises_sip_timeout_error(self, client_with_mock, mock_transport):
+    async def test_timeout_raises_sip_timeout_error(
+        self, client_with_mock, mock_transport
+    ):
         """Timeout must raise SipTimeoutError."""
         client_with_mock._config.timeout = 0.1
 

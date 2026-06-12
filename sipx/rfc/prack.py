@@ -84,7 +84,7 @@ class PrackHandler:
 
         try:
             rseq = int(rseq_raw) if not isinstance(rseq_raw, list) else int(rseq_raw[0])
-        except (ValueError, IndexError):
+        except ValueError, IndexError:
             raise ProtocolError(
                 f"Invalid RSeq header value: {rseq_raw}",
                 rfc_ref="RFC 3262 §3",
@@ -118,7 +118,7 @@ class PrackHandler:
         prack_cseq = self._prack_cseq
         self._prack_cseq += 1
 
-        prack_headers: dict[str, str] = {
+        prack_headers: dict[str, str | list[str]] = {
             "RAck": rack_value,
             "CSeq": f"{prack_cseq} PRACK",
         }
@@ -153,7 +153,7 @@ class PrackHandler:
         parts = str(cseq_raw).split(None, 1)
         try:
             return int(parts[0])
-        except (ValueError, IndexError):
+        except ValueError, IndexError:
             return 1
 
     @property

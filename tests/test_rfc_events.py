@@ -7,7 +7,7 @@ import pytest
 from sipx.exceptions import ProtocolError
 from sipx.models import Request, Response
 from sipx.protocol.transaction import ClientTransaction
-from sipx.rfc.events import SubscriptionDialog, SubscriptionState
+from sipx.rfc.events import SubscriptionDialog
 
 
 def _subscribe_request(
@@ -73,6 +73,7 @@ class TestSubscriptionDialogCreation:
 
     def test_import(self):
         from sipx.rfc.events import SubscriptionDialog
+
         assert SubscriptionDialog is not None
 
     def test_create_active_from_200(self):

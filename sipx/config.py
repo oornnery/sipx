@@ -39,7 +39,9 @@ class ClientConfig:
     params: dict[str, str] | None = None
     cookies: dict[str, str] | None = None
 
-    def merge(self, overrides: dict[str, Any] | "ClientConfig" | None = None, **kwargs: Any) -> "ClientConfig":
+    def merge(
+        self, overrides: dict[str, Any] | "ClientConfig" | None = None, **kwargs: Any
+    ) -> "ClientConfig":
         """Merge overrides into this config and return a new ClientConfig.
 
         Supports merging headers, params, cookies (dicts are shallow-merged).
@@ -58,18 +60,14 @@ class ClientConfig:
 
         if isinstance(overrides, ClientConfig):
             overrides = {
-                f.name: getattr(overrides, f.name)
-                for f in fields(ClientConfig)
+                f.name: getattr(overrides, f.name) for f in fields(ClientConfig)
             }
         else:
             overrides = dict(overrides)
 
         overrides.update(kwargs)
 
-        current = {
-            f.name: getattr(self, f.name)
-            for f in fields(ClientConfig)
-        }
+        current = {f.name: getattr(self, f.name) for f in fields(ClientConfig)}
 
         merged: dict[str, Any] = {}
         for f in fields(ClientConfig):

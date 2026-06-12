@@ -19,6 +19,9 @@ class TransportConfig:
 class Transport(abc.ABC):
     """Abstract base class for SIP transports (UDP, TCP, TLS)."""
 
+    def __init__(self, config: TransportConfig | None = None) -> None:
+        self._config = config or TransportConfig()
+
     @abc.abstractmethod
     async def send(self, data: bytes, remote: tuple[str, int]) -> None:
         """Send raw bytes to the remote address."""

@@ -406,9 +406,7 @@ class TestTargetRefresh:
     def test_target_refresh_on_2xx(self) -> None:
         """Remote target is refreshed on 2xx response."""
         req = make_invite_request()
-        resp = make_invite_response(
-            req, 200, "OK", contact="<sip:bob@192.0.2.2:5060>"
-        )
+        resp = make_invite_response(req, 200, "OK", contact="<sip:bob@192.0.2.2:5060>")
         dialog = Dialog.from_invite(req, resp)
 
         assert dialog.remote_target == "<sip:bob@192.0.2.2:5060>"
@@ -445,7 +443,7 @@ class TestDialogId:
         dialog_id = DialogId("call-123", "local-tag", "remote-tag")
 
         with pytest.raises(AttributeError):
-            dialog_id.call_id = "new-call"  # type: ignore[misc]
+            setattr(dialog_id, "call_id", "new-call")  # noqa: B010
 
 
 # --- DialogState Tests ---

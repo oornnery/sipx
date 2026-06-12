@@ -47,9 +47,7 @@ def _extract_tag(header_value: str, header_name: str) -> str | None:
     return None
 
 
-def _require_header(
-    message: Request | Response, name: str
-) -> str:
+def _require_header(message: Request | Response, name: str) -> str:
     """Get a required header value or raise DialogError."""
     value = message.headers.get(name)
     if value is None:
@@ -176,9 +174,7 @@ class Dialog:
         contact = _require_header(response, "Contact")
 
         state = (
-            DialogState.CONFIRMED
-            if response.status_code >= 200
-            else DialogState.EARLY
+            DialogState.CONFIRMED if response.status_code >= 200 else DialogState.EARLY
         )
 
         # CSeq from request.
@@ -284,9 +280,7 @@ class Dialog:
         # Target refresh: update remote target from Contact (§12.2.2).
         contact = response.headers.get("Contact")
         if contact and status >= 200:
-            self.remote_target = (
-                contact[0] if isinstance(contact, list) else contact
-            )
+            self.remote_target = contact[0] if isinstance(contact, list) else contact
 
         # Route set refresh on 2xx (§12.2.2).
         if 200 <= status < 300:
@@ -358,8 +352,7 @@ class Dialog:
         call_id = _require_header(response, "Call-ID")
         if call_id != self.dialog_id.call_id:
             raise DialogError(
-                f"Call-ID mismatch: expected {self.dialog_id.call_id}, "
-                f"got {call_id}",
+                f"Call-ID mismatch: expected {self.dialog_id.call_id}, got {call_id}",
                 rfc_ref="RFC 3261 §12.2.2",
             )
 

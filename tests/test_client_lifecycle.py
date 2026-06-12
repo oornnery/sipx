@@ -6,7 +6,6 @@ management, and error handling during the client lifecycle.
 
 from __future__ import annotations
 
-import asyncio
 
 import pytest
 
@@ -18,6 +17,7 @@ from sipx.exceptions import TransportError
 # Construction / closed state
 # ---------------------------------------------------------------------------
 
+
 def test_client_starts_closed() -> None:
     """AsyncClient must start in a closed state after construction."""
     client = AsyncClient()
@@ -27,6 +27,7 @@ def test_client_starts_closed() -> None:
 # ---------------------------------------------------------------------------
 # __aenter__
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_aenter_opens_client() -> None:
@@ -67,6 +68,7 @@ async def test_aenter_starts_receive_loop() -> None:
 # __aexit__
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_aexit_closes_client() -> None:
     """__aexit__ must transition is_closed back to True."""
@@ -102,6 +104,7 @@ async def test_aexit_closes_transport() -> None:
 # Context manager (combined enter + exit)
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_context_manager_basic() -> None:
     """async with must open the client on entry and close on exit."""
@@ -125,6 +128,7 @@ async def test_context_manager_with_exception() -> None:
 # ---------------------------------------------------------------------------
 # aclose()
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_aclose_closes_opened_client() -> None:

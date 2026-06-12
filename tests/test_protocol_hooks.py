@@ -1,6 +1,5 @@
 import asyncio
 
-import pytest
 
 from sipx.models import Request, Response
 from sipx.protocol.hooks import EventHooks, run_hooks
@@ -9,6 +8,7 @@ from sipx.protocol.hooks import EventHooks, run_hooks
 # ---------------------------------------------------------------------------
 # Hook registration / basic structure
 # ---------------------------------------------------------------------------
+
 
 def test_event_hooks_type_is_dict_of_callable_lists():
     hooks: EventHooks = {
@@ -23,6 +23,7 @@ def test_event_hooks_type_is_dict_of_callable_lists():
 # ---------------------------------------------------------------------------
 # Hook execution — sync
 # ---------------------------------------------------------------------------
+
 
 def test_run_hooks_executes_sync_hook():
     called = []
@@ -53,6 +54,7 @@ def test_run_hooks_executes_multiple_sync_hooks():
 # Hook execution — async
 # ---------------------------------------------------------------------------
 
+
 def test_run_hooks_executes_async_hook():
     called = []
 
@@ -81,6 +83,7 @@ def test_run_hooks_executes_mixed_sync_and_async_hooks():
 # ---------------------------------------------------------------------------
 # Error tolerance
 # ---------------------------------------------------------------------------
+
 
 def test_run_hooks_sync_error_does_not_break_flow():
     called = []
@@ -136,6 +139,7 @@ def test_run_hooks_mixed_errors_do_not_break_flow():
 # Edge cases — empty / missing
 # ---------------------------------------------------------------------------
 
+
 def test_run_hooks_empty_hooks_dict():
     hooks: EventHooks = {}
     asyncio.run(run_hooks(hooks, "request", None))
@@ -149,6 +153,7 @@ def test_run_hooks_missing_event_key():
 # ---------------------------------------------------------------------------
 # Integration with sipx models
 # ---------------------------------------------------------------------------
+
 
 def test_run_hooks_with_request_and_response_objects():
     req = Request(method="INVITE", uri="sip:bob@example.com", headers={}, body=None)

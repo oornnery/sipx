@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from sipx.exceptions import ProtocolError
-from sipx.models import Request, Response
+from sipx.models import Request
 from sipx.rfc.events import SubscriptionDialog, SubscriptionState
 from sipx.rfc.presence import (
     PIDF_NS,
@@ -98,7 +98,9 @@ class TestPresenceImport:
         """PresenceEventPackage can be created with entity and tuples."""
         pkg = PresenceEventPackage(
             entity="pres:bob@example.com",
-            tuples=[PresenceTuple(id="t1", status="open", contact="sip:bob@example.com")],
+            tuples=[
+                PresenceTuple(id="t1", status="open", contact="sip:bob@example.com")
+            ],
         )
         assert pkg.entity == "pres:bob@example.com"
         assert len(pkg.tuples) == 1
@@ -175,7 +177,9 @@ class TestPidfGeneration:
         """Generated PIDF contains the PIDF namespace."""
         pkg = PresenceEventPackage(
             entity="pres:bob@example.com",
-            tuples=[PresenceTuple(id="t1", status="open", contact="sip:bob@example.com")],
+            tuples=[
+                PresenceTuple(id="t1", status="open", contact="sip:bob@example.com")
+            ],
         )
         pidf = pkg.to_pidf()
         assert PIDF_NS in pidf
@@ -193,7 +197,9 @@ class TestPidfGeneration:
         """Generated PIDF contains basic status element."""
         pkg = PresenceEventPackage(
             entity="pres:bob@example.com",
-            tuples=[PresenceTuple(id="t1", status="open", contact="sip:bob@example.com")],
+            tuples=[
+                PresenceTuple(id="t1", status="open", contact="sip:bob@example.com")
+            ],
         )
         pidf = pkg.to_pidf()
         assert "<basic>open</basic>" in pidf
@@ -204,7 +210,9 @@ class TestPidfGeneration:
             entity="pres:alice@example.com",
             tuples=[
                 PresenceTuple(id="t1", status="open", contact="sip:alice@example.com"),
-                PresenceTuple(id="t2", status="closed", contact="sip:alice@home.example.com"),
+                PresenceTuple(
+                    id="t2", status="closed", contact="sip:alice@home.example.com"
+                ),
             ],
         )
         pidf_xml = original.to_pidf()
@@ -318,7 +326,9 @@ class TestSubscriptionIntegration:
         """build_notify_request creates a NOTIFY with PIDF body."""
         pkg = PresenceEventPackage(
             entity="pres:bob@example.com",
-            tuples=[PresenceTuple(id="t1", status="open", contact="sip:bob@example.com")],
+            tuples=[
+                PresenceTuple(id="t1", status="open", contact="sip:bob@example.com")
+            ],
         )
         dialog = PresenceEventPackage.create_subscription(
             subscriber_uri="sip:alice@example.com",

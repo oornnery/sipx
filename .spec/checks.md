@@ -15,6 +15,13 @@
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-06-12 | `uv run pytest` (block 2.0.0) | pass | 525 core tests pass after AsyncClient overhaul, example V64 fixes, and type fixes. |
+| 2026-06-12 | `uv run pytest apps` (block 2.0.0) | pass | 65 pass, 3 skip after rewriting stale CLI test fakes to drive real `SipUserAgent.request()`. |
+| 2026-06-12 | `uv run ruff check .` (block 2.0.0) | pass | Clean after auto-fixes; uncommitted `[tool.ruff] preview = true` was removed (caused 154 preview-only findings). |
+| 2026-06-12 | `uv run ruff format --check .` (block 2.0.0) | pass | 168 files formatted; overhaul commits had 26 unformatted files, now fixed. |
+| 2026-06-12 | `uv run ty check` (block 2.0.0) | pass | Fixed 19 diagnostics in client/protocol/rfc/transport/tests from the overhaul. |
+| 2026-06-12 | `uv run pytest --cov=sipx --cov-fail-under=90` | fail | 82% total (87% excluding `sipx/examples/*`); overhaul plan target of 90% not reached. Biggest gaps: `sipx/legacy.py` 77%, example scripts 19-36%. |
+| 2026-06-12 | `python -c "from sipx import AsyncClient, Request, Response"` | pass | Root exports fixed; previously `Request`/`Response`/`ClientConfig` were missing from `sipx/__init__.py`. |
 | 2026-06-12 | `pytest tests/test_transport_tls.py` | pass | 12 tests pass for TlsTransport and TlsConfig implementation. |
 | 2026-06-12 | `ruff check sipx/transport/tls.py tests/test_transport_tls.py` | pass | All lint checks pass for TLS transport implementation. |
 | 2026-06-12 | `ruff format --check sipx/transport/tls.py tests/test_transport_tls.py` | pass | Format clean for TLS transport files. |

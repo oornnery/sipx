@@ -18,7 +18,7 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
-EventHooks = dict[str, list[Callable[..., None]]]
+EventHooks = dict[str, list[Callable[..., Any]]]
 
 
 async def run_hooks(hooks: EventHooks, event: str, *args: Any) -> None:

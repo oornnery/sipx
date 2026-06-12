@@ -42,7 +42,13 @@ class MockTransport:
     def local_address(self) -> tuple[str, int]:
         return ("127.0.0.1", 5060)
 
-    def add_response(self, status_code: int, reason: str, headers: dict | None = None, body: bytes | None = None):
+    def add_response(
+        self,
+        status_code: int,
+        reason: str,
+        headers: dict | None = None,
+        body: bytes | None = None,
+    ):
         """Add a response to be returned by the mock transport."""
         header_lines = []
         if headers:
@@ -100,7 +106,9 @@ class TestMessageMethod:
         )
 
         with patch("sipx.client._new_call_id", return_value=call_id):
-            response = await client_with_mock.message("sip:bob@example.com", "Hello, Bob!")
+            response = await client_with_mock.message(
+                "sip:bob@example.com", "Hello, Bob!"
+            )
 
         assert response.status_code == 200
         assert len(mock_transport.sent_data) == 1
@@ -134,7 +142,9 @@ class TestMessageMethod:
         assert b"<html><body>Hello</body></html>" in sent_data
 
     @pytest.mark.asyncio
-    async def test_message_content_length_header(self, client_with_mock, mock_transport):
+    async def test_message_content_length_header(
+        self, client_with_mock, mock_transport
+    ):
         """MESSAGE must include correct Content-Length header."""
         call_id = "test-message-length"
         mock_transport.add_response(
@@ -153,7 +163,9 @@ class TestMessageMethod:
         assert f"Content-Length: {expected_length}".encode() in sent_data
 
     @pytest.mark.asyncio
-    async def test_message_4xx_raises_protocol_error(self, client_with_mock, mock_transport):
+    async def test_message_4xx_raises_protocol_error(
+        self, client_with_mock, mock_transport
+    ):
         """MESSAGE with 4xx response must raise ProtocolError."""
         call_id = "test-message-4xx"
         mock_transport.add_response(
@@ -171,7 +183,9 @@ class TestMessageMethod:
         assert exc_info.value.rfc_ref == "RFC 3428"
 
     @pytest.mark.asyncio
-    async def test_message_5xx_raises_protocol_error(self, client_with_mock, mock_transport):
+    async def test_message_5xx_raises_protocol_error(
+        self, client_with_mock, mock_transport
+    ):
         """MESSAGE with 5xx response must raise ProtocolError."""
         call_id = "test-message-5xx"
         mock_transport.add_response(
@@ -189,7 +203,9 @@ class TestMessageMethod:
         assert exc_info.value.rfc_ref == "RFC 3428"
 
     @pytest.mark.asyncio
-    async def test_message_with_bytes_body_and_explicit_content_type(self, client_with_mock, mock_transport):
+    async def test_message_with_bytes_body_and_explicit_content_type(
+        self, client_with_mock, mock_transport
+    ):
         """MESSAGE with bytes body and explicit Content-Type must use provided type."""
         call_id = "test-message-bytes"
         mock_transport.add_response(
@@ -229,7 +245,9 @@ class TestMessageMethod:
         assert b"Content-Length: 0" in sent_data
 
     @pytest.mark.asyncio
-    async def test_message_480_raises_protocol_error(self, client_with_mock, mock_transport):
+    async def test_message_480_raises_protocol_error(
+        self, client_with_mock, mock_transport
+    ):
         """MESSAGE with 480 Temporarily Unavailable must raise ProtocolError."""
         call_id = "test-message-480"
         mock_transport.add_response(
@@ -246,7 +264,9 @@ class TestMessageMethod:
         assert exc_info.value.details["status_code"] == 480
 
     @pytest.mark.asyncio
-    async def test_message_503_raises_protocol_error(self, client_with_mock, mock_transport):
+    async def test_message_503_raises_protocol_error(
+        self, client_with_mock, mock_transport
+    ):
         """MESSAGE with 503 Service Unavailable must raise ProtocolError."""
         call_id = "test-message-503"
         mock_transport.add_response(

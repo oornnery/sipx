@@ -6,7 +6,7 @@ import pytest
 
 from sipx.exceptions import AuthError
 from sipx.models import Request, Response
-from sipx.protocol.auth import AuthFlow, DigestChallenge
+from sipx.protocol.auth import AuthFlow
 
 
 def make_request(
@@ -177,6 +177,7 @@ class TestDigestAuthentication:
 
         auth_req = flow.send(resp)
         auth_header = auth_req.headers["Authorization"]
+        assert isinstance(auth_header, str)
 
         # Response hash should be present
         assert 'response="' in auth_header

@@ -93,6 +93,8 @@ from sipx.sip import (
     sip_wire_event_name,
 )
 from sipx.client import AsyncClient
+from sipx.config import ClientConfig
+from sipx.models import Request, Response
 from sipx.legacy import (
     EventHooks,
     SipCall,
@@ -130,6 +132,9 @@ from sipx.legacy import SipUac, SipUacError, SipUas, SipUasError
 __all__ = [
     "AsyncClient",
     "AudioFrame",
+    "ClientConfig",
+    "Request",
+    "Response",
     "HeaderName",
     "HeaderValue",
     "SipMethod",

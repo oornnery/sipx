@@ -4,7 +4,9 @@ from sipx.models import Request, Response
 
 
 def test_request_construction():
-    req = Request(method="INVITE", uri="sip:bob@example.com", headers={"From": "alice"}, body=None)
+    req = Request(
+        method="INVITE", uri="sip:bob@example.com", headers={"From": "alice"}, body=None
+    )
     assert req.method == "INVITE"
     assert req.uri == "sip:bob@example.com"
     assert req.headers == {"From": "alice"}
@@ -20,7 +22,9 @@ def test_request_defaults():
 
 
 def test_request_build_with_dict_and_kwargs():
-    req = Request.build("INVITE", "sip:bob@example.com", headers={"From": "alice"}, To="bob")
+    req = Request.build(
+        "INVITE", "sip:bob@example.com", headers={"From": "alice"}, To="bob"
+    )
     assert req.method == "INVITE"
     assert req.uri == "sip:bob@example.com"
     assert req.headers == {"From": "alice", "To": "bob"}

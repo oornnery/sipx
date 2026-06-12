@@ -74,14 +74,29 @@ async def test_on_invite_invocation():
 
     async def handle_invite(request: Request) -> Response:
         invoked.append(request)
-        return Response(200, "OK", {"Call-ID": "test-call-123", "To": "bob;tag=789", "Contact": "sip:bob@example.com"}, None)
+        return Response(
+            200,
+            "OK",
+            {
+                "Call-ID": "test-call-123",
+                "To": "bob;tag=789",
+                "Contact": "sip:bob@example.com",
+            },
+            None,
+        )
 
     client.on_invite(handle_invite)
 
     request = Request(
         method="INVITE",
         uri="sip:bob@example.com",
-        headers={"Call-ID": "test-call-123", "From": "alice;tag=456", "To": "bob", "CSeq": "1 INVITE", "Contact": "sip:alice@example.com"},
+        headers={
+            "Call-ID": "test-call-123",
+            "From": "alice;tag=456",
+            "To": "bob",
+            "CSeq": "1 INVITE",
+            "Contact": "sip:alice@example.com",
+        },
     )
 
     response = await client.handle_request(request)
@@ -223,14 +238,29 @@ async def test_transaction_management():
     client = AsyncClient()
 
     async def handle_invite(request: Request) -> Response:
-        return Response(200, "OK", {"Call-ID": "test-txn-123", "To": "bob;tag=789", "Contact": "sip:bob@example.com"}, None)
+        return Response(
+            200,
+            "OK",
+            {
+                "Call-ID": "test-txn-123",
+                "To": "bob;tag=789",
+                "Contact": "sip:bob@example.com",
+            },
+            None,
+        )
 
     client.on_invite(handle_invite)
 
     request = Request(
         method="INVITE",
         uri="sip:bob@example.com",
-        headers={"Call-ID": "test-txn-123", "From": "alice;tag=456", "To": "bob", "CSeq": "1 INVITE", "Contact": "sip:alice@example.com"},
+        headers={
+            "Call-ID": "test-txn-123",
+            "From": "alice;tag=456",
+            "To": "bob",
+            "CSeq": "1 INVITE",
+            "Contact": "sip:alice@example.com",
+        },
     )
 
     response = await client.handle_request(request)
@@ -244,7 +274,16 @@ async def test_dialog_management():
     client = AsyncClient()
 
     async def handle_invite(request: Request) -> Response:
-        return Response(200, "OK", {"Call-ID": "test-dialog-123", "To": "bob;tag=123", "Contact": "sip:bob@example.com"}, None)
+        return Response(
+            200,
+            "OK",
+            {
+                "Call-ID": "test-dialog-123",
+                "To": "bob;tag=123",
+                "Contact": "sip:bob@example.com",
+            },
+            None,
+        )
 
     client.on_invite(handle_invite)
 
@@ -276,7 +315,16 @@ async def test_multiple_handlers():
 
     async def handle_invite(request: Request) -> Response:
         invite_count.append(1)
-        return Response(200, "OK", {"Call-ID": "test-multi-1", "To": "bob;tag=789", "Contact": "sip:bob@example.com"}, None)
+        return Response(
+            200,
+            "OK",
+            {
+                "Call-ID": "test-multi-1",
+                "To": "bob;tag=789",
+                "Contact": "sip:bob@example.com",
+            },
+            None,
+        )
 
     async def handle_message(request: Request) -> Response:
         message_count.append(1)
@@ -288,7 +336,13 @@ async def test_multiple_handlers():
     invite_request = Request(
         method="INVITE",
         uri="sip:bob@example.com",
-        headers={"Call-ID": "test-multi-1", "From": "alice;tag=456", "To": "bob", "CSeq": "1 INVITE", "Contact": "sip:alice@example.com"},
+        headers={
+            "Call-ID": "test-multi-1",
+            "From": "alice;tag=456",
+            "To": "bob",
+            "CSeq": "1 INVITE",
+            "Contact": "sip:alice@example.com",
+        },
     )
 
     message_request = Request(

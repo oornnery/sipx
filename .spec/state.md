@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.25.0` is complete: full `TlsTransport` implementation in `sipx.transport.tls` with `ssl.SSLContext` support, extending `TcpTransport` with TLS encryption and certificate validation per RFC 3261 §26.2 and RFC 5922; `TlsConfig` dataclass with `certfile`, `keyfile`, `ca_certs`, `verify_mode`, and `check_hostname` fields; 12 tests in `tests/test_transport_tls.py` covering import, subclass verification, transport type, config dataclass, TLS connection, send/receive over TLS, close behavior, and certificate validation modes.
+Implement `sipx` in verified commit blocks. Block `2.0.0` is complete: the AsyncClient overhaul (`.omo/plans/sipx-overhaul.md`) is finished and validated. Root `sipx` now ships an httpx-like `AsyncClient` (`sipx/client.py`) over `sipx/protocol/*` (transactions, dialog, generator-based `AuthFlow`, hooks, provisional streaming), `sipx/transport/*` (UDP with rport, TCP, TLS, registry), and `sipx/rfc/*` (PRACK 3262, DNS 3263, events 3265/6665, presence 3856/3858, MESSAGE 3428, outbound 5626). The old `SipUserAgent`/`SipUac`/`SipUas` API is consolidated in `sipx/legacy.py` (still exported from root); `sipx/ua.py`, `sipx/uac.py`, `sipx/uas.py` were removed. `docs/migration.md` documents the migration. Validation wave passed after fixes: 525 core + 65 app tests, ruff lint/format, `uv run ty check`.
 
 ## Sources Read
 
@@ -306,6 +306,13 @@ Implement `sipx` in verified commit blocks. Block `1.25.0` is complete: full `Tl
 - Added `tests/test_transport_tls.py` with 12 tests covering import, subclass verification, transport type, config dataclass, TLS connection, send/receive over TLS, close behavior, and certificate validation modes.
 - Replaced the previous TLS transport stub with a production-ready implementation.
 - Bumped root package version to `1.25.0`.
+- Completed AsyncClient overhaul (block `2.0.0`): added `sipx/client.py` (`AsyncClient`), `sipx/models.py` (`Request`/`Response`), `sipx/config.py` (`ClientConfig`), `sipx/exceptions.py`, `sipx/protocol/*` (transaction, dialog, auth, hooks, provisional), `sipx/rfc/*` (prack, dns, events, presence, message, outbound), and RFC 3581 rport in UDP transport.
+- Consolidated old `SipUserAgent`/`SipUac`/`SipUas` API into `sipx/legacy.py`; deleted `sipx/ua.py`, `sipx/uac.py`, `sipx/uas.py`; old-API snapshot kept in `docs/old-api-snapshot/`.
+- Exported `Request`, `Response`, `ClientConfig` from root `sipx`; added `docs/migration.md`.
+- Rewrote `sipx/examples/` register/invite/message/subscribe for `AsyncClient` with `SIPX_*` env vars only (V64) and supported `request`/`response` debug hooks.
+- Fixed stale CLI tests (broken since the UAC/UAS media commit) with scripted no-socket `SipUserAgent` fakes that exercise the real `request()` Digest retry.
+- Fixed 19 `ty` diagnostics in new overhaul code; added `cryptography` dev dep for TLS tests; removed uncommitted `[tool.ruff] preview = true` experiment.
+- Bumped root package version to `2.0.0`.
 
 ## Active Decision
 

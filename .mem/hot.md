@@ -38,7 +38,13 @@
 - `sipx.rtp.buffer.RtpJitterBuffer` now provides fixed target/max playout buffering with concealment, underrun, overrun, duplicate, and late-drop counters.
 - `sipx.rtp.audio.RtpAudioSession` now sends/receives UDP RTP with PCMU/PCMA, synthetic silence/noise, jitter-buffer playout, and metrics snapshots.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.25.0`.
+- Current implementation version: `2.0.0`.
+- Root `sipx` now ships httpx-like `AsyncClient` (`sipx/client.py`) with `Request`/`Response` models, `ClientConfig`, typed `sipx.exceptions`, `sipx/protocol/*`, `sipx/transport/*` (udp+rport/tcp/tls/registry), and `sipx/rfc/*` (prack/dns/events/presence/message/outbound).
+- Legacy `SipUserAgent`/`SipUac`/`SipUas` API lives in `sipx/legacy.py`, still exported from root; `sipx/ua.py`/`uac.py`/`uas.py` were deleted; snapshot in `docs/old-api-snapshot/`; migration guide in `docs/migration.md`.
+- `AsyncClient` event hooks are `request`, `response`, `provisional` only; the legacy `wire` hook does not exist on AsyncClient.
+- New examples (register/invite/message/subscribe) use `AsyncClient` and `SIPX_*` env vars only (V64: no argparse); extra vars: `SIPX_EXPIRES`, `SIPX_DEBUG`, `SIPX_CODECS`, `SIPX_RTP_PORT`, `SIPX_MESSAGE`, `SIPX_CONTENT_TYPE`, `SIPX_EVENT`, `SIPX_ACCEPT`.
+- `cryptography` is a dev dependency for TLS transport tests (self-signed cert generation).
+- CLI tests use scripted no-socket `SipUserAgent` subclasses (override `start`/`stop`/`local_address`/`_send_message`/`receive_event`) so the real `request()` Digest retry stays covered.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - Root `sipx` package exports SIP/SDP/RTP/media primitives, SIP UAC/UAS runtime, and direct SIP-only examples.
 - `sipx-harness` package contains events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, profiles, reports, and harness runtime contracts.

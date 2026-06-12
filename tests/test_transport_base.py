@@ -83,7 +83,9 @@ def test_transport_config_defaults() -> None:
 
 
 def test_transport_config_override() -> None:
-    config = TransportConfig(local_host="192.168.1.1", local_port=5060, timeout=5.0, max_message_size=1500)
+    config = TransportConfig(
+        local_host="192.168.1.1", local_port=5060, timeout=5.0, max_message_size=1500
+    )
     assert config.local_host == "192.168.1.1"
     assert config.local_port == 5060
     assert config.timeout == 5.0

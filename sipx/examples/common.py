@@ -7,6 +7,24 @@ from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from sipx import RtpWireDirection, RtpWireEvent, SipWireDirection, SipWireEvent
+from sipx.models import Request, Response
+
+
+def debug_request(request: Request) -> None:
+    call_id = request.headers.get("Call-ID", "unknown")
+    header = f"REQUEST (Call-ID: {call_id}) Local ===> {request.uri}"
+    raw_text = request.to_bytes().decode("utf-8", errors="replace").rstrip()
+    border = "=" * len(header)
+    print(f"\n{border}\n{header}\n{border}\n{raw_text}\n{border}\n", file=sys.stderr)
+
+
+def debug_response(response: Response) -> None:
+    call_id = response.headers.get("Call-ID", "unknown")
+    origin = response.request.uri if response.request else "remote"
+    header = f"RESPONSE (Call-ID: {call_id}) {origin} <=== Local"
+    raw_text = response.to_bytes().decode("utf-8", errors="replace").rstrip()
+    border = "=" * len(header)
+    print(f"\n{border}\n{header}\n{border}\n{raw_text}\n{border}\n", file=sys.stderr)
 
 
 def debug_wire(event: SipWireEvent) -> None:

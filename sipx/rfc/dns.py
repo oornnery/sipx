@@ -35,7 +35,7 @@ class SipDnsResolver:
     """
 
     # Transport preference order (higher index = higher preference)
-    TRANSPORT_PREFERENCE = {'udp': 0, 'tcp': 1, 'tls': 2}
+    TRANSPORT_PREFERENCE = {"udp": 0, "tcp": 1, "tls": 2}
 
     def __init__(self, registry: TransportRegistry | None = None) -> None:
         """Initialize the DNS resolver.
@@ -46,6 +46,7 @@ class SipDnsResolver:
         """
         if registry is None:
             from sipx.transport.registry import TransportRegistry
+
             registry = TransportRegistry()
         self._registry = registry
         self._mock_records: dict[str, list[tuple[str, int, str]]] = {}
@@ -70,8 +71,8 @@ class SipDnsResolver:
         except ValueError as e:
             raise TransportError(
                 f"Invalid SIP URI: {uri}",
-                details={'uri': uri, 'error': str(e)},
-                rfc_ref='RFC 3261 Section 19.1'
+                details={"uri": uri, "error": str(e)},
+                rfc_ref="RFC 3261 Section 19.1",
             ) from e
 
         # Check for mock records (for testing)
@@ -89,22 +90,26 @@ class SipDnsResolver:
                 results.append((host, port, transport))
             else:
                 # Explicit transport, no port: try SRV, then A/AAAA
-                srv_results = await self._query_srv_for_transport(transport, scheme, host)
+                srv_results = await self._query_srv_for_transport(
+                    transport, scheme, host
+                )
                 if srv_results:
                     results.extend(srv_results)
                 else:
-                    default_port = 5061 if scheme == 'sips' else 5060
+                    default_port = 5061 if scheme == "sips" else 5060
                     a_results = await self._query_a_aaaa(host, default_port, transport)
                     results.extend(a_results)
         else:
             # Step 2: No explicit transport
             if port:
                 # Explicit port, no transport: try SRV for each transport, then A/AAAA
-                for proto in ['udp', 'tcp', 'tls']:
-                    srv_results = await self._query_srv_for_transport(proto, scheme, host)
+                for proto in ["udp", "tcp", "tls"]:
+                    srv_results = await self._query_srv_for_transport(
+                        proto, scheme, host
+                    )
                     results.extend(srv_results)
                 if not results:
-                    a_results = await self._query_a_aaaa(host, port, 'udp')
+                    a_results = await self._query_a_aaaa(host, port, "udp")
                     results.extend(a_results)
             else:
                 # No port, no transport: full RFC 3263 algorithm
@@ -114,22 +119,26 @@ class SipDnsResolver:
                     results.extend(naptr_results)
                 else:
                     # No NAPTR: try SRV for each transport
-                    for proto in ['udp', 'tcp', 'tls']:
-                        srv_results = await self._query_srv_for_transport(proto, scheme, host)
+                    for proto in ["udp", "tcp", "tls"]:
+                        srv_results = await self._query_srv_for_transport(
+                            proto, scheme, host
+                        )
                         results.extend(srv_results)
 
                 # If still no results, fall back to A/AAAA
                 if not results:
-                    default_port = 5061 if scheme == 'sips' else 5060
-                    default_transport = 'tls' if scheme == 'sips' else 'udp'
-                    a_results = await self._query_a_aaaa(host, default_port, default_transport)
+                    default_port = 5061 if scheme == "sips" else 5060
+                    default_transport = "tls" if scheme == "sips" else "udp"
+                    a_results = await self._query_a_aaaa(
+                        host, default_port, default_transport
+                    )
                     results.extend(a_results)
 
         if not results:
             raise TransportError(
                 f"No DNS records found for {uri}",
-                details={'uri': uri, 'host': host},
-                rfc_ref='RFC 3263 Section 4'
+                details={"uri": uri, "host": host},
+                rfc_ref="RFC 3263 Section 4",
             )
 
         return self._sort_by_preference(results)
@@ -147,7 +156,7 @@ class SipDnsResolver:
             ValueError: If the URI is not a valid SIP URI
         """
         # Match sip: or sips: scheme
-        pattern = r'^(sips?):(?:[^@]+@)?([^:;>]+)(?::(\d+))?(?:;transport=([a-zA-Z]+))?'
+        pattern = r"^(sips?):(?:[^@]+@)?([^:;>]+)(?::(\d+))?(?:;transport=([a-zA-Z]+))?"
         match = re.match(pattern, uri, re.IGNORECASE)
         if not match:
             raise ValueError(f"Not a valid SIP URI: {uri}")
@@ -163,7 +172,9 @@ class SipDnsResolver:
 
         return scheme, host, port, transport
 
-    async def _query_naptr(self, domain: str, scheme: str) -> list[tuple[str, int, str]]:
+    async def _query_naptr(
+        self, domain: str, scheme: str
+    ) -> list[tuple[str, int, str]]:
         """Query NAPTR records for the domain.
 
         Args:
@@ -226,7 +237,5 @@ class SipDnsResolver:
             Sorted list with preferred transports first
         """
         return sorted(
-            results,
-            key=lambda x: self.TRANSPORT_PREFERENCE.get(x[2], -1),
-            reverse=True
+            results, key=lambda x: self.TRANSPORT_PREFERENCE.get(x[2], -1), reverse=True
         )

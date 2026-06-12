@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 2.0.0 - 2026-06-12
+
+- BREAKING: removed old root API modules `sipx/ua.py`, `sipx/uac.py`, and `sipx/uas.py`; the legacy `SipUserAgent`/`SipUac`/`SipUas` surface now lives in `sipx/legacy.py` and remains exported from root `sipx`.
+- Added httpx-like `AsyncClient` in `sipx/client.py` with UAC methods (`invite`, `register`, `message`, `options`, `subscribe`), UAS handler decorators (`on_invite`, `on_message`, `on_options`, `on_subscribe`), context-manager lifecycle, per-request config merge, and generator-based Digest auth via `AuthFlow`.
+- Added `sipx/protocol/` modules: transaction state machines, dialog state machine, generator-based auth flow, event hooks (`request`, `response`, `provisional`), and provisional response streaming.
+- Added `sipx/rfc/` modules: PRACK (RFC 3262), DNS resolution (RFC 3263), event notification (RFC 3265/6665), presence with PIDF (RFC 3856/3858), MESSAGE (RFC 3428), and outbound flows (RFC 5626).
+- Added RFC 3581 `rport` support to the UDP transport.
+- Exported `Request`, `Response`, and `ClientConfig` from root `sipx` to match the documented public API.
+- Rewrote `sipx/examples/` register/invite/message/subscribe for the new API using `SIPX_*` env vars only (invariant V64; no argparse) and `request`/`response` debug hooks; added `debug_request`/`debug_response` helpers to `sipx.examples.common`.
+- Added `docs/migration.md` migration guide and updated `.spec/rfc-compliance.md` with test evidence.
+- Updated CLI tests to drive the real `SipUserAgent.request()` flow through scripted no-socket fakes, preserving Digest retry and redaction coverage.
+- Fixed type-check errors in `sipx/client.py`, `sipx/protocol/auth.py`, `sipx/rfc/prack.py`, `sipx/transport/{base,udp,registry}.py`, and new tests; `uv run ty check` passes.
+- Added `cryptography` dev dependency so TLS transport connection tests run.
+- Validation: 525 core tests and 65 app tests pass; ruff lint/format clean; coverage 82% total (87% excluding `sipx/examples/*`) against the overhaul plan target of 90%.
+
 ## 1.25.0 - 2026-06-12
 
 - Implemented full `TlsTransport` with `ssl.SSLContext` support, extending `TcpTransport` with TLS encryption and certificate validation per RFC 3261 §26.2 and RFC 5922.

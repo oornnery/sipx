@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import Literal
-from unittest.mock import AsyncMock
 
 import pytest
 
 from sipx.exceptions import TransportError
-from sipx.rfc.outbound import FlowInfo, OutboundHandler
+from sipx.rfc.outbound import OutboundHandler
 from sipx.transport.base import Transport
 
 

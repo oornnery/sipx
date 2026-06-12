@@ -284,6 +284,8 @@ class AsyncClient:
 
         call_id = headers.get("Call-ID")
         cseq = headers.get("CSeq")
+        if not isinstance(call_id, str) or not isinstance(cseq, str):
+            return
         if not call_id or not cseq:
             return
 
@@ -438,7 +440,7 @@ class AsyncClient:
 
         if method == "INVITE" and 100 <= response.status_code < 300:
             call_id = request.headers.get("Call-ID")
-            if call_id:
+            if isinstance(call_id, str) and call_id:
                 if call_id not in self._dialogs:
                     local_tag = f"uas-{call_id}"
                     dialog = Dialog.from_request(request, local_tag=local_tag)
@@ -555,7 +557,9 @@ class AsyncClient:
             current_request = next(flow)
 
             while True:
-                response = await self._send_and_receive(current_request, remote, transaction)
+                response = await self._send_and_receive(
+                    current_request, remote, transaction
+                )
                 await run_hooks(self._event_hooks, "response", response)
 
                 if response.status_code in (401, 407):
@@ -580,7 +584,11 @@ class AsyncClient:
         """Send request and wait for final response."""
         call_id = request.headers.get("Call-ID", "")
         cseq_header = request.headers.get("CSeq", "")
-        cseq_num = cseq_header.split(" ", 1)[0] if cseq_header else "1"
+        cseq_num = (
+            cseq_header.split(" ", 1)[0]
+            if isinstance(cseq_header, str) and cseq_header
+            else "1"
+        )
         key = f"{call_id}:{cseq_num}"
 
         future: asyncio.Future[Response] = asyncio.get_event_loop().create_future()
@@ -609,7 +617,9 @@ class AsyncClient:
 
             if 100 <= response.status_code < 200:
                 await run_hooks(self._event_hooks, "provisional", response)
-                future2: asyncio.Future[Response] = asyncio.get_event_loop().create_future()
+                future2: asyncio.Future[Response] = (
+                    asyncio.get_event_loop().create_future()
+                )
                 self._pending_responses[key] = future2
                 try:
                     data2 = await asyncio.wait_for(future2, timeout)
@@ -655,7 +665,7 @@ class AsyncClient:
 
         if 100 <= response.status_code < 300:
             call_id = request.headers.get("Call-ID")
-            if call_id:
+            if isinstance(call_id, str) and call_id:
                 try:
                     dialog = Dialog.from_invite(request, response)
                     self._dialogs[call_id] = dialog
@@ -717,7 +727,10 @@ class AsyncClient:
             raise ProtocolError(
                 f"MESSAGE failed: {response.status_code} {response.reason}",
                 rfc_ref="RFC 3428",
-                details={"status_code": response.status_code, "reason": response.reason},
+                details={
+                    "status_code": response.status_code,
+                    "reason": response.reason,
+                },
             )
 
         return response

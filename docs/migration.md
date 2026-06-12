@@ -348,7 +348,7 @@ response = await client.subscribe(
 
 9. **`mode="lab"` removed.** The lab mode for malformed messages and protocol overrides is not supported. Use the low-level `sipx.sip` message builders for custom messages.
 
-10. **`sdp` and `retransmission` event hooks removed.** Only `request`, `response`, `provisional`, and `wire` hooks are supported.
+10. **`sdp`, `retransmission`, and `wire` event hooks removed.** Only `request`, `response`, and `provisional` hooks are supported.
 
 11. **`compact_headers` parameter removed.** Header serialization always uses canonical names.
 

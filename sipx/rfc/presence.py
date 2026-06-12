@@ -36,14 +36,16 @@ PRESENCE_EVENT_PACKAGE = "presence"
 VALID_BASIC_STATUSES = frozenset({"open", "closed"})
 
 #: Common presence state labels derived from basic status and notes.
-PRESENCE_STATES = frozenset({
-    "online",
-    "offline",
-    "busy",
-    "away",
-    "on-the-phone",
-    "unknown",
-})
+PRESENCE_STATES = frozenset(
+    {
+        "online",
+        "offline",
+        "busy",
+        "away",
+        "on-the-phone",
+        "unknown",
+    }
+)
 
 
 @dataclass
@@ -150,8 +152,7 @@ class PresenceEventPackage:
         ns = f"{{{PIDF_NS}}}"
         if root.tag != f"{ns}presence":
             raise ProtocolError(
-                f"PIDF root element must be '{ns}presence', "
-                f"got {root.tag!r}",
+                f"PIDF root element must be '{ns}presence', got {root.tag!r}",
                 rfc_ref="RFC 3858 §2.1",
             )
 
@@ -193,12 +194,14 @@ class PresenceEventPackage:
             if note_elem is not None and note_elem.text:
                 note = note_elem.text.strip()
 
-            tuples.append(PresenceTuple(
-                id=tuple_id,
-                status=status,
-                contact=contact,
-                note=note,
-            ))
+            tuples.append(
+                PresenceTuple(
+                    id=tuple_id,
+                    status=status,
+                    contact=contact,
+                    note=note,
+                )
+            )
 
         return cls(entity=entity, tuples=tuples)
 
@@ -225,9 +228,7 @@ class PresenceEventPackage:
             basic_elem.text = tup.status
 
             if tup.contact:
-                contact_elem = ET.SubElement(
-                    tuple_elem, f"{{{PIDF_NS}}}contact"
-                )
+                contact_elem = ET.SubElement(tuple_elem, f"{{{PIDF_NS}}}contact")
                 contact_elem.text = tup.contact
 
             if tup.note:
@@ -381,7 +382,9 @@ class PresenceEventPackage:
         if "pidf+xml" not in content_type and "application/pidf" not in content_type:
             # Be lenient — try to parse anyway if body looks like XML
             body_str = request.body.decode("utf-8", errors="replace")
-            if not body_str.strip().startswith("<?xml") and not body_str.strip().startswith("<"):
+            if not body_str.strip().startswith(
+                "<?xml"
+            ) and not body_str.strip().startswith("<"):
                 raise ProtocolError(
                     f"NOTIFY body Content-Type is {content_type!r}, "
                     "expected application/pidf+xml",
@@ -419,7 +422,6 @@ class PresenceEventPackage:
         event_name = event.split(";")[0].strip().lower()
         if event_name != PRESENCE_EVENT_PACKAGE:
             raise ProtocolError(
-                f"Event header value {event_name!r} is not "
-                f"'{PRESENCE_EVENT_PACKAGE}'",
+                f"Event header value {event_name!r} is not '{PRESENCE_EVENT_PACKAGE}'",
                 rfc_ref="RFC 3856 §4.1",
             )

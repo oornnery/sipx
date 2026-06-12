@@ -8,25 +8,38 @@ AsyncClient. It shows:
 3. Handling the response and delivery confirmation
 4. Proper error handling for common failures
 
-Usage:
+Usage (all configuration via SIPX_* environment variables):
     # Using default Mizu demo account:
     export SIPX_LOCAL_HOST=<your-local-ip>
-    python -m sipx.examples.message sip:2222@demo.mizu-voip.com:37075 "Hello from sipx!"
+    export SIPX_TARGET=sip:2222@demo.mizu-voip.com:37075
+    export SIPX_MESSAGE="Hello from sipx!"
+    python -m sipx.examples.message
 
     # Using custom SIP account:
     export SIPX_AOR=sip:1001@example.com
     export SIPX_USERNAME=1001
     export SIPX_PASSWORD=secret
-    python -m sipx.examples.message sip:alice@pbx.example.com "Meeting at 3pm"
+    export SIPX_TARGET=sip:alice@pbx.example.com
+    export SIPX_MESSAGE="Meeting at 3pm"
+    python -m sipx.examples.message
 
-    # Show help:
-    python -m sipx.examples.message --help
+Environment variables:
+    SIPX_AOR           Address of Record (e.g., sip:1001@example.com)
+    SIPX_USERNAME      Authentication username
+    SIPX_PASSWORD      Authentication password
+    SIPX_LOCAL_HOST    Local bind address (default: 0.0.0.0)
+    SIPX_LOCAL_PORT    Local bind port (default: 0 for ephemeral)
+    SIPX_TIMEOUT       Request timeout in seconds (default: 10)
+    SIPX_TARGET        Target SIP URI to message (default: account AOR)
+    SIPX_MESSAGE       Message text to send (default: "Hello from sipx!")
+    SIPX_CONTENT_TYPE  Content-Type for the body (default: text/plain)
+    SIPX_DEBUG         Set to 1 to print SIP request/response debug output
 """
 
 from __future__ import annotations
 
-import argparse
 import asyncio
+import os
 import sys
 
 from sipx import AsyncClient
@@ -36,56 +49,13 @@ from sipx.exceptions import (
     ProtocolError,
     TimeoutError as SipTimeoutError,
 )
-from sipx.examples.common import account_settings, debug_wire, print_json
+from sipx.examples.common import (
+    account_settings,
+    debug_request,
+    debug_response,
+    print_json,
+)
 from sipx.protocol.auth import AuthFlow
-
-
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="SIP MESSAGE example using AsyncClient",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Environment variables:
-  SIPX_AOR          Address of Record (e.g., sip:1001@example.com)
-  SIPX_USERNAME     Authentication username
-  SIPX_PASSWORD     Authentication password
-  SIPX_LOCAL_HOST   Local bind address (default: 0.0.0.0)
-  SIPX_LOCAL_PORT   Local bind port (default: 0 for ephemeral)
-  SIPX_TIMEOUT      Request timeout in seconds (default: 30)
-
-Examples:
-  # Send a simple text message
-  export SIPX_LOCAL_HOST=192.168.1.100
-  python -m sipx.examples.message sip:2222@demo.mizu-voip.com:37075 "Hello!"
-
-  # Send with custom content type
-  python -m sipx.examples.message sip:alice@pbx.example.com "<msg>Hi</msg>" --content-type application/xml
-
-  # Send multiple messages
-  python -m sipx.examples.message sip:alice@pbx.example.com "Message 1" "Message 2" "Message 3"
-        """,
-    )
-    parser.add_argument(
-        "target",
-        help="Target SIP URI to message (e.g., sip:alice@example.com)",
-    )
-    parser.add_argument(
-        "messages",
-        nargs="+",
-        help="Message text(s) to send",
-    )
-    parser.add_argument(
-        "--content-type",
-        default="text/plain",
-        help="Content-Type for message body (default: text/plain)",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable SIP wire-level debug output",
-    )
-    return parser.parse_args()
 
 
 async def message(
@@ -137,7 +107,8 @@ async def message(
     # Step 3: Set up event hooks (optional)
     event_hooks = {}
     if debug:
-        event_hooks["wire"] = [debug_wire]
+        event_hooks["request"] = [debug_request]
+        event_hooks["response"] = [debug_response]
 
     # Step 4: Create and use the AsyncClient
     async with AsyncClient(
@@ -175,93 +146,112 @@ async def message(
                 )
             except SipTimeoutError as exc:
                 # Timeout waiting for response
-                results.append({
-                    "message": msg_text,
-                    "state": "failed",
-                    "error": {
-                        "type": "timeout",
-                        "message": str(exc),
-                        "rfc_ref": exc.rfc_ref,
-                    },
-                })
+                results.append(
+                    {
+                        "message": msg_text,
+                        "state": "failed",
+                        "error": {
+                            "type": "timeout",
+                            "message": str(exc),
+                            "rfc_ref": exc.rfc_ref,
+                        },
+                    }
+                )
                 continue
             except AuthError as exc:
                 # Authentication failed
-                results.append({
-                    "message": msg_text,
-                    "state": "failed",
-                    "error": {
-                        "type": "auth",
-                        "message": str(exc),
-                        "rfc_ref": exc.rfc_ref,
-                    },
-                })
+                results.append(
+                    {
+                        "message": msg_text,
+                        "state": "failed",
+                        "error": {
+                            "type": "auth",
+                            "message": str(exc),
+                            "rfc_ref": exc.rfc_ref,
+                        },
+                    }
+                )
                 continue
             except ProtocolError as exc:
                 # Protocol violation
-                results.append({
-                    "message": msg_text,
-                    "state": "failed",
-                    "error": {
-                        "type": "protocol",
-                        "message": str(exc),
-                        "rfc_ref": exc.rfc_ref,
-                    },
-                })
+                results.append(
+                    {
+                        "message": msg_text,
+                        "state": "failed",
+                        "error": {
+                            "type": "protocol",
+                            "message": str(exc),
+                            "rfc_ref": exc.rfc_ref,
+                        },
+                    }
+                )
                 continue
 
             # Step 6: Process the response
             # 200 OK means the message was delivered to the recipient's server
             # 4xx/5xx means delivery failed
             if 200 <= response.status_code < 300:
-                results.append({
-                    "message": msg_text,
-                    "state": "delivered",
-                    "status_code": response.status_code,
-                })
+                results.append(
+                    {
+                        "message": msg_text,
+                        "state": "delivered",
+                        "status_code": response.status_code,
+                    }
+                )
             elif 400 <= response.status_code < 500:
                 # Client error - message rejected
-                results.append({
-                    "message": msg_text,
-                    "state": "rejected",
-                    "status_code": response.status_code,
-                    "reason": response.reason,
-                })
+                results.append(
+                    {
+                        "message": msg_text,
+                        "state": "rejected",
+                        "status_code": response.status_code,
+                        "reason": response.reason,
+                    }
+                )
             elif 500 <= response.status_code < 600:
                 # Server error - temporary failure
-                results.append({
-                    "message": msg_text,
-                    "state": "server_error",
-                    "status_code": response.status_code,
-                    "reason": response.reason,
-                })
+                results.append(
+                    {
+                        "message": msg_text,
+                        "state": "server_error",
+                        "status_code": response.status_code,
+                        "reason": response.reason,
+                    }
+                )
             else:
                 # Other failure
-                results.append({
-                    "message": msg_text,
-                    "state": "failed",
-                    "status_code": response.status_code,
-                    "reason": response.reason,
-                })
+                results.append(
+                    {
+                        "message": msg_text,
+                        "state": "failed",
+                        "status_code": response.status_code,
+                        "reason": response.reason,
+                    }
+                )
 
         # Print summary
-        print_json({
-            "target": target,
-            "messages_sent": len(messages),
-            "results": results,
-        })
+        print_json(
+            {
+                "target": target,
+                "messages_sent": len(messages),
+                "results": results,
+            }
+        )
 
 
 def main() -> None:
     """Entry point for the message example."""
-    args = parse_args()
+    s = account_settings()
+    messages = [os.getenv("SIPX_MESSAGE", "Hello from sipx!")]
+    content_type = os.getenv("SIPX_CONTENT_TYPE", "text/plain")
+    debug = os.getenv("SIPX_DEBUG", "0") not in ("", "0", "false")
     try:
         asyncio.run(
             message(
-                target=args.target,
-                messages=args.messages,
-                content_type=args.content_type,
-                debug=args.debug,
+                target=s["target"],
+                messages=messages,
+                content_type=content_type,
+                debug=debug,
             )
         )
     except KeyboardInterrupt:

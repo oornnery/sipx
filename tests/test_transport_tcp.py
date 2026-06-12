@@ -43,7 +43,9 @@ def test_connect() -> None:
 async def _test_connect() -> None:
     connected = asyncio.Event()
 
-    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         connected.set()
         writer.close()
         await writer.wait_closed()
@@ -72,7 +74,9 @@ async def _test_send_auto_connects() -> None:
     received_data = asyncio.Event()
     received_bytes = b""
 
-    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         nonlocal received_bytes
         data = await reader.read(1024)
         received_bytes = data
@@ -105,7 +109,9 @@ def test_receive_message() -> None:
 async def _test_receive_message() -> None:
     message = b"SIP/2.0 200 OK\r\nContent-Length: 4\r\n\r\ntest"
 
-    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         writer.write(message)
         await writer.drain()
         await asyncio.sleep(0.1)
@@ -142,7 +148,9 @@ async def _test_message_framing_content_length() -> None:
     body = b"v=0\r\no=- 0 0 IN IP4 0.0.0.0\r\n"
     message = f"SIP/2.0 200 OK\r\nContent-Length: {len(body)}\r\n\r\n".encode() + body
 
-    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         writer.write(message)
         await writer.drain()
         await asyncio.sleep(0.1)
@@ -175,7 +183,9 @@ async def _test_multiple_messages_one_segment() -> None:
     msg2 = b"SIP/2.0 200 OK\r\nContent-Length: 2\r\n\r\nOK"
     combined = msg1 + msg2
 
-    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         writer.write(combined)
         await writer.drain()
         await asyncio.sleep(0.1)
@@ -212,7 +222,9 @@ async def _test_message_split_across_segments() -> None:
     part1 = message[:20]
     part2 = message[20:]
 
-    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         writer.write(part1)
         await writer.drain()
         await asyncio.sleep(0.05)
@@ -244,7 +256,9 @@ def test_close() -> None:
 
 
 async def _test_close() -> None:
-    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         await asyncio.sleep(1)
         writer.close()
         await writer.wait_closed()
@@ -270,7 +284,9 @@ def test_send_after_close_raises() -> None:
 
 
 async def _test_send_after_close_raises() -> None:
-    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         writer.close()
         await writer.wait_closed()
 
@@ -287,6 +303,3 @@ async def _test_send_after_close_raises() -> None:
 
     server.close()
     await server.wait_closed()
-
-
-

@@ -65,12 +65,16 @@ async def _test_connect_with_tls() -> None:
 
         connected = asyncio.Event()
 
-        async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        async def handle_client(
+            reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+        ) -> None:
             connected.set()
             writer.close()
             await writer.wait_closed()
 
-        server = await asyncio.start_server(handle_client, "127.0.0.1", 0, ssl=ssl_context)
+        server = await asyncio.start_server(
+            handle_client, "127.0.0.1", 0, ssl=ssl_context
+        )
         port = server.sockets[0].getsockname()[1]
 
         config = TransportConfig(local_host="127.0.0.1", local_port=0)
@@ -104,7 +108,9 @@ async def _test_send_over_tls() -> None:
         received_data = asyncio.Event()
         received_bytes = b""
 
-        async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        async def handle_client(
+            reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+        ) -> None:
             nonlocal received_bytes
             data = await reader.read(1024)
             received_bytes = data
@@ -112,7 +118,9 @@ async def _test_send_over_tls() -> None:
             writer.close()
             await writer.wait_closed()
 
-        server = await asyncio.start_server(handle_client, "127.0.0.1", 0, ssl=ssl_context)
+        server = await asyncio.start_server(
+            handle_client, "127.0.0.1", 0, ssl=ssl_context
+        )
         port = server.sockets[0].getsockname()[1]
 
         config = TransportConfig(local_host="127.0.0.1", local_port=0)
@@ -145,14 +153,18 @@ async def _test_receive_over_tls() -> None:
 
         message = b"SIP/2.0 200 OK\r\nContent-Length: 4\r\n\r\ntest"
 
-        async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        async def handle_client(
+            reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+        ) -> None:
             writer.write(message)
             await writer.drain()
             await asyncio.sleep(0.1)
             writer.close()
             await writer.wait_closed()
 
-        server = await asyncio.start_server(handle_client, "127.0.0.1", 0, ssl=ssl_context)
+        server = await asyncio.start_server(
+            handle_client, "127.0.0.1", 0, ssl=ssl_context
+        )
         port = server.sockets[0].getsockname()[1]
 
         config = TransportConfig(local_host="127.0.0.1", local_port=0, timeout=1.0)
@@ -189,12 +201,16 @@ async def _test_close_tls() -> None:
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain(cert_file, key_file)
 
-        async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        async def handle_client(
+            reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+        ) -> None:
             await asyncio.sleep(1)
             writer.close()
             await writer.wait_closed()
 
-        server = await asyncio.start_server(handle_client, "127.0.0.1", 0, ssl=ssl_context)
+        server = await asyncio.start_server(
+            handle_client, "127.0.0.1", 0, ssl=ssl_context
+        )
         port = server.sockets[0].getsockname()[1]
 
         config = TransportConfig(local_host="127.0.0.1", local_port=0)
@@ -225,11 +241,15 @@ async def _test_send_after_close_raises() -> None:
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain(cert_file, key_file)
 
-        async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        async def handle_client(
+            reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+        ) -> None:
             writer.close()
             await writer.wait_closed()
 
-        server = await asyncio.start_server(handle_client, "127.0.0.1", 0, ssl=ssl_context)
+        server = await asyncio.start_server(
+            handle_client, "127.0.0.1", 0, ssl=ssl_context
+        )
         port = server.sockets[0].getsockname()[1]
 
         config = TransportConfig(local_host="127.0.0.1", local_port=0)
@@ -276,34 +296,41 @@ def _create_self_signed_cert() -> tuple[str, str]:
         backend=default_backend(),
     )
 
-    subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, "localhost"),
-    ])
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, "localhost"),
+        ]
+    )
 
-    cert = x509.CertificateBuilder().subject_name(
-        subject
-    ).issuer_name(
-        issuer
-    ).public_key(
-        key.public_key()
-    ).serial_number(
-        x509.random_serial_number()
-    ).not_valid_before(
-        datetime.datetime.now(datetime.UTC)
-    ).not_valid_after(
-        datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=1)
-    ).sign(key, hashes.SHA256(), default_backend())
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime.now(datetime.UTC))
+        .not_valid_after(
+            datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=1)
+        )
+        .sign(key, hashes.SHA256(), default_backend())
+    )
 
-    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pem") as cert_file:
+    with tempfile.NamedTemporaryFile(
+        mode="wb", delete=False, suffix=".pem"
+    ) as cert_file:
         cert_file.write(cert.public_bytes(serialization.Encoding.PEM))
         cert_path = cert_file.name
 
-    with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".pem") as key_file:
-        key_file.write(key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption(),
-        ))
+    with tempfile.NamedTemporaryFile(
+        mode="wb", delete=False, suffix=".pem"
+    ) as key_file:
+        key_file.write(
+            key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+        )
         key_path = key_file.name
 
     return cert_path, key_path

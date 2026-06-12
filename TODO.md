@@ -529,6 +529,20 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 2.0.0 Done
+
+- [x] Bumped package version to `2.0.0`.
+- [x] Completed the AsyncClient overhaul (`.omo/plans/sipx-overhaul.md`): `AsyncClient`, `sipx/protocol/*`, `sipx/rfc/*` (PRACK, DNS, events, presence, MESSAGE, outbound), rport, migration guide, docstrings, examples rewrite.
+- [x] Moved legacy `SipUserAgent`/`SipUac`/`SipUas` into `sipx/legacy.py`; removed `sipx/ua.py`, `sipx/uac.py`, `sipx/uas.py`.
+- [x] Exported `Request`, `Response`, `ClientConfig` from root `sipx`.
+- [x] Converted new examples (register/invite/message/subscribe) to `SIPX_*` env vars only, honoring invariant V64 (no argparse); switched debug hooks to supported `request`/`response` events.
+- [x] Fixed CLI tests to drive real `SipUserAgent.request()` via scripted no-socket fakes (Digest retry and redaction still covered).
+- [x] Fixed 19 type-check errors across client/protocol/rfc/transport/tests; `uv run ty check` passes.
+- [x] Added `cryptography` dev dependency so TLS connection tests run (were failing with ModuleNotFoundError).
+- [x] Removed uncommitted `[tool.ruff] preview = true` experiment that broke the lint gate with 154 preview-only findings.
+- [x] Validation: `pytest` 525 pass, `pytest apps` 65 pass + 3 skip, `ruff check .` pass, `ruff format --check .` pass, `uv run ty check` pass.
+- [ ] Coverage gate from overhaul plan (`--cov-fail-under=90`) not reached: 82% total, 87% excluding `sipx/examples/*`; biggest gap is `sipx/legacy.py` (77%) and example scripts.
+
 ## Block 1.25.0 Done
 
 - [x] Bumped package version to `1.25.0`.

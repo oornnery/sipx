@@ -184,8 +184,8 @@ class TestRSeqTracking:
         prack1 = handler.generate_prack(_reliable_provisional(180, 1, invite))
         prack2 = handler.generate_prack(_reliable_provisional(180, 2, invite))
 
-        cseq1 = int(prack1.headers["CSeq"].split()[0])
-        cseq2 = int(prack2.headers["CSeq"].split()[0])
+        cseq1 = int(str(prack1.headers["CSeq"]).split()[0])
+        cseq2 = int(str(prack2.headers["CSeq"]).split()[0])
         assert cseq2 == cseq1 + 1
 
 

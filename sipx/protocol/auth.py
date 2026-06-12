@@ -15,6 +15,12 @@ from sipx.exceptions import AuthError
 from sipx.models import Request, Response
 
 
+def _first_header_value(value: str | list[str] | None) -> str | None:
+    if isinstance(value, list):
+        return value[0] if value else None
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class DigestChallenge:
     """Parsed Digest authentication challenge."""
@@ -117,10 +123,10 @@ class AuthFlow:
     def _extract_challenge(self, response: Response) -> tuple[str, str] | None:
         """Extract authentication challenge from response."""
         if response.status_code == 401:
-            value = response.headers.get("WWW-Authenticate")
+            value = _first_header_value(response.headers.get("WWW-Authenticate"))
             return ("Authorization", value) if value else None
         if response.status_code == 407:
-            value = response.headers.get("Proxy-Authenticate")
+            value = _first_header_value(response.headers.get("Proxy-Authenticate"))
             return ("Proxy-Authorization", value) if value else None
         return None
 

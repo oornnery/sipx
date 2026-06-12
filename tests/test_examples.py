@@ -8,6 +8,9 @@ from sipx import SipCall, SipCallError
 
 ROOT_EXAMPLES = (
     Path("sipx/examples/register.py"),
+    Path("sipx/examples/invite.py"),
+    Path("sipx/examples/message.py"),
+    Path("sipx/examples/subscribe.py"),
     Path("sipx/examples/options.py"),
     Path("sipx/examples/invite_without_sdp.py"),
     Path("sipx/examples/invite_with_sdp.py"),

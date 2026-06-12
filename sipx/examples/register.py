@@ -9,7 +9,7 @@ server using the AsyncClient. It shows:
 4. Handling the response and extracting registration state
 5. Proper error handling for common failures
 
-Usage:
+Usage (all configuration via SIPX_* environment variables):
     # Using default Mizu demo account:
     export SIPX_LOCAL_HOST=<your-local-ip>
     python -m sipx.examples.register
@@ -21,63 +21,34 @@ Usage:
     export SIPX_PASSWORD=secret
     python -m sipx.examples.register
 
-    # Show help:
-    python -m sipx.examples.register --help
+Environment variables:
+    SIPX_AOR          Address of Record (e.g., sip:1001@example.com)
+    SIPX_REGISTRAR    Registrar URI (e.g., sip:pbx.example.com:5060)
+    SIPX_USERNAME     Authentication username
+    SIPX_PASSWORD     Authentication password
+    SIPX_LOCAL_HOST   Local bind address (default: 0.0.0.0)
+    SIPX_LOCAL_PORT   Local bind port (default: 0 for ephemeral)
+    SIPX_TIMEOUT      Request timeout in seconds (default: 10)
+    SIPX_EXPIRES      Registration expiration in seconds (default: 3600)
+    SIPX_DEBUG        Set to 1 to print SIP request/response debug output
 """
 
 from __future__ import annotations
 
-import argparse
 import asyncio
+import os
 import sys
 
 from sipx import AsyncClient
 from sipx.config import ClientConfig
 from sipx.exceptions import AuthError, ProtocolError, TimeoutError as SipTimeoutError
-from sipx.examples.common import account_settings, debug_wire, print_json
+from sipx.examples.common import (
+    account_settings,
+    debug_request,
+    debug_response,
+    print_json,
+)
 from sipx.protocol.auth import AuthFlow
-
-
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="SIP REGISTER example using AsyncClient",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Environment variables:
-  SIPX_AOR          Address of Record (e.g., sip:1001@example.com)
-  SIPX_REGISTRAR    Registrar URI (e.g., sip:pbx.example.com:5060)
-  SIPX_USERNAME     Authentication username
-  SIPX_PASSWORD     Authentication password
-  SIPX_LOCAL_HOST   Local bind address (default: 0.0.0.0)
-  SIPX_LOCAL_PORT   Local bind port (default: 0 for ephemeral)
-  SIPX_TIMEOUT      Request timeout in seconds (default: 10)
-
-Examples:
-  # Register with default Mizu demo account
-  export SIPX_LOCAL_HOST=192.168.1.100
-  python -m sipx.examples.register
-
-  # Register with custom account
-  export SIPX_AOR=sip:alice@pbx.example.com
-  export SIPX_REGISTRAR=sip:pbx.example.com:5060
-  export SIPX_USERNAME=alice
-  export SIPX_PASSWORD=secret123
-  python -m sipx.examples.register --expires 3600
-        """,
-    )
-    parser.add_argument(
-        "--expires",
-        type=int,
-        default=3600,
-        help="Registration expiration in seconds (default: 3600)",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable SIP wire-level debug output",
-    )
-    return parser.parse_args()
 
 
 async def register(expires: int, debug: bool) -> None:
@@ -128,10 +99,12 @@ async def register(expires: int, debug: bool) -> None:
 
     # Step 3: Set up event hooks (optional)
     # Event hooks allow intercepting requests and responses for debugging.
-    # The "wire" hook fires for every SIP message sent/received.
+    # "request" fires before each request is sent; "response" after each
+    # response is received.
     event_hooks = {}
     if debug:
-        event_hooks["wire"] = [debug_wire]
+        event_hooks["request"] = [debug_request]
+        event_hooks["response"] = [debug_response]
 
     # Step 4: Create and use the AsyncClient
     # The async context manager ensures proper cleanup:
@@ -160,36 +133,42 @@ async def register(expires: int, debug: bool) -> None:
             )
         except SipTimeoutError as exc:
             # Timeout waiting for response - network issue or server down
-            print_json({
-                "state": "failed",
-                "error": {
-                    "type": "timeout",
-                    "message": str(exc),
-                    "rfc_ref": exc.rfc_ref,
-                },
-            })
+            print_json(
+                {
+                    "state": "failed",
+                    "error": {
+                        "type": "timeout",
+                        "message": str(exc),
+                        "rfc_ref": exc.rfc_ref,
+                    },
+                }
+            )
             return
         except AuthError as exc:
             # Authentication failed - wrong credentials
-            print_json({
-                "state": "failed",
-                "error": {
-                    "type": "auth",
-                    "message": str(exc),
-                    "rfc_ref": exc.rfc_ref,
-                },
-            })
+            print_json(
+                {
+                    "state": "failed",
+                    "error": {
+                        "type": "auth",
+                        "message": str(exc),
+                        "rfc_ref": exc.rfc_ref,
+                    },
+                }
+            )
             return
         except ProtocolError as exc:
             # Protocol violation - malformed response
-            print_json({
-                "state": "failed",
-                "error": {
-                    "type": "protocol",
-                    "message": str(exc),
-                    "rfc_ref": exc.rfc_ref,
-                },
-            })
+            print_json(
+                {
+                    "state": "failed",
+                    "error": {
+                        "type": "protocol",
+                        "message": str(exc),
+                        "rfc_ref": exc.rfc_ref,
+                    },
+                }
+            )
             return
 
         # Step 6: Process the response
@@ -199,31 +178,36 @@ async def register(expires: int, debug: bool) -> None:
         if response.status_code == 200:
             contact = response.headers.get("Contact", "unknown")
             expires_header = response.headers.get("Expires", str(expires))
-            print_json({
-                "state": "registered",
-                "status_code": response.status_code,
-                "contact": contact,
-                "expires": expires_header,
-                "local_address": {
-                    "host": client.transport.local_address[0],
-                    "port": client.transport.local_address[1],
-                },
-            })
+            print_json(
+                {
+                    "state": "registered",
+                    "status_code": response.status_code,
+                    "contact": contact,
+                    "expires": expires_header,
+                    "local_address": {
+                        "host": client.transport.local_address[0],
+                        "port": client.transport.local_address[1],
+                    },
+                }
+            )
         else:
             # Non-200 response - registration failed
-            print_json({
-                "state": "failed",
-                "status_code": response.status_code,
-                "reason": response.reason,
-                "headers": dict(response.headers.items()),
-            })
+            print_json(
+                {
+                    "state": "failed",
+                    "status_code": response.status_code,
+                    "reason": response.reason,
+                    "headers": dict(response.headers.items()),
+                }
+            )
 
 
 def main() -> None:
     """Entry point for the register example."""
-    args = parse_args()
+    expires = int(os.getenv("SIPX_EXPIRES", "3600"))
+    debug = os.getenv("SIPX_DEBUG", "0") not in ("", "0", "false")
     try:
-        asyncio.run(register(expires=args.expires, debug=args.debug))
+        asyncio.run(register(expires=expires, debug=debug))
     except KeyboardInterrupt:
         print("\nRegistration cancelled by user", file=sys.stderr)
         sys.exit(130)

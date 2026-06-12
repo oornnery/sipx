@@ -9,26 +9,38 @@ AsyncClient. It shows:
 4. Handling the response and extracting SDP answer
 5. Proper error handling for common failures
 
-Usage:
+Usage (all configuration via SIPX_* environment variables):
     # Using default Mizu demo account:
     export SIPX_LOCAL_HOST=<your-local-ip>
-    python -m sipx.examples.invite sip:2222@demo.mizu-voip.com:37075
+    export SIPX_TARGET=sip:2222@demo.mizu-voip.com:37075
+    python -m sipx.examples.invite
 
     # Using custom SIP account:
     export SIPX_AOR=sip:1001@example.com
     export SIPX_USERNAME=1001
     export SIPX_PASSWORD=secret
-    python -m sipx.examples.invite sip:alice@pbx.example.com
+    export SIPX_TARGET=sip:alice@pbx.example.com
+    python -m sipx.examples.invite
 
-    # Show help:
-    python -m sipx.examples.invite --help
+Environment variables:
+    SIPX_AOR          Address of Record (e.g., sip:1001@example.com)
+    SIPX_USERNAME     Authentication username
+    SIPX_PASSWORD     Authentication password
+    SIPX_LOCAL_HOST   Local bind address (default: 0.0.0.0)
+    SIPX_LOCAL_PORT   Local bind port (default: 0 for ephemeral)
+    SIPX_TIMEOUT      Request timeout in seconds (default: 10)
+    SIPX_TARGET       Target SIP URI to call (default: account AOR)
+    SIPX_CODECS       Space-separated codecs to offer (default: "PCMU PCMA")
+    SIPX_RTP_PORT     Local RTP port to advertise in SDP (default: 10000)
+    SIPX_DEBUG        Set to 1 to print SIP request/response debug output
 """
 
 from __future__ import annotations
 
-import argparse
 import asyncio
+import os
 import sys
+from typing import Any
 
 from sipx import AsyncClient
 from sipx.config import ClientConfig
@@ -37,59 +49,14 @@ from sipx.exceptions import (
     ProtocolError,
     TimeoutError as SipTimeoutError,
 )
-from sipx.examples.common import account_settings, debug_wire, print_json
+from sipx.examples.common import (
+    account_settings,
+    debug_request,
+    debug_response,
+    print_json,
+)
 from sipx.protocol.auth import AuthFlow
 from sipx.sdp import create_audio_offer, parse_sdp
-
-
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="SIP INVITE example with SDP using AsyncClient",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Environment variables:
-  SIPX_AOR          Address of Record (e.g., sip:1001@example.com)
-  SIPX_USERNAME     Authentication username
-  SIPX_PASSWORD     Authentication password
-  SIPX_LOCAL_HOST   Local bind address (default: 0.0.0.0)
-  SIPX_LOCAL_PORT   Local bind port (default: 0 for ephemeral)
-  SIPX_TIMEOUT      Request timeout in seconds (default: 30)
-
-Examples:
-  # Call the Mizu demo echo service
-  export SIPX_LOCAL_HOST=192.168.1.100
-  python -m sipx.examples.invite sip:2222@demo.mizu-voip.com:37075
-
-  # Call with custom codecs
-  python -m sipx.examples.invite sip:alice@pbx.example.com --codecs PCMU PCMA
-
-  # Call with specific RTP port
-  python -m sipx.examples.invite sip:alice@pbx.example.com --rtp-port 10000
-        """,
-    )
-    parser.add_argument(
-        "target",
-        help="Target SIP URI to call (e.g., sip:alice@example.com)",
-    )
-    parser.add_argument(
-        "--codecs",
-        nargs="+",
-        default=["PCMU", "PCMA"],
-        help="Audio codecs to offer (default: PCMU PCMA)",
-    )
-    parser.add_argument(
-        "--rtp-port",
-        type=int,
-        default=10000,
-        help="Local RTP port to advertise in SDP (default: 10000)",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable SIP wire-level debug output",
-    )
-    return parser.parse_args()
 
 
 async def invite(
@@ -165,7 +132,8 @@ async def invite(
     # Step 4: Set up event hooks (optional)
     event_hooks = {}
     if debug:
-        event_hooks["wire"] = [debug_wire]
+        event_hooks["request"] = [debug_request]
+        event_hooks["response"] = [debug_response]
 
     # Step 5: Create and use the AsyncClient
     async with AsyncClient(
@@ -197,36 +165,42 @@ async def invite(
             )
         except SipTimeoutError as exc:
             # Timeout waiting for response - callee didn't answer
-            print_json({
-                "state": "failed",
-                "error": {
-                    "type": "timeout",
-                    "message": str(exc),
-                    "rfc_ref": exc.rfc_ref,
-                },
-            })
+            print_json(
+                {
+                    "state": "failed",
+                    "error": {
+                        "type": "timeout",
+                        "message": str(exc),
+                        "rfc_ref": exc.rfc_ref,
+                    },
+                }
+            )
             return
         except AuthError as exc:
             # Authentication failed - wrong credentials
-            print_json({
-                "state": "failed",
-                "error": {
-                    "type": "auth",
-                    "message": str(exc),
-                    "rfc_ref": exc.rfc_ref,
-                },
-            })
+            print_json(
+                {
+                    "state": "failed",
+                    "error": {
+                        "type": "auth",
+                        "message": str(exc),
+                        "rfc_ref": exc.rfc_ref,
+                    },
+                }
+            )
             return
         except ProtocolError as exc:
             # Protocol violation - malformed response
-            print_json({
-                "state": "failed",
-                "error": {
-                    "type": "protocol",
-                    "message": str(exc),
-                    "rfc_ref": exc.rfc_ref,
-                },
-            })
+            print_json(
+                {
+                    "state": "failed",
+                    "error": {
+                        "type": "protocol",
+                        "message": str(exc),
+                        "rfc_ref": exc.rfc_ref,
+                    },
+                }
+            )
             return
 
         # Step 7: Process the response
@@ -246,7 +220,7 @@ async def invite(
             from_header = response.headers.get("From", "")
             to_header = response.headers.get("To", "")
 
-            result = {
+            result: dict[str, Any] = {
                 "state": "established",
                 "status_code": response.status_code,
                 "call_id": call_id,
@@ -276,47 +250,58 @@ async def invite(
         elif 300 <= response.status_code < 400:
             # Redirect - callee is at a different address
             contact = response.headers.get("Contact", "unknown")
-            print_json({
-                "state": "redirected",
-                "status_code": response.status_code,
-                "contact": contact,
-            })
+            print_json(
+                {
+                    "state": "redirected",
+                    "status_code": response.status_code,
+                    "contact": contact,
+                }
+            )
 
         elif 400 <= response.status_code < 500:
             # Client error - request was rejected
-            print_json({
-                "state": "rejected",
-                "status_code": response.status_code,
-                "reason": response.reason,
-            })
+            print_json(
+                {
+                    "state": "rejected",
+                    "status_code": response.status_code,
+                    "reason": response.reason,
+                }
+            )
 
         elif 500 <= response.status_code < 600:
             # Server error - temporary failure
-            print_json({
-                "state": "server_error",
-                "status_code": response.status_code,
-                "reason": response.reason,
-            })
+            print_json(
+                {
+                    "state": "server_error",
+                    "status_code": response.status_code,
+                    "reason": response.reason,
+                }
+            )
 
         else:
             # Global failure
-            print_json({
-                "state": "failed",
-                "status_code": response.status_code,
-                "reason": response.reason,
-            })
+            print_json(
+                {
+                    "state": "failed",
+                    "status_code": response.status_code,
+                    "reason": response.reason,
+                }
+            )
 
 
 def main() -> None:
     """Entry point for the invite example."""
-    args = parse_args()
+    s = account_settings()
+    codecs = os.getenv("SIPX_CODECS", "PCMU PCMA").split()
+    rtp_port = int(os.getenv("SIPX_RTP_PORT", "10000"))
+    debug = os.getenv("SIPX_DEBUG", "0") not in ("", "0", "false")
     try:
         asyncio.run(
             invite(
-                target=args.target,
-                codecs=args.codecs,
-                rtp_port=args.rtp_port,
-                debug=args.debug,
+                target=s["target"],
+                codecs=codecs,
+                rtp_port=rtp_port,
+                debug=debug,
             )
         )
     except KeyboardInterrupt:
