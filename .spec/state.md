@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.24.0` is complete: `TransportRegistry` in `sipx.transport.registry` with `register()`, `create()`, and `get_supported_types()`; `create_transport()` factory function with pre-registered UDP, TCP, and TLS transports; `TlsTransport` stub in `sipx.transport.tls`; 8 tests in `tests/test_transport_registry.py` covering defaults, creation, errors, custom registration, overwrite, and factory function.
+Implement `sipx` in verified commit blocks. Block `1.25.0` is complete: full `TlsTransport` implementation in `sipx.transport.tls` with `ssl.SSLContext` support, extending `TcpTransport` with TLS encryption and certificate validation per RFC 3261 §26.2 and RFC 5922; `TlsConfig` dataclass with `certfile`, `keyfile`, `ca_certs`, `verify_mode`, and `check_hostname` fields; 12 tests in `tests/test_transport_tls.py` covering import, subclass verification, transport type, config dataclass, TLS connection, send/receive over TLS, close behavior, and certificate validation modes.
 
 ## Sources Read
 
@@ -300,6 +300,12 @@ Implement `sipx` in verified commit blocks. Block `1.24.0` is complete: `Transpo
 - Pre-registered UDP, TCP, and TLS transports in default registry.
 - Added `tests/test_transport_registry.py` with 8 tests covering defaults, creation, errors, custom registration, overwrite, and factory function.
 - Bumped root package version to `1.24.0`.
+- Implemented full `TlsTransport` with `ssl.SSLContext` support, extending `TcpTransport` with TLS encryption and certificate validation per RFC 3261 §26.2 and RFC 5922.
+- Added `TlsConfig` dataclass with `certfile`, `keyfile`, `ca_certs`, `verify_mode`, and `check_hostname` fields.
+- Implemented certificate validation, hostname checking, and proper error handling with `TransportError` for TLS failures.
+- Added `tests/test_transport_tls.py` with 12 tests covering import, subclass verification, transport type, config dataclass, TLS connection, send/receive over TLS, close behavior, and certificate validation modes.
+- Replaced the previous TLS transport stub with a production-ready implementation.
+- Bumped root package version to `1.25.0`.
 
 ## Active Decision
 

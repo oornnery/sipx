@@ -38,7 +38,7 @@
 - `sipx.rtp.buffer.RtpJitterBuffer` now provides fixed target/max playout buffering with concealment, underrun, overrun, duplicate, and late-drop counters.
 - `sipx.rtp.audio.RtpAudioSession` now sends/receives UDP RTP with PCMU/PCMA, synthetic silence/noise, jitter-buffer playout, and metrics snapshots.
 - Asterisk GPL risk reinforces separate Python process, not loadable Asterisk module.
-- Current implementation version: `1.11.0`.
+- Current implementation version: `1.25.0`.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
 - Root `sipx` package exports SIP/SDP/RTP/media primitives, SIP UAC/UAS runtime, and direct SIP-only examples.
 - `sipx-harness` package contains events, timeline, verdict, artifacts, metrics, capabilities, expectations, actors, scenarios, profiles, reports, and harness runtime contracts.
@@ -111,3 +111,5 @@
 - `.github/workflows/create-release.yml` reads `pyproject.toml` version and creates a draft `v<version>` release on `master` if missing.
 - `.github/workflows/release.yml` verifies release tag vs `pyproject.toml`, tests/builds, and publishes to PyPI with trusted publishing.
 - `origin` is `https://github.com/oornnery/sipx.git`; old remote branches/tags/releases were removed during replacement.
+- `sipx.transport.tls.TlsTransport` now provides full TLS support with `ssl.SSLContext`, extending `TcpTransport` with certificate validation and hostname checking per RFC 3261 §26.2 and RFC 5922.
+- `sipx.transport.tls.TlsConfig` dataclass configures `certfile`, `keyfile`, `ca_certs`, `verify_mode`, and `check_hostname` for TLS connections.

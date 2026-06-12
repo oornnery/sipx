@@ -529,6 +529,16 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 1.25.0 Done
+
+- [x] Bumped package version to `1.25.0`.
+- [x] Implemented full `TlsTransport` with `ssl.SSLContext` support, extending `TcpTransport` with TLS encryption and certificate validation per RFC 3261 §26.2 and RFC 5922.
+- [x] Added `TlsConfig` dataclass with `certfile`, `keyfile`, `ca_certs`, `verify_mode`, and `check_hostname` fields.
+- [x] Implemented certificate validation, hostname checking, and proper error handling with `TransportError` for TLS failures.
+- [x] Added `tests/test_transport_tls.py` with 12 tests covering import, subclass verification, transport type, config dataclass, TLS connection, send/receive over TLS, close behavior, and certificate validation modes.
+- [x] Replaced the previous TLS transport stub with a production-ready implementation.
+- [x] Verified import, interface compliance, and TLS behavior via QA scenarios.
+
 ## Block 1.24.0 Done
 
 - [x] Bumped package version to `1.24.0`.

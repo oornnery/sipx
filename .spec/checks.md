@@ -15,6 +15,9 @@
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-06-12 | `pytest tests/test_transport_tls.py` | pass | 12 tests pass for TlsTransport and TlsConfig implementation. |
+| 2026-06-12 | `ruff check sipx/transport/tls.py tests/test_transport_tls.py` | pass | All lint checks pass for TLS transport implementation. |
+| 2026-06-12 | `ruff format --check sipx/transport/tls.py tests/test_transport_tls.py` | pass | Format clean for TLS transport files. |
 | 2026-06-12 | `pytest tests/test_transport_registry.py` | pass | 8 tests pass for TransportRegistry and create_transport factory. |
 | 2026-06-12 | `ruff check sipx/transport/registry.py sipx/transport/tls.py` | pass | All lint checks pass for new registry and TLS stub. |
 | 2026-06-12 | `ruff format --check .` | pass | Format clean after registry and TLS stub additions. |

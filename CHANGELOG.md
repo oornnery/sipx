@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 1.25.0 - 2026-06-12
+
+- Implemented full `TlsTransport` with `ssl.SSLContext` support, extending `TcpTransport` with TLS encryption and certificate validation per RFC 3261 §26.2 and RFC 5922.
+- Added `TlsConfig` dataclass with `certfile`, `keyfile`, `ca_certs`, `verify_mode`, and `check_hostname` fields for TLS-specific configuration.
+- Implemented certificate validation, hostname checking, and proper error handling with `TransportError` for TLS failures.
+- Added `tests/test_transport_tls.py` with 12 tests covering import, subclass verification, transport type, config dataclass, TLS connection, send/receive over TLS, close behavior, and certificate validation modes.
+- Replaced the previous TLS transport stub with a production-ready implementation.
+
 ## 1.24.0 - 2026-06-12
 
 - Added `sipx.transport.registry.TransportRegistry` for registering and creating transport instances by type name.

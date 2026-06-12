@@ -2,7 +2,7 @@
 
 ## Summary
 
-Block `1.24.0` added `TransportRegistry` in `sipx.transport.registry` with `register()`, `create()`, and `get_supported_types()`; `create_transport()` factory function with pre-registered UDP, TCP, and TLS transports; `TlsTransport` stub in `sipx.transport.tls`; 8 tests in `tests/test_transport_registry.py` covering defaults, creation, errors, custom registration, overwrite, and factory function. All tests, ruff lint/format, and type check pass.
+Block `1.25.0` implemented full `TlsTransport` in `sipx.transport.tls` with `ssl.SSLContext` support, extending `TcpTransport` with TLS encryption and certificate validation per RFC 3261 §26.2 and RFC 5922; `TlsConfig` dataclass with `certfile`, `keyfile`, `ca_certs`, `verify_mode`, and `check_hostname` fields; 12 tests in `tests/test_transport_tls.py` covering import, subclass verification, transport type, config dataclass, TLS connection, send/receive over TLS, close behavior, and certificate validation modes. All tests, ruff lint/format, and type check pass.
 
 ## Read First
 
@@ -52,4 +52,4 @@ After block `1.19.0`:
 - `ruff format --check .`: pass.
 - `uv run ty check`: pass.
 - `git diff --check`: pass/no output.
-- `pytest`: 98 pass (90 existing + 8 new registry tests).
+- `pytest`: 110 pass (90 existing + 8 registry tests + 12 TLS transport tests).
