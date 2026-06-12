@@ -11,11 +11,16 @@ the transition period (removal scheduled for Task 32, Wave 10).
 from __future__ import annotations
 
 import asyncio
+import re
+import secrets
 from collections.abc import AsyncIterator
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from sipx.exceptions import TransportError
 from sipx.transport.base import Transport, TransportConfig
+
+if TYPE_CHECKING:
+    from sipx.models import Request, Response
 
 
 class UdpTransport(Transport):
@@ -33,15 +38,36 @@ class UdpTransport(Transport):
                 print(f"Received {data} from {remote}")
     """
 
-    def __init__(self, config: TransportConfig) -> None:
+    def __init__(
+        self,
+        config: TransportConfig | None = None,
+        *,
+        local_host: str | None = None,
+        local_port: int | None = None,
+        max_message_size: int = 65535,
+    ) -> None:
         """Initialize UDP transport with configuration.
 
         Args:
             config: Transport configuration specifying bind address and limits.
+            local_host: Convenience parameter for local host (used if config is None).
+            local_port: Convenience parameter for local port (used if config is None).
+            max_message_size: Convenience parameter for max message size (used if config is None).
 
         Raises:
             TransportError: If configuration is invalid.
         """
+        if config is None:
+            if local_host is None:
+                raise TransportError("local_host is required")
+            if local_port is None:
+                local_port = 0
+            config = TransportConfig(
+                local_host=local_host,
+                local_port=local_port,
+                max_message_size=max_message_size,
+            )
+
         if not config.local_host:
             raise TransportError("local_host is required")
         if not 0 <= config.local_port < 65536:
@@ -185,6 +211,101 @@ class UdpTransport(Transport):
         if self._transport is None:
             raise TransportError("UDP transport is not started")
         return self._transport
+
+    def add_via_header(self, request: Request) -> None:
+        """Add Via header with rport parameter to outbound request.
+
+        Per RFC 3581, the rport parameter (without value) requests that the
+        server fill in the actual source port and add a received parameter.
+
+        Args:
+            request: The SIP request to modify.
+        """
+        host = self._config.local_host
+        port = self._config.local_port
+        branch = f"z9hG4bK{secrets.token_hex(8)}"
+        via = f"SIP/2.0/UDP {host}:{port};branch={branch};rport"
+        request.headers["Via"] = via
+
+    def parse_via_rport(self, response: Response) -> tuple[int | None, str | None]:
+        """Parse rport and received parameters from Via header in response.
+
+        Per RFC 3581, extracts the rport (port) and received (IP address)
+        parameters that the server added to the Via header.
+
+        Args:
+            response: The SIP response to parse.
+
+        Returns:
+            Tuple of (rport, received) where rport is the port number or None,
+            and received is the IP address string or None.
+        """
+        via = response.headers.get("Via", "")
+        if not via:
+            return None, None
+
+        rport = None
+        received = None
+
+        rport_match = re.search(r";rport(?:=(\d+))?", via)
+        if rport_match and rport_match.group(1):
+            rport = int(rport_match.group(1))
+
+        received_match = re.search(r";received=([^;]+)", via)
+        if received_match:
+            received = received_match.group(1).strip()
+
+        return rport, received
+
+    def get_response_destination(
+        self, via_header: str, source_addr: tuple[str, int]
+    ) -> tuple[str, int]:
+        """Determine where to send a response based on Via header and source address.
+
+        Per RFC 3581, if rport is present in the Via header, send the response
+        to the source address/port instead of the Via address. If received
+        parameter is also present, use that IP address.
+
+        Args:
+            via_header: The Via header value from the request.
+            source_addr: The actual source address where the request came from.
+
+        Returns:
+            The destination address (host, port) where the response should be sent.
+        """
+        if ";rport" not in via_header:
+            return self._parse_via_address(via_header)
+
+        source_host, source_port = source_addr
+
+        received_match = re.search(r";received=([^;]+)", via_header)
+        if received_match:
+            source_host = received_match.group(1).strip()
+
+        rport_match = re.search(r";rport(?:=(\d+))?", via_header)
+        if rport_match and rport_match.group(1):
+            source_port = int(rport_match.group(1))
+
+        return source_host, source_port
+
+    def _parse_via_address(self, via_header: str) -> tuple[str, int]:
+        """Parse host and port from Via header address.
+
+        Args:
+            via_header: The Via header value.
+
+        Returns:
+            Tuple of (host, port) from the Via address.
+        """
+        match = re.search(r"SIP/2\.0/UDP\s+([^;]+)", via_header)
+        if not match:
+            raise TransportError(f"Invalid Via header format: {via_header}")
+
+        address = match.group(1).strip()
+        if ":" in address:
+            host, port_str = address.rsplit(":", 1)
+            return host, int(port_str)
+        return address, 5060
 
 
 class _UdpProtocol(asyncio.DatagramProtocol):
