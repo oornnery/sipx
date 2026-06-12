@@ -529,6 +529,15 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 1.24.0 Done
+
+- [x] Bumped package version to `1.24.0`.
+- [x] Added `sipx.transport.registry.TransportRegistry` with `register()`, `create()`, and `get_supported_types()`.
+- [x] Added `create_transport()` factory function using default registry with pre-registered UDP, TCP, and TLS transports.
+- [x] Added `sipx.transport.tls.TlsTransport` as a minimal stub satisfying the `Transport` interface.
+- [x] Added `tests/test_transport_registry.py` with 8 tests covering default registrations, creation per type, unknown type errors, custom registration, overwrite, and factory function.
+- [x] Verified import, default transports, and factory creation via QA scenarios.
+
 ## Block 1.23.0 Done
 
 - [x] Bumped package version to `1.23.0`.

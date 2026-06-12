@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `1.21.0` is complete: abstract `Transport` base class in `sipx.transport.base` with async `send`, `receive`, `close`, and properties `local_address`/`transport_type`; `TransportConfig` dataclass with `local_host`, `local_port`, `timeout`, `max_message_size` defaults; mock transport tests in `tests/test_transport_base.py` covering abstractness, config, send, receive, and close.
+Implement `sipx` in verified commit blocks. Block `1.24.0` is complete: `TransportRegistry` in `sipx.transport.registry` with `register()`, `create()`, and `get_supported_types()`; `create_transport()` factory function with pre-registered UDP, TCP, and TLS transports; `TlsTransport` stub in `sipx.transport.tls`; 8 tests in `tests/test_transport_registry.py` covering defaults, creation, errors, custom registration, overwrite, and factory function.
 
 ## Sources Read
 
@@ -295,6 +295,11 @@ Implement `sipx` in verified commit blocks. Block `1.21.0` is complete: abstract
 - Enabled `debug_wire_rtp` in `metrics.py` and `invite_with_sdp.py` examples.
 - 90 core tests pass; ruff/type-check clean.
 - Bumped root package version to `1.19.0`.
+- Added `sipx/transport/tls.py` with minimal `TlsTransport` stub satisfying `Transport` interface.
+- Added `sipx/transport/registry.py` with `TransportRegistry` and `create_transport()` factory.
+- Pre-registered UDP, TCP, and TLS transports in default registry.
+- Added `tests/test_transport_registry.py` with 8 tests covering defaults, creation, errors, custom registration, overwrite, and factory function.
+- Bumped root package version to `1.24.0`.
 
 ## Active Decision
 

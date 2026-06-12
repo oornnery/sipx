@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.24.0 - 2026-06-12
+
+- Added `sipx.transport.registry.TransportRegistry` for registering and creating transport instances by type name.
+- Added `create_transport()` factory function using the default registry with pre-registered `udp`, `tcp`, and `tls` transports.
+- Added `sipx.transport.tls.TlsTransport` as a minimal TLS transport stub satisfying the `Transport` interface.
+- Added `tests/test_transport_registry.py` with 8 tests covering default registrations, creation of each transport type, unknown type errors, custom registration, overwrite, and factory function.
+
 ## 1.23.0 - 2026-06-11
 
 - Added `sipx/exceptions.py` with typed exception hierarchy: `SipError`, `TransportError`, `TimeoutError`, `ProtocolError`, `AuthError`, `DialogError`, `TransactionError`.

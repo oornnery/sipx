@@ -2,7 +2,7 @@
 
 ## Summary
 
-Block `1.21.0` added abstract `Transport` base class in `sipx.transport.base` with async `send`, `receive`, `close`, and properties `local_address`/`transport_type`; `TransportConfig` dataclass with common config defaults; mock transport tests in `tests/test_transport_base.py`. All 96 core tests (90 existing + 6 new), ruff lint/format, and type check pass.
+Block `1.24.0` added `TransportRegistry` in `sipx.transport.registry` with `register()`, `create()`, and `get_supported_types()`; `create_transport()` factory function with pre-registered UDP, TCP, and TLS transports; `TlsTransport` stub in `sipx.transport.tls`; 8 tests in `tests/test_transport_registry.py` covering defaults, creation, errors, custom registration, overwrite, and factory function. All tests, ruff lint/format, and type check pass.
 
 ## Read First
 
@@ -52,4 +52,4 @@ After block `1.19.0`:
 - `ruff format --check .`: pass.
 - `uv run ty check`: pass.
 - `git diff --check`: pass/no output.
-- `pytest`: 90 pass.
+- `pytest`: 98 pass (90 existing + 8 new registry tests).

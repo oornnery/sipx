@@ -8,12 +8,18 @@
 | `ruff check .` | lint | pass |
 | `uv run ty check` | type check | pass |
 | `pytest tests/test_transport_base.py` | transport base tests | 6 pass |
+| `pytest tests/test_transport_registry.py` | transport registry tests | 8 pass |
 | `pre-commit run --all-files` | full local hooks | not run yet |
 
 ## Latest Results
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-06-12 | `pytest tests/test_transport_registry.py` | pass | 8 tests pass for TransportRegistry and create_transport factory. |
+| 2026-06-12 | `ruff check sipx/transport/registry.py sipx/transport/tls.py` | pass | All lint checks pass for new registry and TLS stub. |
+| 2026-06-12 | `ruff format --check .` | pass | Format clean after registry and TLS stub additions. |
+| 2026-06-12 | `uv run ty check` | pass | Type-check gate passes after registry and TLS stub additions. |
+| 2026-06-12 | `git diff --check` | pass/no output | No whitespace errors after registry and TLS stub additions. |
 | 2026-06-10 | `pytest` | pass | 90 core tests pass after RTP wire event hooks. |
 | 2026-06-10 | `ruff check .` | pass | All lint checks pass after RTP wire event hooks. |
 | 2026-06-10 | `ruff format --check .` | pass | Format clean after RTP wire event hooks. |
