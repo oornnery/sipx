@@ -23,7 +23,7 @@ def test_asyncclient_default_construction():
     """AsyncClient must construct with default parameters."""
     client = AsyncClient()
     assert client is not None
-    assert not client.is_closed
+    assert client.is_closed
     assert client.config is not None
     assert client.transport is not None
 
@@ -103,6 +103,8 @@ async def test_asyncclient_context_manager():
 async def test_asyncclient_aclose():
     """AsyncClient.aclose() must close the client."""
     client = AsyncClient()
+    assert client.is_closed
+    await client.__aenter__()
     assert not client.is_closed
     await client.aclose()
     assert client.is_closed
