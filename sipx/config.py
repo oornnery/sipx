@@ -12,6 +12,19 @@ class ClientConfig:
     Defaults match existing sipx behavior where applicable.
     New httpx-like fields (user_agent, headers, params, cookies) are added
     for the evolving API.
+
+    Attributes:
+        transport: Transport protocol ("udp", "tcp", or "tls").
+        local_host: Local address to bind to.
+        local_port: Local port to bind to (0 for auto-assign).
+        timeout: Default timeout in seconds for SIP transactions.
+        max_message_size: Maximum SIP message size in bytes.
+        user_agent: User-Agent header value.
+        from_uri: Default From URI (optional).
+        contact_uri: Default Contact URI (optional).
+        headers: Default headers merged into every request.
+        params: Default query parameters.
+        cookies: Default cookies (rarely used in SIP).
     """
 
     transport: str = "udp"

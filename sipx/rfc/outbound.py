@@ -28,7 +28,13 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class FlowInfo:
-    """Metadata for a single client-initiated connection flow."""
+    """Metadata for a single client-initiated connection flow.
+
+    Attributes:
+        token: Unique flow identifier (UUID4 hex string).
+        remote: The (host, port) of the remote SIP server.
+        active: Whether the flow is currently active and usable.
+    """
 
     token: str
     remote: tuple[str, int]
@@ -47,6 +53,11 @@ class OutboundHandler:
     """
 
     def __init__(self, transport: Transport | None = None) -> None:
+        """Initialize OutboundHandler.
+
+        Args:
+            transport: Optional transport layer for sending keep-alives.
+        """
         self._transport = transport
         self._flows: dict[str, FlowInfo] = {}
 

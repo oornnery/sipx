@@ -13,6 +13,13 @@ class SipError(Exception):
         details: dict | None = None,
         rfc_ref: str | None = None,
     ) -> None:
+        """Initialize SipError.
+
+        Args:
+            message: Human-readable error description.
+            details: Optional structured data about the error.
+            rfc_ref: Optional RFC reference (e.g. ``RFC 3261 §17``).
+        """
         super().__init__(message)
         self.message = message
         self.details = details or {}

@@ -66,6 +66,11 @@ class PresenceTuple:
     note: str = ""
 
     def __post_init__(self) -> None:
+        """Validate the tuple status after initialization.
+
+        Raises:
+            ProtocolError: If status is not 'open' or 'closed'.
+        """
         if self.status not in VALID_BASIC_STATUSES:
             raise ProtocolError(
                 f"Invalid PIDF basic status: {self.status!r} "

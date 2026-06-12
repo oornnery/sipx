@@ -631,7 +631,24 @@ class AsyncClient:
             self._pending_responses.pop(key, None)
 
     async def invite(self, uri: str, **kwargs: Any) -> Response:
-        """Send an INVITE request to initiate a session (RFC 3261 §13)."""
+        """Send an INVITE request to initiate a session (RFC 3261 §13).
+
+        Args:
+            uri: Target SIP URI for the invitation.
+            **kwargs: Extra headers merged into the request.
+
+        Returns:
+            The SIP response, typically 100 Trying, 180 Ringing, or 200 OK.
+
+        Raises:
+            ProtocolError: If the response indicates a protocol-level failure.
+            TimeoutError: If no response is received within the configured timeout.
+
+        Examples:
+            >>> response = await client.invite("sip:bob@example.com")
+            >>> print(response.status_code)
+            200
+        """
         request = self._build_request("INVITE", uri, **kwargs)
         remote = _parse_remote(uri)
         response = await self._send_request(request, remote)
@@ -648,7 +665,24 @@ class AsyncClient:
         return response
 
     async def register(self, uri: str, **kwargs: Any) -> Response:
-        """Send a REGISTER request (RFC 3261 §10)."""
+        """Send a REGISTER request (RFC 3261 §10).
+
+        Args:
+            uri: SIP URI of the registrar (e.g. ``sip:registrar.example.com``).
+            **kwargs: Extra headers merged into the request.
+
+        Returns:
+            The SIP response, typically 200 OK on success.
+
+        Raises:
+            ProtocolError: If the response indicates a registration failure.
+            TimeoutError: If no response is received within the configured timeout.
+
+        Examples:
+            >>> response = await client.register("sip:registrar.example.com")
+            >>> print(response.status_code)
+            200
+        """
         request = self._build_request("REGISTER", uri, **kwargs)
         remote = _parse_remote(uri)
         return await self._send_request(request, remote)
@@ -689,13 +723,51 @@ class AsyncClient:
         return response
 
     async def options(self, uri: str, **kwargs: Any) -> Response:
-        """Send an OPTIONS request (RFC 3261 §11)."""
+        """Send an OPTIONS request (RFC 3261 §11).
+
+        Args:
+            uri: Target SIP URI to query for capabilities.
+            **kwargs: Extra headers merged into the request.
+
+        Returns:
+            The SIP response, typically 200 OK with supported methods
+            and capabilities in the header fields.
+
+        Raises:
+            ProtocolError: If the response indicates a protocol-level failure.
+            TimeoutError: If no response is received within the configured timeout.
+
+        Examples:
+            >>> response = await client.options("sip:bob@example.com")
+            >>> print(response.status_code)
+            200
+        """
         request = self._build_request("OPTIONS", uri, **kwargs)
         remote = _parse_remote(uri)
         return await self._send_request(request, remote)
 
     async def subscribe(self, uri: str, event: str, **kwargs: Any) -> Response:
-        """Send a SUBSCRIBE request (RFC 6665)."""
+        """Send a SUBSCRIBE request (RFC 6665).
+
+        Args:
+            uri: Target SIP URI for the subscription.
+            event: Event package name (e.g. ``presence``, ``dialog``).
+            **kwargs: Extra headers merged into the request.
+
+        Returns:
+            The SIP response, typically 200 OK or 202 Accepted.
+
+        Raises:
+            ProtocolError: If the response indicates a protocol-level failure.
+            TimeoutError: If no response is received within the configured timeout.
+
+        Examples:
+            >>> response = await client.subscribe(
+            ...     "sip:bob@example.com", event="presence"
+            ... )
+            >>> print(response.status_code)
+            200
+        """
         kwargs["Event"] = event
         kwargs.setdefault("Expires", "3600")
         request = self._build_request("SUBSCRIBE", uri, **kwargs)
