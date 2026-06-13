@@ -155,6 +155,8 @@ The SIP client runtime is required for what Asterisk intentionally hides or norm
 
 `AsyncClient` is an httpx-style async SIP client. UAC methods (`invite`, `register`, `message`, `options`, `subscribe`, generic `request`, in-dialog `ack`/`bye`) and UAS handler decorators (`on_invite`, `on_message`, `on_options`, `on_subscribe`) share one client, one `ClientConfig`, event hooks (`request`, `response`, `provisional`), and a generator-based Digest `AuthFlow`.
 
+Every UAC call returns one final `Response` (the first `>= 200` reply). Intermediate responses — provisional `1xx` and `401`/`407` Digest challenges — are collected on `response.history` in arrival order, each carrying its own `.request`, so the full request/response exchange is recoverable from a single call. Live streaming of each event is still available through `event_hooks`.
+
 The SIP/SDP/RTP core should be sans-I/O so protocol logic can be tested without sockets.
 
 ## Expectations

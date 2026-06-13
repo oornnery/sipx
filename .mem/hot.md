@@ -4,7 +4,7 @@
 - Project name in `pyproject.toml`: `sipx`; public package/import name `sipx`; CLI command `sipx`.
 - Python requirement: `>=3.14`.
 - Dev deps: `pytest`, `pytest-asyncio`, `pytest-cov`, `ruff`, `ty`, `taskipy`, `pre-commit`, `cryptography` (TLS test certs).
-- Current implementation version: `3.0.0`.
+- Current implementation version: `3.1.1`.
 - `IDEA.md` is historical source material only; maintained English files in the current structure are source of truth; no separate `/docs` tree (only `docs/migration.md`).
 - `FORMAT.md` defines compact `SPEC.md` section/table/invariant/task/backprop format.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
@@ -13,6 +13,7 @@
 - BLOCK 3.0.0: legacy API fully removed per user direction. No `sipx/legacy.py`, no `SipUserAgent`/`SipUac`/`SipUas`/`SipCall`/`SipRetransmissionPolicy` anywhere; `AsyncClient` is the only client runtime.
 - `AsyncClient` (`sipx/client.py`): UAC methods `invite`, `register`, `message`, `options`, `subscribe`, generic `request(method, uri, **kwargs)`, in-dialog `ack(call_id)`/`bye(call_id)` from tracked `Dialog` state, `dialog(call_id)` accessor; UAS decorators `on_invite`/`on_message`/`on_options`/`on_subscribe`; context-manager lifecycle; Digest via generator `AuthFlow`.
 - `AsyncClient` event hooks: `request`, `response`, `provisional` only (sync or async callables, side-effect only); `EventHooks` type lives in `sipx.protocol.hooks` and is re-exported from root.
+- UAC calls return one final `Response` (first `>= 200`); intermediate responses (provisional `1xx`, `401`/`407` challenges) are on `response.history` in arrival order, each with its `.request` (added `3.1.0`). `_send_and_receive` collects 0+ provisionals; auth retries append the challenge response to history.
 - Root exports: `AsyncClient`, `AuthFlow`, `ClientConfig`, `Request`, `Response`, `EventHooks`, plus `sipx.sip` sans-I/O primitives, `sipx.sdp`, `sipx.rtp`, `sipx.media`, types, and summaries (no `SipCallSummary`/`call_summary`).
 - `sipx/protocol/*`: transactions, dialog (RFC 3261 §12), auth flow, hooks, provisional streaming. `sipx/transport/*`: UDP (+rport RFC 3581), TCP, TLS (`TlsConfig`), registry. `sipx/rfc/*`: PRACK 3262, DNS 3263, events 3265/6665, presence 3856/3858, MESSAGE 3428, outbound 5626.
 - `sipx.sip` stays as sans-I/O layer: `SipUri`, `HeaderMap`, `SipRequest`/`SipResponse`, parser with size/Content-Length validation, transactions, Digest helpers, register flow, UDP endpoint.

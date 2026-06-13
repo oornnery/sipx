@@ -4,6 +4,8 @@
 
 Implement `sipx` in verified commit blocks. Block `3.0.0` is complete: the legacy API was removed entirely per explicit user direction ("nao precisa de nada legacy"). `sipx/legacy.py` is deleted; `AsyncClient` (`sipx/client.py`) is the only client runtime, now extended with generic `request()`, in-dialog `ack()`/`bye()` built from `Dialog` state, and a `dialog()` accessor. The CLI (`apps/cli`) was rewritten on `AsyncClient` with commands `options`, `message`, `request`, `register`, `unregister`; legacy `call`/`listen` RTP commands were removed. Legacy-based examples (root and `apps/scenarios/examples/mizu`), `docs/old-api-snapshot/`, and `tests/test_uac_uas.py` were deleted. Validation wave passed: 567 tests (core + apps, 3 opt-in skips), ruff lint/format, `uv run ty check`.
 
+Block `3.1.0` is complete: answered the user's observability question ("o request/options retorna todas as transacoes e respostas?") by adding `Response.history`. UAC calls still return one final `Response`, but it now carries every intermediate response (provisional `1xx` + `401`/`407` challenges) in arrival order, each with its `.request`. `_send_and_receive` was fixed to collect any number of provisionals (was one). Validation: 503 core + 65 app tests pass (3 opt-in skips), ruff lint/format, `uv run ty check`.
+
 ## Sources Read
 
 - `IDEA.md`: 5270 lines; source of product architecture and roadmap.
@@ -319,6 +321,9 @@ Implement `sipx` in verified commit blocks. Block `3.0.0` is complete: the legac
 - Rewrote the opt-in Asterisk SIP integration test on `AsyncClient` invite/ack/bye; harness mixed-scenario test uses `MockRuntime` for the SIP slot.
 - Updated `README.md`, `docs/migration.md`, and scenarios README to the AsyncClient-only surface.
 - Bumped root package version to `3.0.0`.
+- Added `Response.history` (block `3.1.0`): UAC calls attach provisional `1xx` and `401`/`407` challenge responses to the final `Response.history` in arrival order, each with its `.request`; `_send_and_receive` now collects 0+ provisionals (was one). Added multi-provisional and auth-challenge history tests.
+- Bumped root package version to `3.1.0`.
+- Documented `Response.history` in `README.md` and refreshed `.spec/*`/`.mem/*` state; bumped root package version to `3.1.1`.
 
 ## Active Decision
 

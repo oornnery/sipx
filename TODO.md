@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code has root `sipx` package for SIP/SDP/RTP/media primitives and the httpx-like `AsyncClient` runtime (UAC verbs, UAS handlers, generic `request`, in-dialog `ack`/`bye`, Digest `AuthFlow`, event hooks) over `sipx/protocol/*`, `sipx/transport/*`, and `sipx/rfc/*`. The legacy `SipUserAgent`/`SipUac`/`SipUas` API was removed in `3.0.0`. The `sipx` CLI is AsyncClient-based and curl-like (`options`, `message`, `request`, `register`, `unregister`). Harness concepts and generic redaction live in workspace package `apps/harness` as `sipx_harness`, with `MockRuntime` for deterministic scenarios. Asterisk, LLM, scenarios, STT, and TTS remain app packages.
+Implement `sipx` in small verified blocks. Current code has root `sipx` package for SIP/SDP/RTP/media primitives and the httpx-like `AsyncClient` runtime (UAC verbs, UAS handlers, generic `request`, in-dialog `ack`/`bye`, Digest `AuthFlow`, event hooks, `Response.history` exposing the full provisional/auth exchange) over `sipx/protocol/*`, `sipx/transport/*`, and `sipx/rfc/*`. The legacy `SipUserAgent`/`SipUac`/`SipUas` API was removed in `3.0.0`. The `sipx` CLI is AsyncClient-based and curl-like (`options`, `message`, `request`, `register`, `unregister`). Harness concepts and generic redaction live in workspace package `apps/harness` as `sipx_harness`, with `MockRuntime` for deterministic scenarios. Asterisk, LLM, scenarios, STT, and TTS remain app packages.
 
 ## Milestone 0 - Project Grounding
 

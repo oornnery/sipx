@@ -15,6 +15,11 @@
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-06-13 | `uv run pytest` (block 3.1.0) | pass | 503 core pass incl. new `Response.history` multi-provisional + 401-challenge tests. |
+| 2026-06-13 | `uv run pytest apps` (block 3.1.0) | pass | 65 pass, 3 opt-in skips after `Response.history` addition. |
+| 2026-06-13 | `uv run ruff check .` (block 3.1.0) | pass | All checks passed. |
+| 2026-06-13 | `uv run ruff format --check .` (block 3.1.0) | pass | 146 files already formatted. |
+| 2026-06-13 | `uv run ty check` (block 3.1.0) | pass | Clean after `Response.history` + `_send_and_receive` rewrite. |
 | 2026-06-12 | `uv run pytest tests apps` (block 3.0.0) | pass | 567 pass, 3 opt-in skips after full legacy removal, CLI rewrite, and AsyncClient request/ack/bye additions. |
 | 2026-06-12 | `uv run ruff check .` (block 3.0.0) | pass | Clean after legacy removal. |
 | 2026-06-12 | `uv run ruff format --check .` (block 3.0.0) | pass | 146 files formatted. |
