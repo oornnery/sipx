@@ -40,25 +40,6 @@ def info_dtmf_command(target: str, from_uri: str, digit: str) -> list[str]:
     ]
 
 
-def call_with_dtmf_command(target: str, aor: str, registrar: str) -> list[str]:
-    return [
-        *CLI,
-        "call",
-        target,
-        *account_flags(aor, registrar),
-        "--codec",
-        "PCMU",
-        "--audio",
-        "noise",
-        "--rtp-stats",
-        "--dtmf",
-        "123#",
-        "--duration",
-        "3",
-        "--debug-sip",
-    ]
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Print runnable sipx CLI examples.")
     parser.add_argument("--aor", default="sip:1001@example.com")
@@ -73,7 +54,6 @@ def main(argv: list[str] | None = None) -> int:
         options_command(args.target, args.from_uri),
         message_command(args.message_target, args.from_uri, "hello from sipx"),
         info_dtmf_command(args.target, args.from_uri, "1"),
-        call_with_dtmf_command(args.target, args.aor, args.registrar),
     ]
     for command in commands:
         print(_shell_join(command))

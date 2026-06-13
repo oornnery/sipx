@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `2.0.0` is complete: the AsyncClient overhaul (`.omo/plans/sipx-overhaul.md`) is finished and validated. Root `sipx` now ships an httpx-like `AsyncClient` (`sipx/client.py`) over `sipx/protocol/*` (transactions, dialog, generator-based `AuthFlow`, hooks, provisional streaming), `sipx/transport/*` (UDP with rport, TCP, TLS, registry), and `sipx/rfc/*` (PRACK 3262, DNS 3263, events 3265/6665, presence 3856/3858, MESSAGE 3428, outbound 5626). The old `SipUserAgent`/`SipUac`/`SipUas` API is consolidated in `sipx/legacy.py` (still exported from root); `sipx/ua.py`, `sipx/uac.py`, `sipx/uas.py` were removed. `docs/migration.md` documents the migration. Validation wave passed after fixes: 525 core + 65 app tests, ruff lint/format, `uv run ty check`.
+Implement `sipx` in verified commit blocks. Block `3.0.0` is complete: the legacy API was removed entirely per explicit user direction ("nao precisa de nada legacy"). `sipx/legacy.py` is deleted; `AsyncClient` (`sipx/client.py`) is the only client runtime, now extended with generic `request()`, in-dialog `ack()`/`bye()` built from `Dialog` state, and a `dialog()` accessor. The CLI (`apps/cli`) was rewritten on `AsyncClient` with commands `options`, `message`, `request`, `register`, `unregister`; legacy `call`/`listen` RTP commands were removed. Legacy-based examples (root and `apps/scenarios/examples/mizu`), `docs/old-api-snapshot/`, and `tests/test_uac_uas.py` were deleted. Validation wave passed: 567 tests (core + apps, 3 opt-in skips), ruff lint/format, `uv run ty check`.
 
 ## Sources Read
 
@@ -313,6 +313,12 @@ Implement `sipx` in verified commit blocks. Block `2.0.0` is complete: the Async
 - Fixed stale CLI tests (broken since the UAC/UAS media commit) with scripted no-socket `SipUserAgent` fakes that exercise the real `request()` Digest retry.
 - Fixed 19 `ty` diagnostics in new overhaul code; added `cryptography` dev dep for TLS tests; removed uncommitted `[tool.ruff] preview = true` experiment.
 - Bumped root package version to `2.0.0`.
+- Removed legacy API entirely (block `3.0.0`): deleted `sipx/legacy.py`, all legacy root exports, `SipCallSummary`/`call_summary`, `docs/old-api-snapshot/`, `tests/test_uac_uas.py`, legacy root examples, and `apps/scenarios/examples/mizu/`.
+- Added `AsyncClient.request()` (generic method), `AsyncClient.ack()`/`AsyncClient.bye()` (in-dialog from tracked `Dialog`), and `AsyncClient.dialog()`; root now exports `AuthFlow` and protocol `EventHooks`.
+- Rewrote `apps/cli` on `AsyncClient` (`options`, `message`, `request`, `register`, `unregister`; `--debug-sip` redacted hooks) and rewrote its tests with a `FakeAsyncClient` double.
+- Rewrote the opt-in Asterisk SIP integration test on `AsyncClient` invite/ack/bye; harness mixed-scenario test uses `MockRuntime` for the SIP slot.
+- Updated `README.md`, `docs/migration.md`, and scenarios README to the AsyncClient-only surface.
+- Bumped root package version to `3.0.0`.
 
 ## Active Decision
 

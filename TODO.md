@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code now has root `sipx` package for SIP/SDP/RTP/media primitives, SIP UAC/UAS runtime, high-level `SipUac`/`SipUas` phone ergonomics, configurable INVITE provisional responses, G.711 helpers, RTP metrics, jitter buffer, synthetic audio sources, optional lazy PyAudio input, RTP wire event hooks, direct root Mizu examples, and a SIP/RTP-only `sipx` CLI in a curl/httpx-cli style. Harness concepts and generic redaction live in workspace package `apps/harness` as `sipx_harness`, with `MockRuntime` for deterministic scenarios. Asterisk, LLM, scenarios, STT, and TTS remain app packages.
+Implement `sipx` in small verified blocks. Current code has root `sipx` package for SIP/SDP/RTP/media primitives and the httpx-like `AsyncClient` runtime (UAC verbs, UAS handlers, generic `request`, in-dialog `ack`/`bye`, Digest `AuthFlow`, event hooks) over `sipx/protocol/*`, `sipx/transport/*`, and `sipx/rfc/*`. The legacy `SipUserAgent`/`SipUac`/`SipUas` API was removed in `3.0.0`. The `sipx` CLI is AsyncClient-based and curl-like (`options`, `message`, `request`, `register`, `unregister`). Harness concepts and generic redaction live in workspace package `apps/harness` as `sipx_harness`, with `MockRuntime` for deterministic scenarios. Asterisk, LLM, scenarios, STT, and TTS remain app packages.
 
 ## Milestone 0 - Project Grounding
 
@@ -528,6 +528,18 @@ Implement `sipx` in small verified blocks. Current code now has root `sipx` pack
 - [x] Removed `cast()` from `sipx/examples/register.py`.
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
+
+## Block 3.0.0 Done
+
+- [x] Bumped package version to `3.0.0`.
+- [x] Removed the legacy API entirely per user direction: deleted `sipx/legacy.py`, all legacy root exports, `SipCallSummary`/`call_summary`, `docs/old-api-snapshot/`, and `tests/test_uac_uas.py`.
+- [x] Added `AsyncClient.request()` (generic method), `AsyncClient.ack()`/`AsyncClient.bye()` (in-dialog from tracked `Dialog`), and `AsyncClient.dialog()` with tests.
+- [x] Rewrote the `sipx` CLI on `AsyncClient`: `options`, `message`, `request`, `register`, `unregister`; removed legacy `call`/`listen` RTP commands; rewrote CLI tests with `FakeAsyncClient`.
+- [x] Deleted legacy root examples and `apps/scenarios/examples/mizu/`; trimmed `sip_cli_flow.py`; updated scenarios tests and README.
+- [x] Rewrote the opt-in Asterisk SIP integration test on `AsyncClient` invite/ack/bye; harness mixed-scenario test uses `MockRuntime` for the SIP slot.
+- [x] Updated `README.md`, `docs/migration.md`, `.spec/*`, and `.mem/*` to the AsyncClient-only surface.
+- [x] Validation: `uv run pytest tests apps` 567 pass + 3 opt-in skips, `ruff check .` pass, `ruff format --check .` pass, `uv run ty check` pass, CLI help smoke pass.
+- [ ] Pending: decide if `AsyncClient` should gain SDP/RTP orchestration to restore call/listen ergonomics; live Mizu smoke of the new examples.
 
 ## Block 2.0.0 Done
 

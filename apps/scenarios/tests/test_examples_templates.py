@@ -38,8 +38,7 @@ def test_examples_do_not_contain_inline_private_credentials() -> None:
                 r"Authorization\s*[:=]\s*['\"]?(?!\[REDACTED\])[^'\"\s]+",
                 text,
             )
-            if path.name != "mizu_call.py" and path.name != "harness.toml":
-                assert not re.search(r"password\s*=\s*['\"][^'\"]+", text)
+            assert not re.search(r"password\s*=\s*['\"][^'\"]+", text)
 
 
 def test_llm_examples_use_generic_environment_key_only() -> None:
@@ -54,16 +53,7 @@ def test_runnable_examples_expose_main() -> None:
     for path in (
         "apps/llm/examples/semantic_smoke.py",
         "apps/llm/examples/sip_flow_audit.py",
-        "apps/scenarios/examples/sip/call_with_dtmf.py",
-        "apps/scenarios/examples/sip/mizu_call.py",
         "apps/scenarios/examples/sip/sip_cli_flow.py",
-        "apps/scenarios/examples/mizu/register.py",
-        "apps/scenarios/examples/mizu/options.py",
-        "apps/scenarios/examples/mizu/invite_without_sdp.py",
-        "apps/scenarios/examples/mizu/invite_with_sdp.py",
-        "apps/scenarios/examples/mizu/metrics.py",
-        "apps/scenarios/examples/mizu/manipulation.py",
-        "apps/scenarios/examples/mizu/smoke_tests.py",
     ):
         namespace = runpy.run_path(path)
         assert callable(namespace["main"])

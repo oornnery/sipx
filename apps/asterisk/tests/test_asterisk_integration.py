@@ -3,12 +3,7 @@ import os
 
 import pytest
 
-from sipx import (
-    SipCallState,
-    SipRetransmissionPolicy,
-    SipUac,
-    SipUri,
-)
+from sipx import AsyncClient, ClientConfig
 from sipx_asterisk import AsteriskAriClient, AsteriskAriConfig
 
 
@@ -41,42 +36,27 @@ async def _asterisk_lab_ari_is_reachable() -> None:
     assert "system" in info or "config" in info
 
 
-def test_sip_uac_calls_asterisk_as_uas() -> None:
-    asyncio.run(_sip_uac_calls_asterisk_as_uas())
+def test_async_client_calls_asterisk_as_uas() -> None:
+    asyncio.run(_async_client_calls_asterisk_as_uas())
 
 
-async def _sip_uac_calls_asterisk_as_uas() -> None:
+async def _async_client_calls_asterisk_as_uas() -> None:
     host = os.getenv("SIPX_ASTERISK_SIP_HOST", "127.0.0.1")
     port = int(os.getenv("SIPX_ASTERISK_SIP_PORT", "5060"))
-    caller = SipUac(
-        retransmission_policy=SipRetransmissionPolicy(
-            initial_interval=0.1,
-            max_interval=0.2,
-            max_attempts=3,
-        )
+    config = ClientConfig(
+        local_host="127.0.0.1",
+        timeout=3.0,
+        from_uri="sip:alice@sipx.local",
     )
-    try:
-        await caller.start()
-        contact = SipUri.parse(f"sip:alice@127.0.0.1:{caller.local_address[1]}")
-
-        call = await caller.initiate_call(
-            remote=(host, port),
-            target=SipUri.parse(f"sip:1001@{host}:{port}"),
-            caller=SipUri.parse("sip:alice@sipx.local"),
-            contact=contact,
-            call_id="sipx-asterisk-uac-1",
-            branch="z9hG4bK-sipx-asterisk-uac",
-            from_tag="sipx-uac",
-            ack_branch="z9hG4bK-sipx-asterisk-ack",
-            timeout=3.0,
-        )
-        response = await caller.hangup_call(
-            call,
-            branch="z9hG4bK-sipx-asterisk-bye",
-            timeout=3.0,
-        )
-
-        assert call.state is SipCallState.TERMINATED
+    async with AsyncClient(config=config) as client:
+        response = await client.invite(f"sip:1001@{host}:{port}")
         assert 200 <= response.status_code < 300
-    finally:
-        await caller.stop()
+
+        call_id = response.headers.get("Call-ID")
+        assert isinstance(call_id, str) and call_id
+
+        await client.ack(call_id)
+        bye_response = await client.bye(call_id)
+
+        assert 200 <= bye_response.status_code < 300
+        assert client.dialog(call_id) is None

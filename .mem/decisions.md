@@ -82,3 +82,6 @@
 | D78 | 2026-06-09 | Use `event_hooks` httpx-style dict without compatibility aliases. | httpx pattern is simpler, well-known, and side-effect only. `SipHooks`/`SipHandlers` decorator APIs removed. |
 | D79 | 2026-06-09 | Summaries stay dataclasses; JSON conversion happens at CLI/example edge. | Keeps core Python API typed while preserving structured output for command-line users. |
 | D80 | 2026-06-09 | Compact headers and advertised capabilities are explicit opt-ins. | Avoids changing default canonical wire output or claiming unsupported SIP features. |
+| D81 | 2026-06-12 | Legacy API removed entirely in `3.0.0`; `AsyncClient` is the only client runtime. | User direction "nao precisa de nada legacy"; one client surface eliminates duplicate runtimes, stale exports, and migration debt. |
+| D82 | 2026-06-12 | CLI drops `call`/`listen` RTP softphone commands until `AsyncClient` gains media orchestration. | `AsyncClient` has no SDP/RTP session path; keeping the commands would require keeping the legacy runtime. |
+| D83 | 2026-06-12 | `AsyncClient` gains generic `request()` and in-dialog `ack()`/`bye()` from `Dialog` state. | Restores curl-like escape hatch and proper INVITE dialog teardown without the legacy engine. |

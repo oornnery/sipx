@@ -15,6 +15,12 @@
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-06-12 | `uv run pytest tests apps` (block 3.0.0) | pass | 567 pass, 3 opt-in skips after full legacy removal, CLI rewrite, and AsyncClient request/ack/bye additions. |
+| 2026-06-12 | `uv run ruff check .` (block 3.0.0) | pass | Clean after legacy removal. |
+| 2026-06-12 | `uv run ruff format --check .` (block 3.0.0) | pass | 146 files formatted. |
+| 2026-06-12 | `uv run ty check` (block 3.0.0) | pass | Clean after legacy removal and CLI rewrite. |
+| 2026-06-12 | `uv run --package sipx-cli sipx --help` (block 3.0.0) | pass | New surface: options, message, request, register, unregister. |
+| 2026-06-12 | `python -c "import sipx"` (block 3.0.0) | pass | 101 root exports; no legacy symbols. |
 | 2026-06-12 | `uv run pytest` (block 2.0.0) | pass | 525 core tests pass after AsyncClient overhaul, example V64 fixes, and type fixes. |
 | 2026-06-12 | `uv run pytest apps` (block 2.0.0) | pass | 65 pass, 3 skip after rewriting stale CLI test fakes to drive real `SipUserAgent.request()`. |
 | 2026-06-12 | `uv run ruff check .` (block 2.0.0) | pass | Clean after auto-fixes; uncommitted `[tool.ruff] preview = true` was removed (caused 154 preview-only findings). |

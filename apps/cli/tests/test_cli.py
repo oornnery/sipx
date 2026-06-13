@@ -1,50 +1,68 @@
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 import tomllib
 
 import pytest
 
-from sipx.sip import HeaderMap, SipResponse
-from sipx.sip.transport import SipWireDirection, SipWireEvent
-from sipx.legacy import SipUserAgent
+from sipx import Request, Response
 from sipx_cli.main import main
 
 
-def _scripted_user_agent(sent_requests: list, response_factory):
-    """SipUserAgent subclass without sockets; scripts wire I/O for CLI tests.
+class FakeAsyncClient:
+    """In-memory AsyncClient double that records calls and returns responses."""
 
-    Keeps the real ``request()`` logic (headers, CSeq, Digest retry) under
-    test while replacing UDP send/receive with deterministic fakes.
-    """
+    instances: list["FakeAsyncClient"] = []
+    responses: list[Response] = []
 
-    class ScriptedSipUserAgent(SipUserAgent):
-        async def start(self):
-            return self
+    def __init__(self, **kwargs: Any) -> None:
+        self.kwargs = kwargs
+        self.calls: list[tuple[str, tuple, dict]] = []
+        FakeAsyncClient.instances.append(self)
 
-        async def stop(self) -> None:
-            return None
+    async def __aenter__(self) -> "FakeAsyncClient":
+        return self
 
-        @property
-        def local_address(self):
-            return ("127.0.0.1", 45000)
+    async def __aexit__(self, *args: object) -> None:
+        return None
 
-        def _send_message(self, message, remote):
-            sent_requests.append((message, remote))
-            event = SipWireEvent(
-                direction=SipWireDirection.TX,
-                remote=remote,
-                raw=message.to_bytes(),
-                message=message,
-            )
-            return event
+    def _next_response(self) -> Response:
+        if FakeAsyncClient.responses:
+            return FakeAsyncClient.responses.pop(0)
+        return Response(status_code=200, reason="OK", headers={})
 
-        async def receive_event(self, *, timeout=None):
-            event = response_factory(sent_requests)
-            self._emit_wire_event(event)
-            return event
+    async def options(self, uri: str, **kwargs: Any) -> Response:
+        self.calls.append(("options", (uri,), kwargs))
+        return await self._respond(uri, "OPTIONS", kwargs)
 
-    return ScriptedSipUserAgent
+    async def message(self, uri: str, body: Any, **kwargs: Any) -> Response:
+        self.calls.append(("message", (uri, body), kwargs))
+        return await self._respond(uri, "MESSAGE", kwargs)
+
+    async def register(self, uri: str, **kwargs: Any) -> Response:
+        self.calls.append(("register", (uri,), kwargs))
+        return await self._respond(uri, "REGISTER", kwargs)
+
+    async def request(self, method: str, uri: str, **kwargs: Any) -> Response:
+        self.calls.append(("request", (method, uri), kwargs))
+        return await self._respond(uri, method, kwargs)
+
+    async def _respond(self, uri: str, method: str, kwargs: dict) -> Response:
+        request = Request(method=method, uri=uri, headers=dict(kwargs))
+        for hook in (self.kwargs.get("event_hooks") or {}).get("request", []):
+            hook(request)
+        response = self._next_response()
+        response.request = request
+        for hook in (self.kwargs.get("event_hooks") or {}).get("response", []):
+            hook(response)
+        return response
+
+
+@pytest.fixture(autouse=True)
+def fake_client(monkeypatch):
+    FakeAsyncClient.instances = []
+    FakeAsyncClient.responses = []
+    monkeypatch.setattr("sipx_cli.main.AsyncClient", FakeAsyncClient)
+    return FakeAsyncClient
 
 
 def test_pyproject_defines_installable_sipx_console_script() -> None:
@@ -57,7 +75,7 @@ def test_pyproject_defines_installable_sipx_console_script() -> None:
     assert pyproject["project"]["dependencies"] == ["sipx"]
 
 
-def test_cli_help_is_sip_rtp_only(capsys) -> None:
+def test_cli_help_lists_async_client_commands(capsys) -> None:
     with pytest.raises(SystemExit) as exc_info:
         main(["--help"])
 
@@ -66,187 +84,44 @@ def test_cli_help_is_sip_rtp_only(capsys) -> None:
     assert "register" in output
     assert "options" in output
     assert "request" in output
-    assert "scenario" not in output
-    assert "profile" not in output
-    assert "replay" not in output
-    assert "phone" not in output
+    assert "message" in output
+    assert "call" not in output.split()
+    assert "listen" not in output.split()
 
 
-@pytest.mark.parametrize("command", ["scenario", "profile", "replay", "phone"])
-def test_cli_rejects_non_sip_commands(command: str) -> None:
+@pytest.mark.parametrize("command", ["scenario", "profile", "replay", "phone", "call"])
+def test_cli_rejects_removed_commands(command: str) -> None:
     with pytest.raises(SystemExit) as exc_info:
         main([command])
 
     assert exc_info.value.code == 2
 
 
-def test_cli_registers_from_account_args(monkeypatch, capsys) -> None:
-    created = {}
+def test_cli_options_sends_request(capsys) -> None:
+    code = main(["options", "sip:pbx.example.com", "--from", "sip:alice@example.com"])
 
-    class FakeUac:
-        def __init__(self, **kwargs) -> None:
-            created["kwargs"] = kwargs
-            self.contact = "sip:alice@127.0.0.1:45000"
-            self.local_address = ("127.0.0.1", 45000)
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, traceback) -> None:
-            return None
-
-        async def register(self):
-            return SimpleNamespace(value="registered")
-
-    monkeypatch.setattr("sipx_cli.main.SipUac", FakeUac)
-
-    code = main(
-        [
-            "register",
-            "--aor",
-            "sip:alice@example.com",
-            "--registrar",
-            "sip:example.com",
-            "--username",
-            "alice",
-            "--password",
-            "secret",
-            "--remote-host",
-            "198.51.100.10",
-            "--remote-port",
-            "5070",
-            "--mode",
-            "lab",
-        ]
-    )
-
-    output = capsys.readouterr().out
-    uac_kwargs = created["kwargs"]
+    client = FakeAsyncClient.instances[0]
     assert code == 0
-    assert "registered: registered" in output
-    assert str(uac_kwargs["aor"]) == "sip:alice@example.com"
-    assert str(uac_kwargs["registrar"]) == "sip:example.com"
-    assert uac_kwargs["username"] == "alice"
-    assert uac_kwargs["password"] == "secret"
-    assert uac_kwargs["remote"] == ("198.51.100.10", 5070)
-    assert uac_kwargs["mode"] == "lab"
+    assert client.calls == [("options", ("sip:pbx.example.com",), {})]
+    assert client.kwargs["config"].from_uri == "sip:alice@example.com"
+    output = capsys.readouterr().out
+    assert "> OPTIONS sip:pbx.example.com" in output
+    assert "< 200 OK" in output
 
 
-def test_cli_register_requires_account_args(monkeypatch, capsys) -> None:
-    def fail_if_network_starts(config):
-        raise AssertionError("SipUac must not be constructed")
-
-    monkeypatch.setattr("sipx_cli.main.SipUac", fail_if_network_starts)
-
-    code = main(["register"])
+def test_cli_options_requires_from_identity(capsys) -> None:
+    code = main(["options", "sip:pbx.example.com"])
 
     captured = capsys.readouterr()
     assert code == 1
-    assert "requires explicit --aor and --registrar" in captured.err
-    assert "timed out" not in captured.err
+    assert "requires --from/--aor" in captured.err
+    assert FakeAsyncClient.instances == []
 
 
-def test_cli_register_uses_registrar_as_default_remote(monkeypatch, capsys) -> None:
-    created = {}
-
-    class FakeUac:
-        def __init__(self, **kwargs) -> None:
-            created["kwargs"] = kwargs
-            self.contact = "sip:alice@127.0.0.1:45000"
-            self.local_address = ("127.0.0.1", 45000)
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, traceback) -> None:
-            return None
-
-        async def register(self):
-            return SimpleNamespace(value="registered")
-
-    monkeypatch.setattr("sipx_cli.main.SipUac", FakeUac)
-
-    code = main(
-        [
-            "register",
-            "--aor",
-            "sip:alice@example.com",
-            "--registrar",
-            "sip:pbx.example.com:5070",
-            "--username",
-            "alice",
-            "--password",
-            "secret",
-        ]
-    )
-
-    assert code == 0
-    assert created["kwargs"]["remote"] == ("pbx.example.com", 5070)
-    assert "registered: registered" in capsys.readouterr().out
-
-
-def test_cli_register_help_shows_account_flags(capsys) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        main(["register", "--help"])
-
-    output = capsys.readouterr().out
-    assert exc_info.value.code == 0
-    assert "--aor" in output
-    assert "--registrar" in output
-    assert "examples:" in output
-
-
-def test_cli_options_sends_sip_request(monkeypatch, capsys) -> None:
-    sent: list = []
-
-    def respond(requests):
-        request, _remote = requests[-1]
-        headers = HeaderMap()
-        headers.add("Call-ID", request.headers.get("Call-ID"))
-        headers.add("CSeq", request.headers.get("CSeq"))
-        response = SipResponse(status_code=200, reason="OK", headers=headers)
-        return SipWireEvent(
-            direction=SipWireDirection.RX,
-            remote=("203.0.113.10", 5060),
-            raw=response.to_bytes(),
-            message=response,
-        )
-
-    monkeypatch.setattr(
-        "sipx_cli.main.SipUserAgent", _scripted_user_agent(sent, respond)
-    )
-
-    code = main(["options", "sip:pbx.example.com", "--from", "sip:alice@example.com"])
-
-    request, remote = sent[0]
-    assert code == 0
-    assert request.method == "OPTIONS"
-    assert str(request.uri) == "sip:pbx.example.com"
-    assert request.headers.get("From").startswith("<sip:alice@example.com>;tag=")
-    assert request.headers.get("To") == "<sip:pbx.example.com>"
-    assert remote == ("pbx.example.com", 5060)
-    assert "< 200 OK" in capsys.readouterr().out
-
-
-def test_cli_message_sends_text_body_and_headers(monkeypatch, capsys) -> None:
-    sent: list = []
-
-    def respond(requests):
-        request, _remote = requests[-1]
-        headers = HeaderMap()
-        headers.add("Call-ID", request.headers.get("Call-ID"))
-        headers.add("CSeq", request.headers.get("CSeq"))
-        response = SipResponse(status_code=202, reason="Accepted", headers=headers)
-        return SipWireEvent(
-            direction=SipWireDirection.RX,
-            remote=("203.0.113.10", 5060),
-            raw=response.to_bytes(),
-            message=response,
-        )
-
-    monkeypatch.setattr(
-        "sipx_cli.main.SipUserAgent", _scripted_user_agent(sent, respond)
-    )
+def test_cli_message_sends_text_body_and_headers(capsys) -> None:
+    FakeAsyncClient.responses = [
+        Response(status_code=202, reason="Accepted", headers={})
+    ]
 
     code = main(
         [
@@ -260,41 +135,24 @@ def test_cli_message_sends_text_body_and_headers(monkeypatch, capsys) -> None:
         ]
     )
 
-    request, remote = sent[0]
+    client = FakeAsyncClient.instances[0]
+    name, args, kwargs = client.calls[0]
     assert code == 0
-    assert request.method == "MESSAGE"
-    assert request.body == b"hello"
-    assert request.headers.get("Content-Type") == "text/plain"
-    assert request.headers.get("X-Test") == "yes"
-    assert remote == ("example.com", 5060)
+    assert name == "message"
+    assert args == ("sip:bob@example.com", b"hello")
+    assert kwargs["X-Test"] == "yes"
     assert "< 202 Accepted" in capsys.readouterr().out
 
 
-def test_cli_generic_request_supports_data_and_include(monkeypatch, capsys) -> None:
-    sent: list = []
-
-    def respond(requests):
-        request, _remote = requests[-1]
-        headers = HeaderMap()
-        headers.add("Call-ID", request.headers.get("Call-ID"))
-        headers.add("CSeq", request.headers.get("CSeq"))
-        headers.add("X-Reply", "yes")
-        response = SipResponse(
+def test_cli_generic_request_supports_data_and_include(capsys) -> None:
+    FakeAsyncClient.responses = [
+        Response(
             status_code=200,
             reason="OK",
-            headers=headers,
+            headers={"X-Reply": "yes"},
             body=b"pong",
         )
-        return SipWireEvent(
-            direction=SipWireDirection.RX,
-            remote=("203.0.113.10", 5060),
-            raw=response.to_bytes(),
-            message=response,
-        )
-
-    monkeypatch.setattr(
-        "sipx_cli.main.SipUserAgent", _scripted_user_agent(sent, respond)
-    )
+    ]
 
     code = main(
         [
@@ -311,48 +169,45 @@ def test_cli_generic_request_supports_data_and_include(monkeypatch, capsys) -> N
         ]
     )
 
-    request, _remote = sent[0]
+    client = FakeAsyncClient.instances[0]
+    name, args, kwargs = client.calls[0]
     output = capsys.readouterr().out
     assert code == 0
-    assert request.method == "INFO"
-    assert request.body == b"Signal=1"
+    assert name == "request"
+    assert args == ("INFO", "sip:bob@example.com")
+    assert kwargs["body"] == b"Signal=1"
+    assert kwargs["Content-Type"] == "application/dtmf-relay"
     assert "X-Reply: yes" in output
     assert output.endswith("pong")
 
 
-def test_cli_request_retries_digest_challenge(monkeypatch, capsys) -> None:
-    sent: list = []
-    receives = 0
+def test_cli_request_rejects_multiple_body_sources(capsys, tmp_path: Path) -> None:
+    body_file = tmp_path / "body.txt"
+    body_file.write_text("data")
 
-    def respond(requests):
-        nonlocal receives
-        receives += 1
-        request, _remote = requests[-1]
-        headers = HeaderMap()
-        headers.add("Call-ID", request.headers.get("Call-ID"))
-        headers.add("CSeq", request.headers.get("CSeq"))
-        if receives == 1:
-            headers.add(
-                "Proxy-Authenticate",
-                'Digest realm="example.com", nonce="nonce-1", qop="auth"',
-            )
-            response = SipResponse(
-                status_code=407,
-                reason="Proxy Authentication Required",
-                headers=headers,
-            )
-        else:
-            response = SipResponse(status_code=200, reason="OK", headers=headers)
-        return SipWireEvent(
-            direction=SipWireDirection.RX,
-            remote=("203.0.113.10", 5060),
-            raw=response.to_bytes(),
-            message=response,
-        )
-
-    monkeypatch.setattr(
-        "sipx_cli.main.SipUserAgent", _scripted_user_agent(sent, respond)
+    code = main(
+        [
+            "request",
+            "INFO",
+            "sip:bob@example.com",
+            "--from",
+            "sip:alice@example.com",
+            "-d",
+            "Signal=1",
+            "--body-file",
+            str(body_file),
+        ]
     )
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "only one request body source" in captured.err
+
+
+def test_cli_request_returns_failure_on_error_response(capsys) -> None:
+    FakeAsyncClient.responses = [
+        Response(status_code=486, reason="Busy Here", headers={})
+    ]
 
     code = main(
         [
@@ -361,93 +216,96 @@ def test_cli_request_retries_digest_challenge(monkeypatch, capsys) -> None:
             "sip:pbx.example.com",
             "--from",
             "sip:alice@example.com",
-            "--username",
-            "alice",
-            "--password",
-            "secret-password",
         ]
     )
 
-    first = sent[0][0]
-    second = sent[1][0]
-    assert code == 0
-    assert receives == 2
-    assert first.headers.get("Proxy-Authorization") is None
-    assert second.headers.get("CSeq") == "2 OPTIONS"
-    authorization = second.headers.get("Proxy-Authorization") or ""
-    assert 'username="alice"' in authorization
-    assert 'nonce="nonce-1"' in authorization
-    assert "secret-password" not in authorization
-    assert "< 200 OK" in capsys.readouterr().out
+    assert code == 1
+    assert "< 486 Busy Here" in capsys.readouterr().out
 
 
-def test_cli_request_debug_sip_prints_redacted_packets(monkeypatch, capsys) -> None:
-    sent: list = []
-    receives = 0
-
-    def respond(requests):
-        nonlocal receives
-        receives += 1
-        request, _remote = requests[-1]
-        headers = HeaderMap()
-        headers.add("Call-ID", request.headers.get("Call-ID"))
-        headers.add("CSeq", request.headers.get("CSeq"))
-        if receives == 1:
-            headers.add(
-                "Proxy-Authenticate",
-                'Digest realm="example.com", nonce="nonce-1", qop="auth"',
-            )
-            response = SipResponse(
-                status_code=407,
-                reason="Proxy Authentication Required",
-                headers=headers,
-            )
-        else:
-            response = SipResponse(status_code=200, reason="OK", headers=headers)
-        return SipWireEvent(
-            direction=SipWireDirection.RX,
-            remote=("203.0.113.10", 5060),
-            raw=response.to_bytes(),
-            message=response,
-        )
-
-    monkeypatch.setattr(
-        "sipx_cli.main.SipUserAgent", _scripted_user_agent(sent, respond)
-    )
-
+def test_cli_register_sends_expires_and_auth(capsys) -> None:
     code = main(
         [
-            "options",
-            "sip:pbx.example.com",
-            "--from",
+            "register",
+            "--aor",
             "sip:alice@example.com",
+            "--registrar",
+            "sip:pbx.example.com:5070",
             "--username",
             "alice",
             "--password",
-            "secret-password",
-            "--debug-sip",
+            "secret",
+            "--expires",
+            "600",
         ]
     )
 
-    captured = capsys.readouterr()
+    client = FakeAsyncClient.instances[0]
+    name, args, kwargs = client.calls[0]
     assert code == 0
-    assert "--- SIP TX pbx.example.com:5060" in captured.err
-    assert "--- SIP RX 203.0.113.10:5060" in captured.err
-    assert "Proxy-Authorization: [REDACTED]" in captured.err
-    assert "secret-password" not in captured.err
+    assert name == "register"
+    assert args == ("sip:pbx.example.com:5070",)
+    assert kwargs["Expires"] == "600"
+    assert client.kwargs["auth"] is not None
+    assert client.kwargs["auth"].username == "alice"
+    assert "registered: 200 OK" in capsys.readouterr().out
 
 
-def test_cli_request_requires_from_identity(monkeypatch, capsys) -> None:
-    def fail_if_network_starts(**kwargs):
-        raise AssertionError("SipUserAgent must not be constructed")
-
-    monkeypatch.setattr("sipx_cli.main.SipUserAgent", fail_if_network_starts)
-
-    code = main(["options", "sip:pbx.example.com"])
+def test_cli_register_requires_account_args(capsys) -> None:
+    code = main(["register"])
 
     captured = capsys.readouterr()
     assert code == 1
-    assert "requires --from/--aor" in captured.err
+    assert "requires explicit --aor and --registrar" in captured.err
+    assert FakeAsyncClient.instances == []
+
+
+def test_cli_register_reports_failure_status(capsys) -> None:
+    FakeAsyncClient.responses = [
+        Response(status_code=403, reason="Forbidden", headers={})
+    ]
+
+    code = main(
+        [
+            "register",
+            "--aor",
+            "sip:alice@example.com",
+            "--registrar",
+            "sip:pbx.example.com",
+        ]
+    )
+
+    assert code == 1
+    assert "registered failed: 403 Forbidden" in capsys.readouterr().out
+
+
+def test_cli_unregister_sends_expires_zero(capsys) -> None:
+    code = main(
+        [
+            "unregister",
+            "--aor",
+            "sip:alice@example.com",
+            "--registrar",
+            "sip:pbx.example.com",
+        ]
+    )
+
+    client = FakeAsyncClient.instances[0]
+    _name, _args, kwargs = client.calls[0]
+    assert code == 0
+    assert kwargs["Expires"] == "0"
+    assert "unregistered: 200 OK" in capsys.readouterr().out
+
+
+def test_cli_register_help_shows_account_flags(capsys) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["register", "--help"])
+
+    output = capsys.readouterr().out
+    assert exc_info.value.code == 0
+    assert "--aor" in output
+    assert "--registrar" in output
+    assert "examples:" in output
 
 
 def test_cli_request_help_shows_curl_like_flags(capsys) -> None:
@@ -462,159 +320,32 @@ def test_cli_request_help_shows_curl_like_flags(capsys) -> None:
     assert "examples:" in output
 
 
-def test_cli_call_help_shows_dtmf_flag(capsys) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        main(["call", "--help"])
-
-    output = capsys.readouterr().out
-    assert exc_info.value.code == 0
-    assert "--dtmf" in output
-    assert "--dtmf-duration-ms" in output
-    assert "--audio" in output
-    assert "--rtp-bind" in output
-    assert "--rtp-advertise" in output
-    assert "--jitter-buffer-ms" in output
-    assert "--rtp-stats" in output
-    assert "--metrics-json" in output
-
-
-def test_cli_places_top_level_call(monkeypatch, tmp_path: Path, capsys) -> None:
-    created: dict[str, Any] = {"hangups": 0}
-    metrics_path = tmp_path / "metrics.json"
-
-    class FakeUac:
-        def __init__(self, **kwargs) -> None:
-            created["kwargs"] = kwargs
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, traceback) -> None:
-            return None
-
-        async def call(self, target, *, audio="none"):
-            created["target"] = target
-            created["audio"] = audio
-            return SimpleNamespace(
-                call_id="call-1",
-                remote=("203.0.113.10", 5060),
-                state=SimpleNamespace(value="confirmed"),
-                local_sdp=None,
-                remote_sdp=None,
-            )
-
-        async def hangup(self, call) -> None:
-            created["hangups"] += 1
-            created["hungup_call"] = call.call_id
-
-        def rtp_session(self, call):
-            return None
-
-    monkeypatch.setattr("sipx_cli.main.SipUac", FakeUac)
+def test_cli_debug_sip_prints_redacted_messages(capsys) -> None:
+    FakeAsyncClient.responses = [
+        Response(
+            status_code=200,
+            reason="OK",
+            headers={"Authorization": 'Digest username="alice"'},
+        )
+    ]
 
     code = main(
         [
-            "call",
-            "sip:bob@example.com",
-            "--aor",
+            "request",
+            "OPTIONS",
+            "sip:pbx.example.com",
+            "--from",
             "sip:alice@example.com",
-            "--registrar",
-            "sip:example.com",
-            "--duration",
-            "0",
-            "--media-host",
-            "192.0.2.10",
-            "--rtp-bind",
-            "127.0.0.1",
-            "--rtp-advertise",
-            "192.0.2.20",
-            "--media-port",
-            "41000",
-            "--codec",
-            "PCMA",
-            "--audio",
-            "noise",
-            "--jitter-buffer-ms",
-            "120",
-            "--rtp-stats",
-            "--metrics-json",
-            str(metrics_path),
-        ]
-    )
-
-    output = capsys.readouterr().out
-    uac_kwargs = created["kwargs"]
-    assert code == 0
-    assert created["target"] == "sip:bob@example.com"
-    assert created["audio"] == "noise"
-    assert created["hangups"] == 1
-    assert created["hungup_call"] == "call-1"
-    assert str(uac_kwargs["aor"]) == "sip:alice@example.com"
-    assert uac_kwargs["remote"] == ("example.com", 5060)
-    assert uac_kwargs["media_host"] == "192.0.2.10"
-    assert uac_kwargs["rtp_bind_host"] == "127.0.0.1"
-    assert uac_kwargs["rtp_advertise_host"] == "192.0.2.20"
-    assert uac_kwargs["media_port"] == 41000
-    assert uac_kwargs["jitter_buffer_ms"] == 120
-    assert uac_kwargs["codecs"] == ("PCMA",)
-    assert "call confirmed: call-1" in output
-    assert "call terminated: call-1" in output
-    assert "rtp: none" in output
-    assert '"call_id": "call-1"' in metrics_path.read_text(encoding="utf-8")
-
-
-def test_cli_call_debug_sip_passes_wire_handler(monkeypatch, capsys) -> None:
-    class FakeUac:
-        def __init__(self, **kwargs) -> None:
-            self.wire_event_handler = kwargs["event_hooks"]["wire"][0]
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, traceback) -> None:
-            return None
-
-        async def call(self, target, *, audio="none"):
-            self.wire_event_handler(
-                SipWireEvent(
-                    direction=SipWireDirection.TX,
-                    remote=("203.0.113.10", 5060),
-                    raw=b"INVITE sip:bob@example.com SIP/2.0\r\n"
-                    b"Authorization: secret-password\r\n\r\n",
-                )
-            )
-            return SimpleNamespace(
-                call_id="call-1",
-                remote=("203.0.113.10", 5060),
-                state=SimpleNamespace(value="confirmed"),
-                local_sdp=None,
-                remote_sdp=None,
-            )
-
-        async def hangup(self, call) -> None:
-            return None
-
-        def rtp_session(self, call):
-            return None
-
-    monkeypatch.setattr("sipx_cli.main.SipUac", FakeUac)
-
-    code = main(
-        [
-            "call",
-            "sip:bob@example.com",
-            "--aor",
-            "sip:alice@example.com",
-            "--registrar",
-            "sip:example.com",
-            "--duration",
-            "0",
+            "-H",
+            "Proxy-Authorization: Digest password-ish secret-password",
             "--debug-sip",
         ]
     )
 
     captured = capsys.readouterr()
     assert code == 0
-    assert "--- SIP TX 203.0.113.10:5060" in captured.err
+    assert "--- SIP TX sip:pbx.example.com ---" in captured.err
+    assert "--- SIP RX 200 OK ---" in captured.err
+    assert "Proxy-Authorization: [REDACTED]" in captured.err
     assert "Authorization: [REDACTED]" in captured.err
     assert "secret-password" not in captured.err

@@ -107,9 +107,9 @@ sipx-harness
         +-------------------------+-------------------------+
         |                         |                         |
         v                         v                         v
- AsteriskRuntime            SipUserAgent                Mock/Replay
+ AsteriskRuntime            AsyncClient                 Mock/Replay
  ARI, Stasis, bridges       SIP, SDP, RTP, DTMF         tests, replay
- media, recordings          strict/lab, softphone       fixtures
+ media, recordings          UAC/UAS, transports         fixtures
         |                         |
         v                         v
  Asterisk/PJSIP             SIP endpoints/PBX/SBC/IVR
@@ -143,25 +143,17 @@ The first practical runtime should use Asterisk where Asterisk is strong:
 
 This runtime is the fastest path to IVR automation, AI voice bots, contact-center flows, queue validation, and functional voice testing.
 
-### SipUserAgent / SipUac / SipUas
+### AsyncClient
 
-The SIP user-agent runtime is required for what Asterisk intentionally hides or normalizes:
+The SIP client runtime is required for what Asterisk intentionally hides or normalizes:
 
 - Raw SIP wire-level assertions.
 - Exact headers, CSeq, Via branch, tags, timers, retransmissions.
 - Malformed SIP/SDP/RTP tests.
 - Fuzzing and parser robustness.
-- Technical softphone behavior.
 - RTP impairment, payload validation, jitter/loss measurement.
 
-Softphone ergonomics now live in `SipUac` and `SipUas` instead of a separate wrapper. `SipUserAgent` remains the shared transport/dialog engine; UAC and UAS own their outbound/inbound convenience behavior. Inbound UAS answers use `SipProvisionalResponse` to choose zero or more RFC 3261 `1xx` responses before the final response.
-
-It should have two modes:
-
-| Mode | Purpose |
-| --- | --- |
-| `strict` | RFC-oriented behavior for real interop and reliable softphone automation. |
-| `lab` | Controlled malformed messages, protocol overrides, delayed messages, custom SDP, and fault injection. |
+`AsyncClient` is an httpx-style async SIP client. UAC methods (`invite`, `register`, `message`, `options`, `subscribe`, generic `request`, in-dialog `ack`/`bye`) and UAS handler decorators (`on_invite`, `on_message`, `on_options`, `on_subscribe`) share one client, one `ClientConfig`, event hooks (`request`, `response`, `provisional`), and a generator-based Digest `AuthFlow`.
 
 The SIP/SDP/RTP core should be sans-I/O so protocol logic can be tested without sockets.
 
@@ -214,7 +206,7 @@ Timeline data must correlate SIP Call-ID, Asterisk channel ID, bridge ID, RTP SS
 5. Build `AsteriskRuntime` with ARI/Stasis.
 6. Choose and implement one Asterisk media path.
 7. Add media frame and barge-in policy in root; keep STT/TTS protocols in app packages.
-8. Build minimum `SipUserAgent`/`SipUac`/`SipUas` runtime for technical softphone mode.
+8. Build minimum `AsyncClient` runtime for technical SIP automation.
 9. Add reports, replay, and scenario export.
 10. Add lab mode, fuzzing, SIP/RTP conformance, and advanced interop.
 
@@ -249,76 +241,57 @@ The repository is a `uv` workspace. `FORMAT.md` defines the `SPEC.md` format. Th
 
 Integration tests that require Asterisk must be explicitly configured and must not depend on real secrets committed to the repository.
 
-The installed `sipx` command is SIP/RTP-only and curl-like. Top-level commands are `options`, `message`, `request`, `register`, `unregister`, `call`, and `listen`; harness `scenario`, `profile`, `replay`, and `phone` subcommands are not part of this root command surface.
+The installed `sipx` command is SIP-only and curl-like. Top-level commands are `options`, `message`, `request`, `register`, and `unregister`; harness `scenario`, `profile`, `replay`, and `phone` subcommands are not part of this root command surface.
 
 Useful CLI commands:
 
 ```bash
 uv run --package sipx-cli sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password "$SIP_PASSWORD"
 uv run --package sipx-cli sipx unregister --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password "$SIP_PASSWORD"
-uv run --package sipx-cli sipx call sip:6000@pbx.example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --username 1001 --password "$SIP_PASSWORD" --audio noise --rtp-stats --duration 5
-uv run --package sipx-cli sipx call sip:6000@pbx.example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --rtp-bind 0.0.0.0 --rtp-advertise 203.0.113.10 --jitter-buffer-ms 80 --metrics-json metrics.json --debug-sip
-uv run --package sipx-cli sipx listen --aor sip:1001@example.com --registrar sip:pbx.example.com --local-port 5062 --audio silence --duration 30 --rtp-stats
 uv run --package sipx-cli sipx options sip:pbx.example.com --from sip:1001@example.com -i
 uv run --package sipx-cli sipx message sip:1002@pbx.example.com 'hello' --from sip:1001@example.com
 uv run --package sipx-cli sipx request INFO sip:1002@pbx.example.com --from sip:1001@example.com --username 1001 --password "$SIP_PASSWORD" --debug-sip -H 'Content-Type: application/dtmf-relay' -d $'Signal=1\r\nDuration=160\r\n'
-uv run --package sipx-cli sipx request OPTIONS sip:pbx.example.com --from sip:1001@example.com --print-message --compact-headers --accept application/sdp --allow OPTIONS
-uv run --package sipx-cli sipx call sip:6000@pbx.example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --print-message --compact-headers --media-port 40000
 ```
 
-Commands that need SIP account identity require explicit `--aor` and `--registrar` flags before network access. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the registrar host and port.
+`register` and `unregister` require explicit `--aor` and `--registrar` flags before network access. Raw SIP request commands require `--from`/`--aor`. The remote peer is derived from the target/registrar URI host and port.
 
-Raw SIP request commands require `--from`/`--aor`. If `--remote-host` and `--remote-port` are omitted, `sipx` uses the target URI host and port.
+When `--username` and `--password` are provided, the client retries one `401` or `407` Digest challenge without persisting the password.
 
-When `--username` and `--password` are provided, calls and raw SIP request commands retry one `401` or `407` Digest challenge without persisting the password.
+Use `--debug-sip` to print redacted SIP messages to stderr as they are sent and received. `Authorization` and `Proxy-Authorization` lines are redacted before printing.
 
-Use `--debug-sip` to print redacted SIP datagrams to stderr as they are sent and received. `Authorization` and `Proxy-Authorization` lines are redacted before printing.
+Current RTP media primitives include PCMU/PCMA encode/decode without `audioop`, deterministic synthetic `silence` and `noise` PCM sources, RFC3550-style jitter metrics, tx/rx packet metrics, a fixed target/max `RtpJitterBuffer` with concealment and late/drop counters, and `RtpAudioSession` for UDP RTP send/receive with metrics snapshots.
 
-Use `--print-message` to render a SIP request without opening a socket. Use `--compact-headers` to serialize RFC compact header names where defined; receive parsing always expands compact names to canonical headers. Raw request commands also accept explicit capability headers with repeatable `--accept`, `--allow`, `--allow-event`, and `--supported`. The CLI does not claim unsupported `Allow` or event-package features unless you set them.
-
-Outbound `SipUac` calls send an SDP audio offer by default, open RTP while the call exists, and validate the `2xx` SDP answer before reporting the call as confirmed. Use `--rtp-bind` for the local RTP socket, `--rtp-advertise` for the SDP address, `--media-port`/`--rtp-port` for the RTP port, and repeatable `--codec` to adjust offered media. Use `--dtmf` to send in-dialog SIP INFO DTMF after confirmation.
-
-Current RTP media primitives include PCMU/PCMA encode/decode without `audioop`, deterministic synthetic `silence` and `noise` PCM sources, RFC3550-style jitter metrics, tx/rx packet metrics, a fixed target/max `RtpJitterBuffer` with concealment and late/drop counters, and `RtpAudioSession` for UDP RTP send/receive with metrics snapshots. High-level `SipUac.call(audio="none|silence|noise|pyaudio")` and `SipUas.answer(audio="none|silence|noise|pyaudio")` support no-device synthetic media plus optional lazy PyAudio microphone input. The CLI exposes `--audio`, `--jitter-buffer-ms`, `--rtp-stats`, and `--metrics-json` on `call` and `listen`.
-
-UAS provisional response examples:
+AsyncClient usage examples:
 
 ```python
-from sipx import SipProvisionalResponse, SipUas
+from sipx import AsyncClient, AuthFlow, ClientConfig
 
-uas = SipUas(aor="sip:1001@example.com")
+config = ClientConfig(from_uri="sip:1001@example.com", timeout=5.0)
+auth = AuthFlow(username="1001", password="secret")
 
-# Default: 180 Ringing, then 200 OK.
-await uas.answer()
+async with AsyncClient(config=config, auth=auth) as client:
+    response = await client.register("sip:pbx.example.com")
+    response = await client.options("sip:pbx.example.com")
+    response = await client.message("sip:1002@example.com", "hello")
 
-# RFC-valid direct final response: INVITE -> 200 OK -> ACK.
-await uas.answer(provisionals=())
+    response = await client.invite("sip:6000@pbx.example.com")
+    call_id = response.headers["Call-ID"]
+    await client.ack(call_id)
+    await client.bye(call_id)
+```
 
-# Explicit carrier-style progress: 100 Trying, 183 Session Progress with SDP, 200 OK.
-await uas.answer(
-    provisionals=(
-        SipProvisionalResponse.trying(),
-        SipProvisionalResponse.session_progress(include_sdp=True),
-    )
+Event hooks follow the httpx pattern: a dict mapping event names (`request`, `response`, `provisional`) to lists of sync or async callables. All hooks are side-effect only (return value is ignored):
+
+```python
+def log_request(request) -> None:
+    print(f"> {request.method} {request.uri}")
+
+def log_response(response) -> None:
+    print(f"< {response.status_code}")
+
+client = AsyncClient(
+    event_hooks={"request": [log_request], "response": [log_response]},
 )
-```
-
-Event hooks follow the httpx pattern: a dict mapping event names to lists of callables. Events `sdp` and `retransmission` require `mode="lab"`. All hooks are side-effect only (return value is ignored):
-
-```python
-from sipx import SipRequest, SipUac
-
-def add_header(request: SipRequest, remote: tuple[str, int]) -> None:
-    request.headers.add("X-Lab", "yes")
-
-def record_response(response, remote):
-    print(response.status_code)
-
-async with SipUac(
-    ...,
-    mode="lab",
-    event_hooks={"request": [add_header], "response": [record_response]},
-) as uac:
-    await uac.register()
 ```
 
 Summaries are dataclasses. Convert them to JSON at the CLI/example edge with `dataclasses.asdict()` or a JSON helper:
@@ -340,35 +313,20 @@ SIP operation examples live under `apps/scenarios/examples/sip`:
 uv run --package sipx-cli sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com --username 1001 --password "$SIP_PASSWORD" --debug-sip --keepalive 10
 uv run --package sipx-cli sipx options sip:pbx.example.com --from sip:1001@example.com --include --debug-sip
 uv run --package sipx-cli sipx message sip:1002@example.com 'hello from sipx' --from sip:1001@example.com --debug-sip
-uv run --package sipx-cli sipx call sip:ivr@example.com --aor sip:1001@example.com --registrar sip:pbx.example.com --codec PCMU --audio noise --rtp-stats --dtmf '123#' --duration 3 --debug-sip
 uv run --package sipx-cli sipx request INFO sip:ivr@example.com --from sip:1001@example.com -H 'Content-Type: application/dtmf-relay' -d $'Signal=1\r\nDuration=160\r\n' --include --debug-sip
 ```
 
-Python templates:
-
-```python
-from apps.scenarios.examples.sip.call_with_dtmf import call_with_dtmf
-
-call_id = await call_with_dtmf("sip:ivr@example.com", digits="123#")
-```
-
-More command examples are in `apps/scenarios/examples/sip/README.md`. `apps/scenarios/examples/sip/sip_cli_flow.py` builds reusable command arrays for register, OPTIONS, MESSAGE, raw INFO DTMF, and call-with-DTMF flows.
+More command examples are in `apps/scenarios/examples/sip/README.md`. `apps/scenarios/examples/sip/sip_cli_flow.py` builds reusable command arrays for register, OPTIONS, MESSAGE, and raw INFO DTMF flows.
 
 Runnable example files:
 
 ```bash
 uv run --package sipx-scenarios python apps/scenarios/examples/sip/sip_cli_flow.py
 
-SIPX_AOR=sip:1001@example.com \
-SIPX_REGISTRAR=sip:pbx.example.com \
-SIPX_USERNAME=1001 \
-SIPX_PASSWORD=... \
-uv run --package sipx-scenarios python apps/scenarios/examples/sip/call_with_dtmf.py sip:ivr@example.com --digits '123#'
-
 export SIPX_LOCAL_HOST=<your-local-ip>
 export SIPX_TARGET=sip:<target>@demo.mizu-voip.com:37075
 uv run python -m sipx.examples.register
-SIPX_AUDIO=noise uv run python -m sipx.examples.metrics
+SIPX_DEBUG=1 uv run python -m sipx.examples.invite
 ```
 
 LLM scenario files are run directly for now:
@@ -379,7 +337,7 @@ uv run --package sipx-llm python apps/llm/examples/sip_flow_audit.py
 uv run --package sipx-llm python apps/llm/examples/sip_flow_audit.py --trace-file /path/to/sip-trace.txt
 ```
 
-Direct SIP example scripts live under `sipx.examples`. They default to the public Mizu demo account, but use generic SIP env vars so the same code can target another SIP provider:
+Direct SIP example scripts live under `sipx.examples` and use the `AsyncClient` API. They default to the public Mizu demo account, but use generic SIP env vars so the same code can target another SIP provider:
 
 ```bash
 export SIPX_LOCAL_HOST=<your-local-ip>
@@ -394,14 +352,9 @@ export SIPX_REMOTE_HOST=pbx.example.com
 export SIPX_REMOTE_PORT=5060
 
 uv run python -m sipx.examples.register
-uv run python -m sipx.examples.options
-uv run python -m sipx.examples.build_request
-uv run python -m sipx.examples.handlers
-uv run python -m sipx.examples.invite_without_sdp
-SIPX_AUDIO=silence uv run python -m sipx.examples.invite_with_sdp
-SIPX_AUDIO=noise uv run python -m sipx.examples.metrics
-SIPX_AUDIO=noise uv run python -m sipx.examples.manipulation
-SIPX_RUN_CALL=1 uv run python -m sipx.examples.smoke_tests
+uv run python -m sipx.examples.invite
+uv run python -m sipx.examples.message
+uv run python -m sipx.examples.subscribe
 ```
 
 Call examples require `SIPX_TARGET`; without it they print a structured JSON configuration error instead of opening a network call to the demo account itself.

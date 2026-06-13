@@ -371,7 +371,7 @@ You must build SDP bodies with `sipx.sdp.create_audio_offer` and `sipx.sdp.creat
 
 ### Can I still send DTMF?
 
-`AsyncClient` does not have a `send_dtmf()` method. Build INFO requests manually with `sipx.sip.create_info_request` and send them through the transport layer, or use the legacy `SipUserAgent` utilities.
+`AsyncClient` does not have a `send_dtmf()` method. Send an in-dialog INFO with the generic escape hatch: `await client.request("INFO", uri, body=b"Signal=1\r\nDuration=160\r\n", **{"Content-Type": "application/dtmf-relay"})`.
 
 ### How do I handle authentication?
 

@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 
-from sipx import SipUserAgent
 from sipx_harness import (
     ArtifactStore,
     Harness,
@@ -124,7 +123,7 @@ def test_mixed_scenario_binds_sip_asterisk_and_mock_actors() -> None:
     timeline = Timeline(run_id="mixed-run")
     runtimes: dict[str, object] = {
         "mock": MockRuntime(),
-        "sip": SipUserAgent(timeline=timeline, actor_id="sip"),
+        "sip": MockRuntime(),
         "asterisk": MockRuntime(),
     }
     harness = Harness(run_id="mixed-run", runtimes=runtimes)

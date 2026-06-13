@@ -90,6 +90,16 @@ def _parse_response(data: bytes, request: Request) -> Response:
     )
 
 
+def _contact_uri(contact: str) -> str:
+    """Extract the bare URI from a Contact header value like ``<sip:a@b>;p=1``."""
+    value = contact.strip()
+    if "<" in value and ">" in value:
+        value = value[value.index("<") + 1 : value.index(">")]
+    else:
+        value = value.split(";", 1)[0].strip()
+    return value
+
+
 def _parse_remote(uri: str) -> tuple[str, int]:
     """Parse a SIP URI to extract host and port."""
     if uri.startswith("sips:"):
@@ -639,6 +649,107 @@ class AsyncClient:
             return response
         finally:
             self._pending_responses.pop(key, None)
+
+    async def request(self, method: str, uri: str, **kwargs: Any) -> Response:
+        """Send a SIP request with an arbitrary method (curl-like escape hatch).
+
+        Args:
+            method: SIP method name (e.g. ``OPTIONS``, ``INFO``, ``PING``).
+            uri: Target SIP URI.
+            **kwargs: ``body`` plus extra headers merged into the request.
+
+        Returns:
+            The SIP response.
+
+        Raises:
+            TimeoutError: If no response is received within the configured timeout.
+        """
+        request = self._build_request(method.upper(), uri, **kwargs)
+        remote = _parse_remote(uri)
+        return await self._send_request(request, remote)
+
+    def dialog(self, call_id: str) -> Dialog | None:
+        """Return the tracked dialog for *call_id*, if any."""
+        return self._dialogs.get(call_id)
+
+    async def ack(self, call_id: str) -> None:
+        """Send an ACK for a confirmed INVITE dialog (RFC 3261 §13.2.2.4).
+
+        Args:
+            call_id: Call-ID of the dialog created by a previous ``invite()``.
+
+        Raises:
+            ProtocolError: If no dialog is tracked for *call_id*.
+        """
+        dialog = self._dialogs.get(call_id)
+        if dialog is None:
+            raise ProtocolError(
+                f"no dialog tracked for Call-ID {call_id!r}",
+                rfc_ref="RFC 3261 §13.2.2.4",
+            )
+
+        request = self._build_in_dialog_request(dialog, "ACK")
+        remote = _parse_remote(_contact_uri(dialog.remote_target))
+        await run_hooks(self._event_hooks, "request", request)
+        await self._transport.send(request.to_bytes(), remote)
+
+    async def bye(self, call_id: str) -> Response:
+        """Send a BYE to terminate a confirmed INVITE dialog (RFC 3261 §15).
+
+        Args:
+            call_id: Call-ID of the dialog created by a previous ``invite()``.
+
+        Returns:
+            The SIP response to the BYE (typically 200 OK).
+
+        Raises:
+            ProtocolError: If no dialog is tracked for *call_id*.
+            TimeoutError: If no response is received within the configured timeout.
+        """
+        dialog = self._dialogs.get(call_id)
+        if dialog is None:
+            raise ProtocolError(
+                f"no dialog tracked for Call-ID {call_id!r}",
+                rfc_ref="RFC 3261 §15",
+            )
+
+        request = self._build_in_dialog_request(dialog, "BYE")
+        remote = _parse_remote(_contact_uri(dialog.remote_target))
+        response = await self._send_request(request, remote)
+
+        if 200 <= response.status_code < 300:
+            dialog.terminate()
+            self._dialogs.pop(call_id, None)
+
+        return response
+
+    def _build_in_dialog_request(self, dialog: Dialog, method: str) -> Request:
+        """Build an in-dialog request (ACK/BYE) from dialog state."""
+        cseq = dialog.next_cseq(method)
+        branch = _new_branch()
+        transport_type = self._transport.transport_type.upper()
+        local_host = self._config.local_host
+        local_port = self._config.local_port
+
+        headers: dict[str, str | list[str]] = {
+            "Via": f"SIP/2.0/{transport_type} {local_host}:{local_port};branch={branch}",
+            "From": dialog.local_uri,
+            "To": dialog.remote_uri,
+            "Call-ID": dialog.call_id,
+            "CSeq": f"{cseq} {method}",
+            "Max-Forwards": "70",
+            "User-Agent": self._config.user_agent,
+        }
+        if dialog.route_set:
+            headers["Route"] = list(dialog.route_set)
+
+        return Request(
+            method=method,
+            uri=_contact_uri(dialog.remote_target),
+            headers=headers,
+            body=None,
+            transport=self._transport,
+        )
 
     async def invite(self, uri: str, **kwargs: Any) -> Response:
         """Send an INVITE request to initiate a session (RFC 3261 §13).

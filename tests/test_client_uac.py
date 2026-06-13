@@ -321,6 +321,119 @@ class TestUACMethods:
         assert b"Event: presence" in sent_data
 
 
+class TestGenericRequest:
+    """Tests for the generic request() method."""
+
+    @pytest.mark.asyncio
+    async def test_request_sends_arbitrary_method(
+        self, client_with_mock, mock_transport
+    ):
+        """request() must send a request with the given method."""
+        call_id = "test-generic-info"
+        mock_transport.add_response(
+            200,
+            "OK",
+            {"Call-ID": call_id, "CSeq": "1 INFO"},
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            response = await client_with_mock.request(
+                "INFO", "sip:bob@example.com", body=b"Signal=1"
+            )
+
+        assert response.status_code == 200
+        sent_data = mock_transport.sent_data[0][0]
+        assert b"INFO sip:bob@example.com SIP/2.0" in sent_data
+        assert b"Signal=1" in sent_data
+
+    @pytest.mark.asyncio
+    async def test_request_uppercases_method(self, client_with_mock, mock_transport):
+        """request() must normalize the method to uppercase."""
+        call_id = "test-generic-lower"
+        mock_transport.add_response(
+            200,
+            "OK",
+            {"Call-ID": call_id, "CSeq": "1 OPTIONS"},
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            response = await client_with_mock.request("options", "sip:bob@example.com")
+
+        assert response.status_code == 200
+        assert b"OPTIONS sip:bob@example.com SIP/2.0" in mock_transport.sent_data[0][0]
+
+
+class TestAckAndBye:
+    """Tests for in-dialog ACK and BYE."""
+
+    async def _establish_dialog(self, client, mock_transport, call_id: str) -> None:
+        mock_transport.add_response(
+            200,
+            "OK",
+            {
+                "Call-ID": call_id,
+                "CSeq": "1 INVITE",
+                "Contact": "<sip:bob@127.0.0.1:5070>",
+                "From": "<sip:alice@example.com>;tag=abc123",
+                "To": "<sip:bob@example.com>;tag=def456",
+            },
+        )
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            response = await client.invite("sip:bob@example.com")
+        assert response.status_code == 200
+        assert client.dialog(call_id) is not None
+
+    @pytest.mark.asyncio
+    async def test_ack_sends_in_dialog_request(self, client_with_mock, mock_transport):
+        """ack() must send an ACK to the dialog remote target."""
+        call_id = "test-ack"
+        await self._establish_dialog(client_with_mock, mock_transport, call_id)
+
+        await client_with_mock.ack(call_id)
+
+        sent_data, remote = mock_transport.sent_data[-1]
+        assert sent_data.startswith(b"ACK sip:bob@127.0.0.1:5070 SIP/2.0")
+        assert remote == ("127.0.0.1", 5070)
+        assert b"CSeq: 1 ACK" in sent_data
+        assert f"Call-ID: {call_id}".encode() in sent_data
+        assert b"tag=def456" in sent_data
+
+    @pytest.mark.asyncio
+    async def test_bye_terminates_dialog(self, client_with_mock, mock_transport):
+        """bye() must send a BYE, wait for 200, and drop the dialog."""
+        call_id = "test-bye"
+        await self._establish_dialog(client_with_mock, mock_transport, call_id)
+
+        mock_transport.add_response(
+            200,
+            "OK",
+            {"Call-ID": call_id, "CSeq": "2 BYE"},
+        )
+        response = await client_with_mock.bye(call_id)
+
+        assert response.status_code == 200
+        sent_data = mock_transport.sent_data[-1][0]
+        assert sent_data.startswith(b"BYE sip:bob@127.0.0.1:5070 SIP/2.0")
+        assert b"CSeq: 2 BYE" in sent_data
+        assert client_with_mock.dialog(call_id) is None
+
+    @pytest.mark.asyncio
+    async def test_ack_without_dialog_raises(self, client_with_mock):
+        """ack() must raise ProtocolError when no dialog is tracked."""
+        from sipx.exceptions import ProtocolError
+
+        with pytest.raises(ProtocolError):
+            await client_with_mock.ack("missing-call-id")
+
+    @pytest.mark.asyncio
+    async def test_bye_without_dialog_raises(self, client_with_mock):
+        """bye() must raise ProtocolError when no dialog is tracked."""
+        from sipx.exceptions import ProtocolError
+
+        with pytest.raises(ProtocolError):
+            await client_with_mock.bye("missing-call-id")
+
+
 class TestTransactionManagement:
     """Tests for transaction management."""
 

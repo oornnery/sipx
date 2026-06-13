@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 3.0.0 - 2026-06-12
+
+- BREAKING: removed the legacy API entirely. Deleted `sipx/legacy.py` (`SipUserAgent`, `SipUac`, `SipUas`, `SipCall`, `SipRetransmissionPolicy`, runtimes, and related errors) and all root exports of those symbols; `AsyncClient` is the only client runtime.
+- BREAKING: removed `SipCallSummary`/`call_summary` from `sipx.summary` (they consumed legacy `SipCall` objects).
+- BREAKING: rewrote the `sipx` CLI on `AsyncClient`. Commands are now `options`, `message`, `request`, `register`, and `unregister`; the legacy `call`/`listen` RTP softphone commands and their media flags were removed. `unregister` sends REGISTER with `Expires: 0`.
+- Added `AsyncClient.request(method, uri, **kwargs)` generic escape hatch, `AsyncClient.ack(call_id)` and `AsyncClient.bye(call_id)` for in-dialog ACK/BYE built from tracked `Dialog` state (CSeq reuse for ACK, increment for BYE, route set as `Route` headers), and `AsyncClient.dialog(call_id)` accessor.
+- Root `EventHooks` now re-exports `sipx.protocol.hooks.EventHooks`; root also exports `AuthFlow`.
+- Removed legacy-based examples: root `sipx/examples/{options,handlers,invite_with_sdp,invite_without_sdp,metrics,manipulation,smoke_tests}.py`, the whole `apps/scenarios/examples/mizu/` folder, `apps/scenarios/examples/sip/{call_with_dtmf,mizu_call}.py`, and `docs/old-api-snapshot/`. Removed `debug_wire`/`debug_wire_rtp` from `sipx.examples.common`.
+- Deleted `tests/test_uac_uas.py`; rewrote `apps/cli/tests/test_cli.py` against the new CLI surface; trimmed `tests/test_examples.py` to the four AsyncClient examples and added a no-legacy invariant check.
+- Rewrote the opt-in Asterisk SIP integration test on `AsyncClient` (`invite` → `ack` → `bye`); harness mixed-scenario test now uses `MockRuntime` for the SIP actor slot.
+- Updated `README.md`, `docs/migration.md`, and `apps/scenarios/examples/sip/README.md` to the AsyncClient-only surface.
+- Validation: 567 tests pass (core + apps; 3 opt-in skips), ruff lint/format clean, `uv run ty check` clean.
+
 ## 2.0.0 - 2026-06-12
 
 - BREAKING: removed old root API modules `sipx/ua.py`, `sipx/uac.py`, and `sipx/uas.py`; the legacy `SipUserAgent`/`SipUac`/`SipUas` surface now lives in `sipx/legacy.py` and remains exported from root `sipx`.

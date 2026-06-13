@@ -38,8 +38,7 @@ Environment variables:
 
 Notes:
     This example demonstrates sending SUBSCRIBE requests. Receiving NOTIFY
-    requests requires extending the AsyncClient with a NOTIFY handler or
-    using the full SipUserAgent runtime for complete subscription management.
+    requests requires extending the AsyncClient with a NOTIFY handler.
 """
 
 from __future__ import annotations

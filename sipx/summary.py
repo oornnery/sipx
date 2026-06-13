@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -29,16 +28,6 @@ class SipResponseSummary:
     reason: str
     headers: dict[str, str]
     body: str
-
-
-@dataclass(frozen=True, slots=True)
-class SipCallSummary:
-    call_id: str
-    state: str
-    remote: dict[str, object]
-    local_sdp: SipSdpSummary | None
-    remote_sdp: SipSdpSummary | None
-    duration_seconds: float | None = None
 
 
 def sdp_summary(sdp: SessionDescription | None) -> SipSdpSummary | None:
@@ -72,16 +61,4 @@ def request_summary(request: Any) -> SipRequestSummary:
         uri=str(request.uri),
         headers=dict(request.headers.items()),
         body=request.body.decode("utf-8", errors="replace"),
-    )
-
-
-def call_summary(call: Any, *, started: float | None = None) -> SipCallSummary:
-    duration = None if started is None else time.monotonic() - started
-    return SipCallSummary(
-        call_id=call.call_id,
-        state=call.state.value,
-        remote={"host": call.remote[0], "port": call.remote[1]},
-        local_sdp=sdp_summary(call.local_sdp),
-        remote_sdp=sdp_summary(call.remote_sdp),
-        duration_seconds=duration,
     )

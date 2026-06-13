@@ -95,21 +95,8 @@ from sipx.sip import (
 from sipx.client import AsyncClient
 from sipx.config import ClientConfig
 from sipx.models import Request, Response
-from sipx.legacy import (
-    EventHooks,
-    SipCall,
-    SipCallError,
-    SipCallState,
-    SipIncomingInvite,
-    SipInviteAttempt,
-    SipProvisionalResponse,
-    SipRegisterError,
-    SipRetransmissionPolicy,
-    SipUacRuntime,
-    SipUasRuntime,
-    SipUserAgent,
-    SipWireRuntime,
-)
+from sipx.protocol.auth import AuthFlow
+from sipx.protocol.hooks import EventHooks
 from sipx.types import (
     HeaderName,
     HeaderValue,
@@ -118,19 +105,17 @@ from sipx.types import (
     Uri,
 )
 from sipx.summary import (
-    SipCallSummary,
     SipRequestSummary,
     SipResponseSummary,
     SipSdpSummary,
-    call_summary,
     request_summary,
     response_summary,
     sdp_summary,
 )
-from sipx.legacy import SipUac, SipUacError, SipUas, SipUasError
 
 __all__ = [
     "AsyncClient",
+    "AuthFlow",
     "AudioFrame",
     "ClientConfig",
     "Request",
@@ -181,43 +166,25 @@ __all__ = [
     "ServerTransactionState",
     "SessionDescription",
     "SipAuthError",
-    "SipCallSummary",
     "SipCapabilities",
-    "SipCall",
-    "SipCallError",
-    "SipCallState",
     "SipDialogError",
-    "SipIncomingInvite",
-    "SipInviteAttempt",
     "SipMessage",
     "SipParseError",
-    "SipProvisionalResponse",
-    "SipRegisterError",
     "SipRequest",
     "SipRequestSummary",
     "SipResponse",
     "SipResponseSummary",
-    "SipRetransmissionPolicy",
     "SipSdpSummary",
     "SipTransactionError",
-    "SipUac",
-    "SipUacError",
-    "SipUacRuntime",
-    "SipUas",
-    "SipUasError",
-    "SipUasRuntime",
     "SipUdpEndpoint",
     "SipUdpError",
     "SipUri",
-    "SipUserAgent",
     "SipWireDirection",
     "SipWireEvent",
-    "SipWireRuntime",
     "SyntheticAudioSource",
     "TransactionEvent",
     "UdpAddress",
     "build_digest_authorization",
-    "call_summary",
     "create_ack_request",
     "create_audio_answer",
     "create_audio_offer",
