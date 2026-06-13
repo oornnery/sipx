@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 3.3.0 - 2026-06-13
+
+### Added
+
+- New workspace app `apps/fastapi` (`sipx-fastapi`): FastAPI REST service with
+  lifespan-managed `AsyncClient` and endpoints for `/health`, `/sip/options`,
+  `/sip/register`, `/sip/unregister`, `/sip/message`, and `/sip/request`.
+- App README with run instructions, env vars, curl examples, and tests under
+  `apps/fastapi/tests/test_app.py`.
+- Root `README.md` documents the FastAPI app and `sipx/extensions/` layout.
+
 ## 3.2.0 - 2026-06-13
 
 ### Security (P0)

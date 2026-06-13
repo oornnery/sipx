@@ -2,9 +2,9 @@
 
 ## Summary
 
-Latest blocks `3.1.2`-`3.1.4` (core review Phase 1, docs only): added RFC-referencing module docstrings to every module that lacked one and fixed the misleading `protocol/__init__.py`/`rfc/__init__.py` docstrings; added six runnable `AsyncClient` examples (`options`, `unregister`, `call`, `info_dtmf`, `server`, `hooks_history`) covered by `tests/test_examples.py`; refreshed `README.md` to drop false claims, document `response.history`, and add an honest "AsyncClient status and RFC limitations" section. `.omo` was untracked. Phase 2 (unify duplicated `sip/`+`protocol/` stacks, remove `rfc/` orphan) and Phase 3 (security/RFC hardening: response correlation by branch+source, CRLF sanitization, `Content-Length`, §17 timers/retransmission, CANCEL, PRACK, Digest SHA-256) are written up as awaiting-OK open loops O16/O17 — do not start them without user direction. Stray untracked `qa_tls_scenarios.py` is left for the user to decide. Validation: 503 core tests, ruff lint/format, `uv run ty check` all pass.
+Block `3.3.0` added the `apps/fastapi` workspace package (`sipx-fastapi`): a FastAPI REST service with lifespan-managed `AsyncClient`, endpoints for `/health`, `/sip/options`, `/sip/register`, `/sip/unregister`, `/sip/message`, and `/sip/request`, env-based `SIPX_*` config, README, and tests. Root `README.md` now documents the FastAPI app and `sipx/extensions/`. P1 RFC items (§17 timers, auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport) remain deferred and documented in README/TODO.
 
-Block `3.0.0` removed the legacy API entirely per explicit user direction ("nao precisa de nada legacy"). `sipx/legacy.py`, all legacy root exports, `SipCallSummary`/`call_summary`, `docs/old-api-snapshot/`, `tests/test_uac_uas.py`, legacy root examples, and `apps/scenarios/examples/mizu/` are gone. `AsyncClient` is the only client runtime and gained `request()` (generic method), in-dialog `ack()`/`bye()` from tracked `Dialog` state, and a `dialog()` accessor. The `sipx` CLI was rewritten on `AsyncClient` with commands `options`, `message`, `request`, `register`, `unregister`; the legacy `call`/`listen` RTP softphone commands were removed because `AsyncClient` has no media/RTP orchestration. RTP/media primitives (`sipx.rtp`, `sipx.media`, `sipx.sdp`) and the sans-I/O `sipx.sip` layer remain. Validation: 567 tests pass (core + apps, 3 opt-in skips), ruff lint/format clean, `uv run ty check` clean.
+Block `3.2.0` completed P0 security (strict response correlation, CR/LF sanitization, Content-Length everywhere, TCP reassembly cap) and Phase 2 partial reorg (`sipx/rfc/` → `sipx/extensions/`, protocol type exports). Block `3.0.0` removed the legacy API; `AsyncClient` is the only client runtime.
 
 ## Read First
 
@@ -24,32 +24,28 @@ Block `3.0.0` removed the legacy API entirely per explicit user direction ("nao 
 
 - Root `sipx` stays SIP protocol/runtime/RTP media core plus direct SIP-only examples.
 - `AsyncClient` is the only client runtime; no legacy `SipUserAgent`/`SipUac`/`SipUas` surface exists.
-- RTP/media primitives stay exported from root but are not orchestrated by `AsyncClient` yet.
-- `sipx-cli` owns the `sipx` console command, which is AsyncClient-based and curl/httpx-like.
+- `sipx-cli` owns the curl-like `sipx` console command.
+- `sipx-fastapi` demonstrates REST integration with lifespan-managed `AsyncClient`.
 - `sipx-harness` remains product center for Harness/Actor/Scenario/Timeline/Verdict/Artifact APIs.
-- `AsteriskRuntime` remains the first Asterisk implementation path.
-- Maintained English files in current structure are source of truth; `IDEA.md` is historical only; no separate `/docs` tree.
+- `sipx/extensions/*` holds standalone extension handlers (test-only, not wired into `AsyncClient`).
 
 ## Recommended Next Task
 
-After blocks `3.1.2`-`3.1.4`:
+1. Implement P1 RFC items when scope allows: §17 timers/retransmission, auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport.
+2. P2: PRACK/100rel in client path, Digest SHA-256, dialog tag matching.
+3. Decide whether `AsyncClient` should gain SDP/RTP orchestration for softphone-style call/listen ergonomics.
+4. Decide license before public distribution.
 
-1. Get user OK on core-review Phase 2 (reorg) and Phase 3 P0 security fixes (open loops O16/O17) before touching protocol code; both are breaking/sensitive.
-2. Run live smoke of the new examples against the public Mizu demo (`python -m sipx.examples.options`, `.call`, `.info_dtmf`, etc.).
-3. Decide whether `AsyncClient` should gain SDP offer/answer + RTP session orchestration to restore softphone-style call/listen ergonomics.
-4. Decide license before public distribution and Asterisk/commercial positioning.
-5. Start `docker/asterisk` and run opt-in Asterisk integration tests (now AsyncClient invite/ack/bye based).
+## Validation
 
-## Do Not Do Yet
+Run before committing:
 
-- Do not couple public API to Asterisk.
-- Do not write real Asterisk secrets/config with credentials.
-- Do not use AI semantic assertions as the only pass/fail check.
-- Do not add native audio dependencies to root default install.
-
-## Latest Validation
-
-- `uv run pytest -q`: 503 core pass (blocks 3.1.2-3.1.4).
-- `uv run ruff check .`: pass.
-- `uv run ruff format --check .`: pass (152 files).
-- `uv run ty check`: pass.
+```bash
+uv sync --all-groups
+uv run ruff format --check .
+uv run ruff check .
+uv run ty check
+uv run pytest
+uv run pytest apps
+uv run --package sipx-fastapi sipx-fastapi --help  # or uvicorn smoke
+```

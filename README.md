@@ -187,7 +187,8 @@ cooperative peer. The following gaps are known and intentional for now:
   adds ``Content-Length`` when absent, which matters for TCP/TLS framing.
 
 PRACK/100rel, `rport`, and dialog matching by tags are likewise not wired into
-the client path yet.
+the client path yet. Standalone extension handlers live under `sipx/extensions/`
+(PRACK, DNS, events, presence, outbound) and are exercised by tests only.
 
 ## Expectations
 
@@ -259,6 +260,7 @@ Root `pytest` is intentionally core-only and collects `tests/`. App package test
 
 ```bash
 pytest apps/cli/tests/test_cli.py
+pytest apps/fastapi/tests/test_app.py
 pytest apps/scenarios/tests/test_examples_templates.py
 ```
 
@@ -266,6 +268,7 @@ The repository is a `uv` workspace. `FORMAT.md` defines the `SPEC.md` format. Th
 
 - `apps/harness`: `sipx-harness`, owns `Harness`, `Actor`, `Timeline`, `Verdict`, artifacts, profiles, reports, and mock runtimes.
 - `apps/cli`: `sipx-cli`, owns the `sipx` console command.
+- `apps/fastapi`: `sipx-fastapi`, REST service demonstrating `AsyncClient` lifespan wiring (OPTIONS, REGISTER, MESSAGE, generic SIP).
 - `apps/asterisk`: `sipx-asterisk`, owns ARI runtime and Stasis helpers.
 - `apps/llm`: `sipx-llm`, owns `LLMChatClient` and LLM examples.
 - `apps/scenarios`: `sipx-scenarios`, owns runnable scenario and SIP example templates.
@@ -416,6 +419,24 @@ uv run --package sipx-llm python apps/llm/examples/sip_flow_audit.py --trace-fil
 ```
 
 `semantic_smoke.py` is the quick smoke test. `sip_flow_audit.py` is the richer example: it extracts deterministic SIP signals, asks the LLM for structured JSON, returns summary, behavior, risk score, protocol findings, media assessment, and next actions.
+
+### FastAPI REST service
+
+The `apps/fastapi` workspace package exposes `AsyncClient` over HTTP with a
+lifespan-managed shared client. See `apps/fastapi/README.md` for endpoint
+details.
+
+```bash
+export SIPX_AOR=sip:1001@example.com
+export SIPX_REGISTRAR=sip:pbx.example.com:5060
+export SIPX_USERNAME=1001
+export SIPX_PASSWORD=...
+uv run --package sipx-fastapi sipx-fastapi
+curl -s http://127.0.0.1:8000/health | jq .
+curl -s -X POST http://127.0.0.1:8000/sip/options \
+  -H 'Content-Type: application/json' \
+  -d '{"target":"sip:pbx.example.com"}' | jq .
+```
 
 Templates live under `apps/llm/examples`, `apps/asterisk/examples`, and `apps/scenarios/examples`. The live LLM smoke test is skipped unless `SIPX_LLM_API_KEY` is set.
 

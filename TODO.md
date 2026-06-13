@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in small verified blocks. Current code has root `sipx` package for SIP/SDP/RTP/media primitives and the httpx-like `AsyncClient` runtime (UAC verbs, UAS handlers, generic `request`, in-dialog `ack`/`bye`, Digest `AuthFlow`, event hooks, `Response.history` exposing the full provisional/auth exchange) over `sipx/protocol/*`, `sipx/transport/*`, and `sipx/rfc/*`. The legacy `SipUserAgent`/`SipUac`/`SipUas` API was removed in `3.0.0`. The `sipx` CLI is AsyncClient-based and curl-like (`options`, `message`, `request`, `register`, `unregister`). Harness concepts and generic redaction live in workspace package `apps/harness` as `sipx_harness`, with `MockRuntime` for deterministic scenarios. Asterisk, LLM, scenarios, STT, and TTS remain app packages.
+Implement `sipx` in small verified blocks. Current code has root `sipx` package for SIP/SDP/RTP/media primitives and the httpx-like `AsyncClient` runtime (UAC verbs, UAS handlers, generic `request`, in-dialog `ack`/`bye`, Digest `AuthFlow`, event hooks, `Response.history` exposing the full provisional/auth exchange) over `sipx/protocol/*`, `sipx/transport/*`, and `sipx/extensions/*`. The legacy `SipUserAgent`/`SipUac`/`SipUas` API was removed in `3.0.0`. The `sipx` CLI is AsyncClient-based and curl-like (`options`, `message`, `request`, `register`, `unregister`). Harness concepts and generic redaction live in workspace package `apps/harness` as `sipx_harness`, with `MockRuntime` for deterministic scenarios. Asterisk, FastAPI, LLM, scenarios, STT, and TTS remain app packages.
 
 ## Milestone 0 - Project Grounding
 
@@ -528,6 +528,13 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] Removed `cast()` from `sipx/examples/register.py`.
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
+
+## Block 3.3.0 Done (FastAPI app + docs)
+
+- [x] Added `apps/fastapi` workspace package (`sipx-fastapi`) with lifespan-managed `AsyncClient`, REST endpoints (`/health`, `/sip/options`, `/sip/register`, `/sip/unregister`, `/sip/message`, `/sip/request`), env-based config, README, and tests.
+- [x] Updated root `README.md` with FastAPI app section and `sipx/extensions/` note.
+- [x] Bumped root package version to `3.3.0`.
+- [ ] Deferred P1 RFC items (§17 timers/retransmission, auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport) — documented in README/TODO roadmap.
 
 ## Block 3.2.0 Done (core review Phase 2 partial + Phase 3 P0)
 

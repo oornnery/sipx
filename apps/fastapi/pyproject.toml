@@ -1,0 +1,21 @@
+[project]
+name = "sipx-fastapi"
+version = "0.1.0"
+description = "FastAPI REST service demonstrating sipx AsyncClient"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.115.0",
+    "httpx>=0.28.0",
+    "sipx",
+    "uvicorn[standard]>=0.34.0",
+]
+
+[project.scripts]
+sipx-fastapi = "sipx_fastapi.main:main"
+
+[tool.uv.sources]
+sipx = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

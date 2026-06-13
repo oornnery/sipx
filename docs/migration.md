@@ -418,6 +418,17 @@ Yes. Pass `transport="tcp"` or `transport="tls"` to the constructor.
 client = AsyncClient(transport="tls")
 ```
 
+### Is there a FastAPI example?
+
+Yes. The workspace app `apps/fastapi` (`sipx-fastapi`) wraps `AsyncClient` in a
+FastAPI lifespan and exposes REST endpoints for OPTIONS, REGISTER, MESSAGE, and
+generic SIP requests. See `apps/fastapi/README.md`.
+
+```bash
+uv run --package sipx-fastapi sipx-fastapi
+curl -s http://127.0.0.1:8000/health
+```
+
 ### How do I set custom headers on every request?
 
 Use `ClientConfig.headers` for default headers, or pass them as keyword arguments to individual methods.

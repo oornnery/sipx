@@ -2,13 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `3.0.0` is complete: the legacy API was removed entirely per explicit user direction ("nao precisa de nada legacy"). `sipx/legacy.py` is deleted; `AsyncClient` (`sipx/client.py`) is the only client runtime, now extended with generic `request()`, in-dialog `ack()`/`bye()` built from `Dialog` state, and a `dialog()` accessor. The CLI (`apps/cli`) was rewritten on `AsyncClient` with commands `options`, `message`, `request`, `register`, `unregister`; legacy `call`/`listen` RTP commands were removed. Legacy-based examples (root and `apps/scenarios/examples/mizu`), `docs/old-api-snapshot/`, and `tests/test_uac_uas.py` were deleted. Validation wave passed: 567 tests (core + apps, 3 opt-in skips), ruff lint/format, `uv run ty check`.
-
-Block `3.1.0` is complete: answered the user's observability question ("o request/options retorna todas as transacoes e respostas?") by adding `Response.history`. UAC calls still return one final `Response`, but it now carries every intermediate response (provisional `1xx` + `401`/`407` challenges) in arrival order, each with its `.request`. `_send_and_receive` was fixed to collect any number of provisionals (was one). Validation: 503 core + 65 app tests pass (3 opt-in skips), ruff lint/format, `uv run ty check`.
-
-Blocks `3.2.0` are complete (core review Phase 2 partial + Phase 3 P0): P0 security hardening on `AsyncClient` (strict response correlation by Call-ID/CSeq/Via branch/remote, CR/LF sanitization via `sipx.wire`, `Content-Length` on all request/response serialization, TCP reassembly cap); renamed `sipx/rfc/` → `sipx/extensions/`; removed dead `protocol/provisional.py`; exported runtime protocol types from root (`ProtocolDialog`, `ClientTransaction`, `ServerTransaction`, `ProtocolDigestChallenge`). Validation: 498 tests pass, ruff lint/format, `uv run ty check` clean.
-
-Blocks `3.1.2`-`3.1.4` are complete (core review Phase 1, docs only): added RFC-referencing module docstrings to the 36 modules that lacked one and rewrote the misleading `protocol/__init__.py`/`rfc/__init__.py` docstrings (`3.1.2`); added six runnable `AsyncClient` examples — `options`, `unregister`, `call`, `info_dtmf`, `server`, `hooks_history` — registered in `tests/test_examples.py` (`3.1.3`); refreshed `README.md` to remove false claims (`timers, retransmissions`, `response.summary()`, implemented `softphone()`), document `response.history`, and add an honest "AsyncClient status and RFC limitations" section (`3.1.4`). The `.omo` agent scratch dir was untracked earlier (`git rm -r --cached` + `.gitignore`). Phase 2 (reorg of duplicated `sip/`+`protocol/` stacks) and Phase 3 (security/RFC hardening roadmap) are written up but await user OK (see `.mem/open-loops.md` O16/O17). Validation: 503 core tests pass, ruff lint/format clean, `uv run ty check` clean. Stray untracked `qa_tls_scenarios.py` left for user decision.
+Implement `sipx` in verified commit blocks. Block `3.3.0` is complete: added `apps/fastapi` (`sipx-fastapi`) FastAPI REST service with lifespan-managed `AsyncClient`, REST endpoints, README, and tests; updated root README/docs. Block `3.2.0` completed P0 security and `sipx/extensions/` rename. Block `3.0.0` removed legacy API; `AsyncClient` is the only client runtime.
 
 ## Sources Read
 
@@ -343,12 +337,11 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Get user OK on core-review Phase 2 (unify duplicated `sip/`+`protocol/` stacks, remove `rfc/` orphan, rename `rfc/`, align public API) and Phase 3 P0 security fixes (response correlation by branch+source, CRLF sanitization, `Content-Length` everywhere, TCP/TLS reassembly cap). See `.mem/open-loops.md` O16/O17.
-2. Decide license before public distribution and Asterisk/commercial positioning.
-3. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest apps/asterisk/tests/test_asterisk_integration.py` after starting `docker/asterisk`.
-3. Add richer fake media events, recording/transcript artifacts, and retention policy.
-4. Add live SIP inspector events, RFC4733 DTMF over RTP, then advanced RTP/media runtime behavior.
-5. Decide whether generic OpenAI-compatible LLM support is enough for the next AI block or whether to add a provider protocol before vendor-specific adapters.
+1. P1 RFC: §17 timers/retransmission, auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport (documented in README/TODO; not yet implemented).
+2. P2: PRACK/100rel in client path, Digest SHA-256, dialog tag matching.
+3. Decide license before public distribution and Asterisk/commercial positioning.
+4. Optional: unify `sip/` sans-I/O toolkit with `protocol/` (deferred — unique, tested).
+5. Run live smoke of FastAPI app and root examples against a cooperative SIP peer.
 
 ## Risks
 
