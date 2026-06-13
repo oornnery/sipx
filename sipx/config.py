@@ -34,6 +34,7 @@ class ClientConfig:
         user_agent: User-Agent header value.
         from_uri: Default From URI (optional).
         contact_uri: Default Contact URI (optional).
+        rport: Add the ``rport`` parameter to outgoing Via headers (RFC 3581).
         headers: Default headers merged into every request.
         params: Default query parameters.
         cookies: Default cookies (rarely used in SIP).
@@ -47,6 +48,7 @@ class ClientConfig:
     user_agent: str = "sipx/2.0"
     from_uri: str | None = None
     contact_uri: str | None = None
+    rport: bool = True
     headers: dict[str, str] | None = None
     params: dict[str, str] | None = None
     cookies: dict[str, str] | None = None

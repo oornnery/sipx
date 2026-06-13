@@ -2,6 +2,8 @@
 
 ## Summary
 
+Block `3.4.0` added P1 RFC part 1 to `AsyncClient`: rport (RFC 3581) on outgoing UDP Via with `learned_address`, non-2xx INVITE auto-ACK (RFC §17.1.1.3), `cancel(call_id)` (RFC §9), and CSeq-method-scoped response correlation. Remaining P1 is §17 timers/retransmission (Block 3.5.0 target).
+
 Block `3.3.0` added the `apps/fastapi` workspace package (`sipx-fastapi`): a FastAPI REST service with lifespan-managed `AsyncClient`, endpoints for `/health`, `/sip/options`, `/sip/register`, `/sip/unregister`, `/sip/message`, and `/sip/request`, env-based `SIPX_*` config, README, and tests. Root `README.md` now documents the FastAPI app and `sipx/extensions/`. P1 RFC items (§17 timers, auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport) remain deferred and documented in README/TODO.
 
 Block `3.2.0` completed P0 security (strict response correlation, CR/LF sanitization, Content-Length everywhere, TCP reassembly cap) and Phase 2 partial reorg (`sipx/rfc/` → `sipx/extensions/`, protocol type exports). Block `3.0.0` removed the legacy API; `AsyncClient` is the only client runtime.
@@ -31,7 +33,7 @@ Block `3.2.0` completed P0 security (strict response correlation, CR/LF sanitiza
 
 ## Recommended Next Task
 
-1. Implement P1 RFC items when scope allows: §17 timers/retransmission, auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport.
+1. Remaining P1 RFC: §17 timers/retransmission in the `AsyncClient` send path (Block 3.5.0).
 2. P2: PRACK/100rel in client path, Digest SHA-256, dialog tag matching.
 3. Decide whether `AsyncClient` should gain SDP/RTP orchestration for softphone-style call/listen ergonomics.
 4. Decide license before public distribution.

@@ -4,7 +4,7 @@
 - Project name in `pyproject.toml`: `sipx`; public package/import name `sipx`; CLI command `sipx`.
 - Python requirement: `>=3.14`.
 - Dev deps: `pytest`, `pytest-asyncio`, `pytest-cov`, `ruff`, `ty`, `taskipy`, `pre-commit`, `cryptography` (TLS test certs).
-- Current implementation version: `3.3.0`.
+- Current implementation version: `3.4.0`.
 - `IDEA.md` is historical source material only; maintained English files in the current structure are source of truth; no separate `/docs` tree (only `docs/migration.md`).
 - `FORMAT.md` defines compact `SPEC.md` section/table/invariant/task/backprop format.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
@@ -24,6 +24,7 @@
 - Direct SIP examples in `sipx.examples`: register/invite/message/subscribe plus (added `3.1.3`) `options`, `unregister`, `call` (INVITE->ACK->BYE via dialog + `response.history`), `info_dtmf` (DTMF over in-dialog INFO via `request()`), `server` (offline UAS `on_*` via `handle_request`), `hooks_history` (event hooks + `response.history`); all on `AsyncClient`, `SIPX_*` env vars only (V64: no argparse), default to public Mizu demo; extra vars: `SIPX_EXPIRES`, `SIPX_DEBUG`, `SIPX_CODECS`, `SIPX_RTP_PORT`, `SIPX_MESSAGE`, `SIPX_CONTENT_TYPE`, `SIPX_EVENT`, `SIPX_ACCEPT`. Helpers: `debug_request`/`debug_response`, `account_settings`, `print_json` in `sipx.examples.common`. `tests/test_examples.py` `ROOT_EXAMPLES` covers all of them.
 - Every `sipx` module carries an RFC-referencing module docstring (purpose + explanation + `References:` block), added `3.1.2`. `sipx.protocol` is the `AsyncClient` runtime layer; `sipx.extensions` (was `rfc/`) holds standalone, test-only extension handlers not yet wired into `AsyncClient`. Root exports `ProtocolDialog`/`ClientTransaction`/`ServerTransaction` for the runtime; `sipx.sip` remains the sans-I/O toolkit (`Dialog`, transactions, parsers, `create_*_request`).
 - `AsyncClient` P0 security (3.2.0): response correlation by Call-ID + CSeq method + Via branch + remote address; CR/LF sanitization via `sipx.wire`; `Content-Length` on all `Request`/`Response` serialization; TCP reassembly capped at `max_message_size`.
+- `AsyncClient` P1 RFC part 1 (3.4.0): outgoing UDP Via carries `;rport` (toggle `ClientConfig.rport`, default on); learns public `(host,port)` from `received`/`rport` echoed on response Via, exposed as `learned_address`; `invite()` auto-ACKs non-2xx final responses on the INVITE branch (RFC §17.1.1.3); new `cancel(call_id)` matches a pending INVITE (RFC §9); correlation key now `Call-ID:CSeq-number:method`. Pending INVITEs tracked in `_pending_invites`. Remaining P1: §17 timers/retransmission.
 - Repo is a `uv` workspace: root `sipx` is SIP-only; apps under `apps/*` (`harness`, `cli`, `fastapi`, `asterisk`, `llm`, `scenarios`, `stt`, `tts`) import root as workspace dep.
 - `sipx-fastapi` (`apps/fastapi`): FastAPI REST wrapper with lifespan-managed `AsyncClient`; endpoints `/health`, `/sip/options`, `/sip/register`, `/sip/unregister`, `/sip/message`, `/sip/request`; run via `uv run --package sipx-fastapi sipx-fastapi`; see `apps/fastapi/README.md`.
 - Root `pytest` collects only core `tests/`; app tests are opt-in by explicit path (`pytest apps` works too).

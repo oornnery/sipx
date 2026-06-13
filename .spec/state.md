@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `3.3.0` is complete: added `apps/fastapi` (`sipx-fastapi`) FastAPI REST service with lifespan-managed `AsyncClient`, REST endpoints, README, and tests; updated root README/docs. Block `3.2.0` completed P0 security and `sipx/extensions/` rename. Block `3.0.0` removed legacy API; `AsyncClient` is the only client runtime.
+Implement `sipx` in verified commit blocks. Block `3.4.0` is complete: P1 RFC part 1 on `AsyncClient` — rport (RFC 3581) on outgoing UDP Via + `learned_address`, non-2xx INVITE auto-ACK (RFC §17.1.1.3), `cancel(call_id)` (RFC §9), and CSeq-method-scoped response correlation. Remaining P1: §17 timers/retransmission (Block 3.5.0 target). Block `3.3.0` added `apps/fastapi` (`sipx-fastapi`). Block `3.2.0` completed P0 security and `sipx/extensions/` rename. Block `3.0.0` removed legacy API; `AsyncClient` is the only client runtime.
 
 ## Sources Read
 

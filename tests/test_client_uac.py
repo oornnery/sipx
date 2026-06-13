@@ -552,6 +552,154 @@ class TestTransactionManagement:
                 await client_with_mock.options("sip:bob@example.com")
 
 
+class TestRportAndAck:
+    """Tests for RFC 3581 rport and RFC 3261 §17.1.1.3 non-2xx ACK."""
+
+    @pytest.mark.asyncio
+    async def test_outgoing_via_includes_rport(self, client_with_mock, mock_transport):
+        """UDP requests must carry an rport parameter on the Via header."""
+        call_id = "test-rport"
+        mock_transport.add_response(
+            200, "OK", {"Call-ID": call_id, "CSeq": "1 OPTIONS"}
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            await client_with_mock.options("sip:bob@example.com")
+
+        sent = mock_transport.sent_data[0][0]
+        via_line = next(
+            line
+            for line in sent.decode().split("\r\n")
+            if line.lower().startswith("via:")
+        )
+        assert ";rport" in via_line
+
+    @pytest.mark.asyncio
+    async def test_rport_disabled_omits_parameter(self, mock_transport):
+        """With rport disabled, the Via must not include rport."""
+        config = ClientConfig(
+            local_host="127.0.0.1", local_port=5060, timeout=5.0, rport=False
+        )
+        client = AsyncClient(config=config)
+        client._transport = mock_transport
+        client._closed = False
+        client._receive_task = asyncio.create_task(client._receive_loop())
+
+        call_id = "test-no-rport"
+        mock_transport.add_response(
+            200, "OK", {"Call-ID": call_id, "CSeq": "1 OPTIONS"}
+        )
+        with (
+            patch("sipx.client._new_call_id", return_value=call_id),
+            patch("sipx.client._new_branch", return_value="z9hG4bKtest"),
+        ):
+            await client.options("sip:bob@example.com")
+
+        sent = mock_transport.sent_data[0][0]
+        via_line = next(
+            line
+            for line in sent.decode().split("\r\n")
+            if line.lower().startswith("via:")
+        )
+        assert ";rport" not in via_line
+        await client.aclose()
+
+    @pytest.mark.asyncio
+    async def test_learns_public_address_from_via(
+        self, client_with_mock, mock_transport
+    ):
+        """received/rport echoed by the server must populate learned_address."""
+        call_id = "test-learn"
+        mock_transport.add_response(
+            200,
+            "OK",
+            {
+                "Call-ID": call_id,
+                "CSeq": "1 OPTIONS",
+                "Via": "SIP/2.0/UDP 127.0.0.1:5060;branch=z9hG4bKtest"
+                ";received=203.0.113.5;rport=44444",
+            },
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            await client_with_mock.options("sip:bob@example.com")
+
+        assert client_with_mock.learned_address == ("203.0.113.5", 44444)
+
+    @pytest.mark.asyncio
+    async def test_invite_non_2xx_sends_ack(self, client_with_mock, mock_transport):
+        """A non-2xx INVITE final response must be auto-ACKed on the same branch."""
+        call_id = "test-fail-ack"
+        mock_transport.add_response(
+            486,
+            "Busy Here",
+            {
+                "Call-ID": call_id,
+                "CSeq": "1 INVITE",
+                "To": "<sip:bob@example.com>;tag=busy99",
+            },
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            response = await client_with_mock.invite("sip:bob@example.com")
+
+        assert response.status_code == 486
+        assert call_id not in client_with_mock._dialogs
+        ack = mock_transport.sent_data[-1][0]
+        assert ack.startswith(b"ACK sip:bob@example.com SIP/2.0")
+        assert b"CSeq: 1 ACK" in ack
+        assert b"tag=busy99" in ack
+        assert b"branch=z9hG4bKtest" in ack
+
+    @pytest.mark.asyncio
+    async def test_cancel_sends_matching_cancel(self, client_with_mock, mock_transport):
+        """cancel() must send a CANCEL matching the pending INVITE branch/CSeq."""
+        call_id = "test-cancel"
+        mock_transport.add_response(
+            100, "Trying", {"Call-ID": call_id, "CSeq": "1 INVITE"}
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            invite_task = asyncio.create_task(
+                client_with_mock.invite("sip:bob@example.com")
+            )
+            for _ in range(100):
+                if call_id in client_with_mock._pending_invites:
+                    break
+                await asyncio.sleep(0.01)
+
+            mock_transport.add_response(
+                200, "OK", {"Call-ID": call_id, "CSeq": "1 CANCEL"}
+            )
+            cancel_response = await client_with_mock.cancel(call_id)
+
+            mock_transport.add_response(
+                487,
+                "Request Terminated",
+                {
+                    "Call-ID": call_id,
+                    "CSeq": "1 INVITE",
+                    "To": "<sip:bob@example.com>;tag=term1",
+                },
+            )
+            invite_response = await invite_task
+
+        assert cancel_response.status_code == 200
+        assert invite_response.status_code == 487
+        cancels = [d for d, _ in mock_transport.sent_data if d.startswith(b"CANCEL")]
+        assert cancels
+        assert b"CSeq: 1 CANCEL" in cancels[0]
+        assert b"branch=z9hG4bKtest" in cancels[0]
+
+    @pytest.mark.asyncio
+    async def test_cancel_without_pending_invite_raises(self, client_with_mock):
+        """cancel() must raise ProtocolError when no INVITE is pending."""
+        from sipx.exceptions import ProtocolError
+
+        with pytest.raises(ProtocolError):
+            await client_with_mock.cancel("missing")
+
+
 class TestDialogManagement:
     """Tests for dialog management."""
 

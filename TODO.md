@@ -529,12 +529,21 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 3.4.0 Done (P1 RFC part 1)
+
+- [x] rport (RFC 3581): `AsyncClient` adds `;rport` to outgoing UDP Via (toggle `ClientConfig.rport`), learns public address from `received`/`rport` on response Via via `learned_address`.
+- [x] Non-2xx INVITE ACK (RFC 3261 §17.1.1.3): `invite()` auto-ACKs 3xx-6xx on the same branch with the response To tag.
+- [x] CANCEL (RFC 3261 §9): `AsyncClient.cancel(call_id)` matches a pending INVITE; correlation key now includes CSeq method.
+- [x] Tests in `tests/test_client_uac.py` (rport, learned address, non-2xx ACK, CANCEL); 504 core tests pass, ruff + ty clean.
+- [ ] Remaining P1: §17 timers/retransmission (Block 3.5.0 target).
+
 ## Block 3.3.0 Done (FastAPI app + docs)
 
 - [x] Added `apps/fastapi` workspace package (`sipx-fastapi`) with lifespan-managed `AsyncClient`, REST endpoints (`/health`, `/sip/options`, `/sip/register`, `/sip/unregister`, `/sip/message`, `/sip/request`), env-based config, README, and tests.
 - [x] Updated root `README.md` with FastAPI app section and `sipx/extensions/` note.
 - [x] Bumped root package version to `3.3.0`.
-- [ ] Deferred P1 RFC items (§17 timers/retransmission, auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport) — documented in README/TODO roadmap.
+- [x] P1 RFC: auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport — done in 3.4.0.
+- [ ] Remaining P1: §17 timers/retransmission — Block 3.5.0 target.
 
 ## Block 3.2.0 Done (core review Phase 2 partial + Phase 3 P0)
 

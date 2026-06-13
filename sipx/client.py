@@ -40,6 +40,14 @@ class _PendingMatch:
     cseq_method: str
 
 
+@dataclass(slots=True)
+class _PendingInvite:
+    """An INVITE awaiting its final response, so CANCEL can target it."""
+
+    request: Request
+    remote: tuple[str, int]
+
+
 def _new_call_id() -> str:
     return str(uuid.uuid4())
 
@@ -191,6 +199,8 @@ class AsyncClient:
         self._uas_handlers: dict[str, Callable[[Request], Awaitable[Response]]] = {}
         self._dialogs: dict[str, Dialog] = {}
         self._pending_responses: dict[str, _PendingMatch] = {}
+        self._pending_invites: dict[str, _PendingInvite] = {}
+        self._learned_address: tuple[str, int] | None = None
 
         # Create transport using registry
         registry = TransportRegistry()
@@ -324,12 +334,9 @@ class AsyncClient:
             return
         cseq_num, cseq_method = cseq_parts
 
-        key = f"{call_id}:{cseq_num}"
+        key = f"{call_id}:{cseq_num}:{cseq_method.upper()}"
         pending = self._pending_responses.get(key)
         if pending is None or pending.future.done():
-            return
-
-        if pending.cseq_method.upper() != cseq_method.upper():
             return
 
         response_branch = extract_top_via_branch(headers)
@@ -339,7 +346,32 @@ class AsyncClient:
         if remote != pending.remote:
             return
 
+        self._learn_via_address(headers)
         pending.future.set_result(data)
+
+    def _learn_via_address(self, headers: dict[str, str | list[str]]) -> None:
+        """Record our public address from the top Via ``received``/``rport`` (RFC 3581)."""
+        via = headers.get("Via")
+        if isinstance(via, list):
+            via = via[0] if via else ""
+        if not isinstance(via, str) or not via:
+            return
+        host: str | None = None
+        port: int | None = None
+        for param in via.split(";")[1:]:
+            name, _, val = param.strip().partition("=")
+            lname = name.lower()
+            if lname == "received" and val:
+                host = val.strip()
+            elif lname == "rport" and val.strip().isdigit():
+                port = int(val.strip())
+        if host is None and port is None:
+            return
+        prev = self._learned_address
+        final_host = host if host is not None else (prev[0] if prev else None)
+        final_port = port if port is not None else (prev[1] if prev else None)
+        if final_host is not None and final_port is not None:
+            self._learned_address = (final_host, final_port)
 
     @property
     def is_closed(self) -> bool:
@@ -365,6 +397,16 @@ class AsyncClient:
     def auth(self) -> AuthFlow | None:
         """Return the authentication flow, if configured."""
         return self._auth
+
+    @property
+    def learned_address(self) -> tuple[str, int] | None:
+        """Public ``(host, port)`` learned from Via ``received``/``rport`` (RFC 3581).
+
+        Populated from the topmost Via of received responses when the server
+        echoes our request Via with ``received`` and/or ``rport`` filled in.
+        Returns ``None`` until such a response is seen.
+        """
+        return self._learned_address
 
     def on_invite(
         self, handler: Callable[[Request], Awaitable[Response]]
@@ -564,6 +606,8 @@ class AsyncClient:
         local_host = self._config.local_host
         local_port = self._config.local_port
         via = f"SIP/2.0/{transport_type} {local_host}:{local_port};branch={branch}"
+        if self._config.rport and transport_type == "UDP":
+            via += ";rport"
 
         headers: dict[str, str | list[str]] = {
             "Via": via,
@@ -664,7 +708,7 @@ class AsyncClient:
         )
         cseq_num = cseq_parts[0] if cseq_parts else "1"
         cseq_method = cseq_parts[1] if cseq_parts else request.method
-        key = f"{call_id}:{cseq_num}"
+        key = f"{call_id}:{cseq_num}:{cseq_method.upper()}"
         timeout = self._config.timeout
         provisionals: list[Response] = []
         branch = extract_top_via_branch(request.headers)
@@ -837,18 +881,137 @@ class AsyncClient:
         """
         request = self._build_request("INVITE", uri, **kwargs)
         remote = _parse_remote(uri)
-        response = await self._send_request(request, remote)
+        call_id = request.headers.get("Call-ID")
+        if isinstance(call_id, str) and call_id:
+            self._pending_invites[call_id] = _PendingInvite(request, remote)
+        try:
+            response = await self._send_request(request, remote)
+        finally:
+            if isinstance(call_id, str) and call_id:
+                self._pending_invites.pop(call_id, None)
 
-        if 100 <= response.status_code < 300:
-            call_id = request.headers.get("Call-ID")
+        if 200 <= response.status_code < 300:
             if isinstance(call_id, str) and call_id:
                 try:
                     dialog = Dialog.from_invite(request, response)
                     self._dialogs[call_id] = dialog
                 except Exception:
                     pass
+        elif response.status_code >= 300:
+            # RFC 3261 §17.1.1.3: the client transaction must ACK a non-2xx
+            # final response on the same Via branch as the INVITE.
+            await self._send_failure_ack(response, remote)
 
         return response
+
+    async def _send_failure_ack(
+        self, response: Response, remote: tuple[str, int]
+    ) -> None:
+        """Send ACK for a non-2xx INVITE final response (RFC 3261 §17.1.1.3).
+
+        The ACK reuses the INVITE's Request-URI and top Via branch and carries
+        the To header (with tag) from the response, per §17.1.1.3.
+        """
+        invite = response.request
+        if invite is None or invite.method != "INVITE":
+            return
+
+        via = invite.headers.get("Via")
+        from_hdr = invite.headers.get("From")
+        call_id = invite.headers.get("Call-ID")
+        cseq = invite.headers.get("CSeq")
+        to_hdr = response.headers.get("To") or invite.headers.get("To")
+        if not (
+            isinstance(via, str)
+            and isinstance(from_hdr, str)
+            and isinstance(call_id, str)
+            and isinstance(cseq, str)
+        ):
+            return
+        if isinstance(to_hdr, list):
+            to_hdr = to_hdr[0] if to_hdr else ""
+        cseq_parts = extract_cseq_parts(cseq)
+        cseq_num = cseq_parts[0] if cseq_parts else "1"
+
+        headers: dict[str, str | list[str]] = {
+            "Via": via,
+            "From": from_hdr,
+            "To": to_hdr or "",
+            "Call-ID": call_id,
+            "CSeq": f"{cseq_num} ACK",
+            "Max-Forwards": "70",
+            "User-Agent": self._config.user_agent,
+        }
+        ack = Request(
+            method="ACK",
+            uri=invite.uri,
+            headers=headers,
+            body=None,
+            transport=self._transport,
+        )
+        await run_hooks(self._event_hooks, "request", ack)
+        await self._transport.send(ack.to_bytes(), remote)
+
+    async def cancel(self, call_id: str) -> Response:
+        """Cancel a pending INVITE (RFC 3261 §9).
+
+        Sends a CANCEL matching an in-flight INVITE (same Request-URI, Call-ID,
+        From, To, CSeq number, and top Via branch). Must be called while an
+        ``invite()`` for *call_id* is still awaiting its final response,
+        typically from a concurrent task.
+
+        Args:
+            call_id: Call-ID of the pending INVITE created by ``invite()``.
+
+        Returns:
+            The SIP response to the CANCEL (typically 200 OK).
+
+        Raises:
+            ProtocolError: If no INVITE is pending for *call_id*.
+            TimeoutError: If no response is received within the configured timeout.
+        """
+        pending = self._pending_invites.get(call_id)
+        if pending is None:
+            raise ProtocolError(
+                f"no pending INVITE for Call-ID {call_id!r}",
+                rfc_ref="RFC 3261 §9.1",
+            )
+
+        invite = pending.request
+        via = invite.headers.get("Via")
+        from_hdr = invite.headers.get("From")
+        to_hdr = invite.headers.get("To")
+        cseq = invite.headers.get("CSeq")
+        if not (
+            isinstance(via, str)
+            and isinstance(from_hdr, str)
+            and isinstance(to_hdr, str)
+            and isinstance(cseq, str)
+        ):
+            raise ProtocolError(
+                "pending INVITE is missing headers required to build CANCEL",
+                rfc_ref="RFC 3261 §9.1",
+            )
+        cseq_parts = extract_cseq_parts(cseq)
+        cseq_num = cseq_parts[0] if cseq_parts else "1"
+
+        headers: dict[str, str | list[str]] = {
+            "Via": via,
+            "From": from_hdr,
+            "To": to_hdr,
+            "Call-ID": call_id,
+            "CSeq": f"{cseq_num} CANCEL",
+            "Max-Forwards": "70",
+            "User-Agent": self._config.user_agent,
+        }
+        cancel = Request(
+            method="CANCEL",
+            uri=invite.uri,
+            headers=headers,
+            body=None,
+            transport=self._transport,
+        )
+        return await self._send_request(cancel, pending.remote)
 
     async def register(self, uri: str, **kwargs: Any) -> Response:
         """Send a REGISTER request (RFC 3261 §10).

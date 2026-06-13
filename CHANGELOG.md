@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 3.4.0 - 2026-06-13
+
+### Added (P1 RFC, part 1)
+
+- **rport (RFC 3581).** `AsyncClient` adds `;rport` to outgoing UDP Via headers
+  (toggle via `ClientConfig.rport`, default on) and learns the public
+  `(host, port)` from the `received`/`rport` parameters echoed on response Via,
+  exposed as `AsyncClient.learned_address`.
+- **Non-2xx INVITE ACK (RFC 3261 §17.1.1.3).** `invite()` now auto-ACKs a
+  3xx-6xx final response on the same Via branch, carrying the response To tag.
+- **CANCEL (RFC 3261 §9).** New `AsyncClient.cancel(call_id)` builds a CANCEL
+  matching a pending INVITE (same Request-URI, Call-ID, From, To, CSeq number,
+  and top Via branch); call it from a concurrent task while `invite()` awaits.
+
+### Changed
+
+- Response correlation key now includes the CSeq method
+  (`Call-ID:CSeq-number:method`), so CANCEL and its INVITE no longer collide
+  on the same branch.
+
 ## 3.3.0 - 2026-06-13
 
 ### Added
