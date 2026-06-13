@@ -867,3 +867,100 @@ class TestTimeoutHandling:
 
         with pytest.raises(SipTimeoutError):
             await client_with_mock.options("sip:bob@example.com")
+
+
+class TestRetransmission:
+    """Tests for RFC 3261 §17 client retransmission."""
+
+    @pytest.mark.asyncio
+    async def test_retransmits_until_response(self, mock_transport):
+        """A non-INVITE request must be retransmitted while no response arrives."""
+        config = ClientConfig(local_host="127.0.0.1", local_port=5060, timeout=5.0)
+        client = AsyncClient(config=config)
+        client._transport = mock_transport
+        client._closed = False
+
+        call_id = "test-retransmit"
+        with (
+            patch("sipx.client._new_call_id", return_value=call_id),
+            patch("sipx.client._new_branch", return_value="z9hG4bKtest"),
+            patch("sipx.client.T1", 0.05),
+            patch("sipx.client.T2", 0.2),
+        ):
+            client._receive_task = asyncio.create_task(client._receive_loop())
+
+            async def respond_late():
+                await asyncio.sleep(0.18)
+                mock_transport.add_response(
+                    200, "OK", {"Call-ID": call_id, "CSeq": "1 OPTIONS"}
+                )
+
+            asyncio.create_task(respond_late())
+            response = await client.options("sip:bob@example.com")
+
+        assert response.status_code == 200
+        # initial send + at least one retransmission before the late response
+        assert len(mock_transport.sent_data) >= 2
+        await client.aclose()
+
+    @pytest.mark.asyncio
+    async def test_no_retransmit_when_disabled(self, mock_transport):
+        """With retransmit disabled, only the initial request is sent."""
+        config = ClientConfig(
+            local_host="127.0.0.1", local_port=5060, timeout=0.2, retransmit=False
+        )
+        client = AsyncClient(config=config)
+        client._transport = mock_transport
+        client._closed = False
+
+        with (
+            patch("sipx.client._new_call_id", return_value="no-rtx"),
+            patch("sipx.client._new_branch", return_value="z9hG4bKtest"),
+            patch("sipx.client.T1", 0.05),
+        ):
+            client._receive_task = asyncio.create_task(client._receive_loop())
+            with pytest.raises(SipTimeoutError):
+                await client.options("sip:bob@example.com")
+
+        assert len(mock_transport.sent_data) == 1
+        await client.aclose()
+
+    @pytest.mark.asyncio
+    async def test_invite_stops_retransmit_after_provisional(self, mock_transport):
+        """INVITE must stop retransmitting once a provisional response arrives."""
+        config = ClientConfig(local_host="127.0.0.1", local_port=5060, timeout=5.0)
+        client = AsyncClient(config=config)
+        client._transport = mock_transport
+        client._closed = False
+
+        call_id = "test-inv-rtx"
+        with (
+            patch("sipx.client._new_call_id", return_value=call_id),
+            patch("sipx.client._new_branch", return_value="z9hG4bKtest"),
+            patch("sipx.client.T1", 0.05),
+        ):
+            client._receive_task = asyncio.create_task(client._receive_loop())
+            mock_transport.add_response(
+                100, "Trying", {"Call-ID": call_id, "CSeq": "1 INVITE"}
+            )
+
+            async def respond_final():
+                await asyncio.sleep(0.4)
+                mock_transport.add_response(
+                    200,
+                    "OK",
+                    {
+                        "Call-ID": call_id,
+                        "CSeq": "1 INVITE",
+                        "Contact": "<sip:bob@127.0.0.1>",
+                    },
+                )
+
+            asyncio.create_task(respond_final())
+            response = await client.invite("sip:bob@example.com")
+
+        assert response.status_code == 200
+        # Only the initial INVITE is sent; no retransmissions after the 100.
+        invites = [d for d, _ in mock_transport.sent_data if d.startswith(b"INVITE")]
+        assert len(invites) == 1
+        await client.aclose()

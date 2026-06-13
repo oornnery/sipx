@@ -529,6 +529,12 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 3.5.0 Done (P1 RFC part 2 - timers)
+
+- [x] RFC 3261 §17 retransmission in `AsyncClient._await_response`: UDP retransmits at T1, doubling, capped at T2 for non-INVITE, bounded by `timeout`; INVITE stops after first provisional; TCP/TLS never retransmit; toggle `ClientConfig.retransmit`.
+- [x] Tests in `tests/test_client_uac.py::TestRetransmission` (retransmit until response, disabled, INVITE stops after provisional); 507 core tests pass, ruff + ty clean.
+- [x] P1 RFC roadmap complete (rport, non-2xx ACK, CANCEL in 3.4.0; timers in 3.5.0).
+
 ## Block 3.4.0 Done (P1 RFC part 1)
 
 - [x] rport (RFC 3581): `AsyncClient` adds `;rport` to outgoing UDP Via (toggle `ClientConfig.rport`), learns public address from `received`/`rport` on response Via via `learned_address`.
@@ -543,7 +549,7 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] Updated root `README.md` with FastAPI app section and `sipx/extensions/` note.
 - [x] Bumped root package version to `3.3.0`.
 - [x] P1 RFC: auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport — done in 3.4.0.
-- [ ] Remaining P1: §17 timers/retransmission — Block 3.5.0 target.
+- [x] P1 RFC: §17 timers/retransmission — done in 3.5.0.
 
 ## Block 3.2.0 Done (core review Phase 2 partial + Phase 3 P0)
 

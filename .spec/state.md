@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `3.4.0` is complete: P1 RFC part 1 on `AsyncClient` — rport (RFC 3581) on outgoing UDP Via + `learned_address`, non-2xx INVITE auto-ACK (RFC §17.1.1.3), `cancel(call_id)` (RFC §9), and CSeq-method-scoped response correlation. Remaining P1: §17 timers/retransmission (Block 3.5.0 target). Block `3.3.0` added `apps/fastapi` (`sipx-fastapi`). Block `3.2.0` completed P0 security and `sipx/extensions/` rename. Block `3.0.0` removed legacy API; `AsyncClient` is the only client runtime.
+Implement `sipx` in verified commit blocks. Block `3.5.0` is complete: P1 RFC part 2 — RFC 3261 §17 retransmission in `AsyncClient._await_response` (UDP T1/T2 backoff bounded by `timeout`, INVITE stops after provisional, TCP/TLS no retransmit, `ClientConfig.retransmit` toggle). P1 RFC roadmap now complete. Block `3.4.0`: P1 part 1 — rport (RFC 3581) + `learned_address`, non-2xx INVITE auto-ACK (RFC §17.1.1.3), `cancel(call_id)` (RFC §9), CSeq-method-scoped correlation. Block `3.3.0` added `apps/fastapi` (`sipx-fastapi`). Block `3.2.0` completed P0 security and `sipx/extensions/` rename. Block `3.0.0` removed legacy API; `AsyncClient` is the only client runtime.
 
 ## Sources Read
 

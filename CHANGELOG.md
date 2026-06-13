@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 3.5.0 - 2026-06-13
+
+### Added (P1 RFC, part 2)
+
+- **Transaction timers / retransmission (RFC 3261 §17).** On unreliable
+  transports (UDP) `AsyncClient` now retransmits the request at intervals
+  starting at T1 and doubling — capped at T2 for non-INVITE — until a response
+  arrives or the overall `timeout` elapses. INVITE stops retransmitting once a
+  provisional arrives (Timer A cancelled in Proceeding); reliable transports
+  (TCP/TLS) never retransmit. Toggle via `ClientConfig.retransmit` (default on).
+
 ## 3.4.0 - 2026-06-13
 
 ### Added (P1 RFC, part 1)

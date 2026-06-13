@@ -17,7 +17,12 @@ from sipx.models import Request, Response
 from sipx.protocol.auth import AuthFlow
 from sipx.protocol.dialog import Dialog
 from sipx.protocol.hooks import EventHooks, run_hooks
-from sipx.protocol.transaction import ClientTransaction, ServerTransaction
+from sipx.protocol.transaction import (
+    ClientTransaction,
+    ServerTransaction,
+    T1,
+    T2,
+)
 from sipx.transport.base import Transport, TransportConfig
 from sipx.transport.registry import TransportRegistry
 from sipx.wire import (
@@ -709,11 +714,15 @@ class AsyncClient:
         cseq_num = cseq_parts[0] if cseq_parts else "1"
         cseq_method = cseq_parts[1] if cseq_parts else request.method
         key = f"{call_id}:{cseq_num}:{cseq_method.upper()}"
-        timeout = self._config.timeout
         provisionals: list[Response] = []
         branch = extract_top_via_branch(request.headers)
+        is_invite = request.method == "INVITE"
+        reliable = self._transport.transport_type in ("tcp", "tls")
+        retransmit = self._config.retransmit and not reliable
+        got_provisional = False
 
         loop = asyncio.get_event_loop()
+        deadline = loop.time() + self._config.timeout
         future: asyncio.Future[bytes] = loop.create_future()
         self._pending_responses[key] = _PendingMatch(
             future=future,
@@ -726,13 +735,18 @@ class AsyncClient:
             await self._transport.send(request.to_bytes(), remote)
 
             while True:
-                try:
-                    data = await asyncio.wait_for(future, timeout)
-                except asyncio.TimeoutError:
-                    raise SipTimeoutError(
-                        f"Timeout waiting for response to {request.method}",
-                        rfc_ref="RFC 3261 §17",
-                    )
+                # INVITE stops retransmitting once a provisional arrives
+                # (Timer A cancelled in Proceeding); non-INVITE keeps Timer E
+                # up to T2 (RFC 3261 §17.1.1.2 / §17.1.2.2).
+                allow_retransmit = retransmit and not (is_invite and got_provisional)
+                data = await self._await_response(
+                    future,
+                    request,
+                    remote,
+                    deadline=deadline,
+                    retransmit=allow_retransmit,
+                    invite=is_invite,
+                )
 
                 response = _parse_response(data, request)
                 transaction.receive_response(
@@ -744,6 +758,7 @@ class AsyncClient:
 
                 if 100 <= response.status_code < 200:
                     provisionals.append(response)
+                    got_provisional = True
                     future = loop.create_future()
                     self._pending_responses[key] = _PendingMatch(
                         future=future,
@@ -758,6 +773,47 @@ class AsyncClient:
                 return response
         finally:
             self._pending_responses.pop(key, None)
+
+    async def _await_response(
+        self,
+        future: asyncio.Future[bytes],
+        request: Request,
+        remote: tuple[str, int],
+        *,
+        deadline: float,
+        retransmit: bool,
+        invite: bool,
+    ) -> bytes:
+        """Wait for *future*, retransmitting on unreliable transports.
+
+        Implements RFC 3261 §17 client retransmission: on UDP the request is
+        resent at intervals starting at T1 and doubling (capped at T2 for
+        non-INVITE) until a response arrives or the overall timeout
+        (``deadline``) elapses, which raises ``SipTimeoutError``. On reliable
+        transports or when ``retransmit`` is False, it waits once.
+        """
+        loop = asyncio.get_event_loop()
+        interval = T1
+        while True:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise SipTimeoutError(
+                    f"Timeout waiting for response to {request.method}",
+                    rfc_ref="RFC 3261 §17",
+                )
+            wait = min(interval, remaining) if retransmit else remaining
+            try:
+                return await asyncio.wait_for(asyncio.shield(future), wait)
+            except asyncio.TimeoutError:
+                if future.done():
+                    return future.result()
+                if not retransmit or (deadline - loop.time()) <= 0:
+                    raise SipTimeoutError(
+                        f"Timeout waiting for response to {request.method}",
+                        rfc_ref="RFC 3261 §17",
+                    )
+                await self._transport.send(request.to_bytes(), remote)
+                interval = interval * 2 if invite else min(interval * 2, T2)
 
     async def request(self, method: str, uri: str, **kwargs: Any) -> Response:
         """Send a SIP request with an arbitrary method (curl-like escape hatch).
