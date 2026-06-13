@@ -1,3 +1,15 @@
+"""Asynchronous G.711 RTP audio session over UDP.
+
+Sends and receives RTP audio: encodes ``AudioFrame`` PCM with G.711, maintains
+sequence/timestamp/SSRC state, pushes received packets through a jitter
+buffer, tracks reception metrics, and emits wire-event hooks.
+
+References:
+    RFC 3550 - RTP: A Transport Protocol for Real-Time Applications
+    RFC 3551 - RTP Profile for Audio and Video Conferences
+    ITU-T G.711 - PCM of voice frequencies
+"""
+
 from __future__ import annotations
 
 import asyncio

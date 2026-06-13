@@ -1,3 +1,14 @@
+"""RTP packet parsing and serialization.
+
+``RtpPacket`` models the RTP fixed header (version, payload type, sequence
+number, timestamp, SSRC, CSRC list, marker) plus payload, with validation and
+round-trip ``parse``/``to_bytes``. Header extensions are not supported.
+
+References:
+    RFC 3550 §5.1 - RTP Fixed Header Fields
+    RFC 3550 §5.3 - Profile-Specific Modifications to the RTP Header
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

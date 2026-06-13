@@ -1,3 +1,14 @@
+"""Structured SDP session description and serialization.
+
+Dataclasses for SDP lines (origin, connection, time, media, codecs) plus an
+``AudioMedia`` convenience view and ``to_sdp`` text generation. Supports both
+structured media descriptions and a simplified audio shortcut.
+
+References:
+    RFC 4566 §5 - SDP Specification (v=, o=, s=, c=, t=, m=, a= fields)
+    RFC 4566 §6 - SDP Attributes (rtpmap, fmtp, direction)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

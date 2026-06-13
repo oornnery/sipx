@@ -1,3 +1,14 @@
+"""Synthetic audio source generating silence or low-level noise.
+
+Produces deterministic linear 16-bit PCM ``AudioFrame`` chunks without any
+capture hardware, useful for tests and for keeping an RTP stream alive when
+no real audio is available.
+
+References:
+    RFC 3550 - RTP (generated PCM is encoded and sent as RTP)
+    ITU-T G.711 - PCM of voice frequencies (sample format)
+"""
+
 from __future__ import annotations
 
 import random

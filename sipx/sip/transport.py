@@ -1,3 +1,15 @@
+"""Asyncio UDP endpoint for SIP messages.
+
+``SipUdpEndpoint`` binds a UDP socket, serializes outbound SIP messages, and
+delivers inbound datagrams as parsed wire events (or parse errors) through an
+async queue. The minimal I/O layer for the sans-I/O ``sipx.sip`` toolkit.
+
+References:
+    RFC 3261 §18 - Transport
+    RFC 3261 §18.1 - Clients
+    RFC 3261 §18.4 - Error Handling
+"""
+
 from __future__ import annotations
 
 import asyncio

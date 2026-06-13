@@ -1,3 +1,14 @@
+"""Playout jitter buffer for received RTP packets.
+
+Reorders packets by sequence number, holds a target depth before playout,
+drops late and duplicate packets, trims overflow, and emits concealment
+frames on underrun. Smooths network jitter ahead of decoding.
+
+References:
+    RFC 3550 §5.1 - Sequence number and timestamp (ordering basis)
+    RFC 3550 §6.4.1 - Interarrival jitter (timing model this buffers against)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,3 +1,14 @@
+"""Human-readable summaries of SIP messages and SDP bodies.
+
+Converts ``Request``/``Response`` objects and parsed SDP into flat,
+JSON-serializable dataclasses for logging, debugging, and example output.
+A presentation helper only; it does not alter protocol behavior.
+
+References:
+    RFC 3261 §7 - SIP Messages (summarized structure)
+    RFC 4566 - SDP: Session Description Protocol (summarized media)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

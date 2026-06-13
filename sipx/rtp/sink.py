@@ -1,3 +1,14 @@
+"""Passive RTP UDP sink that binds a port and discards inbound packets.
+
+Opens a UDP endpoint to reserve and advertise a local RTP port (for example
+in an SDP offer) without processing media. Useful when a media port must
+exist but no audio is consumed.
+
+References:
+    RFC 3550 - RTP (UDP transport for media)
+    RFC 4566 §5.14 - Media Descriptions (port advertised in SDP)
+"""
+
 from __future__ import annotations
 
 import asyncio

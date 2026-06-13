@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 3.1.2 - 2026-06-13
+
+- Added RFC-referencing module docstrings to the 36 core modules that lacked one (`config.py`, `models.py`, `summary.py`, `transport/base.py`, all of `media/`, `rtp/`, `sdp/`, `sip/`, plus `examples/__init__.py` and `examples/common.py`), each in the PRACK-style format (purpose + explanation + `References:` block with the relevant RFC/ITU-T citations).
+- Rewrote the misleading aggregator docstrings on `protocol/__init__.py` (now describes the `AsyncClient` runtime layer: Digest auth, dialog tracking, transactions, hooks) and `rfc/__init__.py` (now describes standalone, test-exercised SIP extension handlers — PRACK, events, presence, outbound, DNS — not yet wired into the `AsyncClient` runtime).
+- Documentation only: no runtime behavior change.
+
 ## 3.1.1 - 2026-06-13
 
 - Documented `Response.history` in the `README.md` AsyncClient section.

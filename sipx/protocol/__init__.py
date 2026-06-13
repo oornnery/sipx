@@ -1,5 +1,12 @@
-"""SIP protocol layer: parser, serializer, message models, transactions.
+"""Runtime SIP protocol layer used by the AsyncClient.
 
-This package will contain RFC 3261 message handling, dialog state,
-and transaction state machines.
+Contains the pieces the client drives at runtime: the Digest authentication
+flow, dialog tracking, transaction state machines, event hooks, and
+provisional-response handling. Built on ``sipx.models`` and consumed by
+``sipx.client``.
+
+References:
+    RFC 3261 §12 - Dialogs
+    RFC 3261 §17 - Transactions
+    RFC 3261 §22 - Usage of HTTP Authentication
 """

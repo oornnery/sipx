@@ -1,3 +1,15 @@
+"""HTTP Digest authentication for SIP (MD5).
+
+Parses ``WWW-Authenticate``/``Proxy-Authenticate`` Digest challenges and
+builds the matching ``Authorization``/``Proxy-Authorization`` header, with
+optional ``qop=auth``. Only the MD5 algorithm is supported.
+
+References:
+    RFC 3261 §22 - Usage of HTTP Authentication
+    RFC 3261 §22.4 - The Digest Authentication Scheme
+    RFC 2617 - HTTP Authentication: Basic and Digest Access Authentication
+"""
+
 from __future__ import annotations
 
 import hashlib

@@ -1,3 +1,14 @@
+"""RTP reception statistics: loss, ordering, duplicates, and jitter.
+
+Tracks received/lost/out-of-order/duplicate counts and computes interarrival
+jitter using the smoothing estimator from RFC 3550, exposing immutable
+snapshots for reporting.
+
+References:
+    RFC 3550 §6.4.1 - Interarrival jitter calculation
+    RFC 3550 §A.8 - Estimating the Interarrival Jitter
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

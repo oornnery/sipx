@@ -1,3 +1,15 @@
+"""SIP transaction state machines (sans-I/O).
+
+Client and server INVITE/non-INVITE transactions that track state from
+provisional through final responses, match responses to requests by Via
+branch and CSeq, and build ACK/CANCEL for INVITE clients.
+
+References:
+    RFC 3261 §17 - Transactions
+    RFC 3261 §17.1 - Client Transaction
+    RFC 3261 §17.2 - Server Transaction
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

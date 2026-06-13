@@ -1,3 +1,15 @@
+"""PCM audio frame model for the media plane.
+
+``AudioFrame`` wraps a buffer of linear 16-bit PCM samples with its sample
+rate, channel count, duration, capture timestamp, and origin. It is the unit
+exchanged between audio sources, codecs, and RTP sessions before G.711
+encoding.
+
+References:
+    RFC 3550 §5.1 - RTP fixed header (timestamp carried per frame)
+    ITU-T G.711 - PCM of voice frequencies (target encoding for frames)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

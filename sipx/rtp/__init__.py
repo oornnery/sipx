@@ -1,3 +1,16 @@
+"""RTP media plane: packets, codecs, jitter buffering, and statistics.
+
+Aggregates the RTP packet model, G.711 (PCMU/PCMA) codecs, RFC 4733 DTMF
+events, an async G.711 audio session, a playout jitter buffer, and reception
+statistics (loss/jitter). The media plane only; SIP signaling is elsewhere.
+
+References:
+    RFC 3550 - RTP: A Transport Protocol for Real-Time Applications
+    RFC 3551 - RTP Profile for Audio and Video Conferences (PCMU=0, PCMA=8)
+    RFC 4733 - RTP Payload for DTMF Digits, Telephony Tones, and Signals
+    ITU-T G.711 - PCM of voice frequencies
+"""
+
 from sipx.rtp.buffer import RtpJitterBuffer, RtpJitterBufferSnapshot, RtpPlayoutFrame
 from sipx.rtp.audio import (
     RtpAudioMode,

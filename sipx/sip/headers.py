@@ -1,3 +1,15 @@
+"""SIP header storage with canonical and compact-form names.
+
+``HeaderMap`` preserves insertion order, supports multi-valued headers, and
+normalizes names to their canonical form while mapping the single-letter
+compact forms used on the wire.
+
+References:
+    RFC 3261 §7.3 - Header Fields
+    RFC 3261 §7.3.3 - Compact Form
+    RFC 3261 §20 - Header Field Definitions
+"""
+
 from __future__ import annotations
 
 from collections.abc import Iterator

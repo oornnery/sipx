@@ -1,3 +1,15 @@
+"""Client configuration for the sipx AsyncClient.
+
+Holds connection defaults (transport, bind address, timeout, max message
+size) and httpx-style request defaults (User-Agent, headers, params,
+cookies) that are merged into every outgoing request. ``ClientConfig.merge``
+returns a new config with per-call overrides without mutating the base.
+
+References:
+    RFC 3261 §18 - Transport (UDP/TCP/TLS selection)
+    RFC 3261 §20.41 - User-Agent header field
+"""
+
 from __future__ import annotations
 
 from copy import deepcopy

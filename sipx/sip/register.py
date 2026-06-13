@@ -1,3 +1,15 @@
+"""Client-side REGISTER flow with Digest authentication.
+
+Drives REGISTER, refresh, and unregister requests, consumes 401/407
+challenges, and builds the authenticated retry while tracking registration
+state.
+
+References:
+    RFC 3261 §10 - Registrations
+    RFC 3261 §10.2 - Constructing the REGISTER Request
+    RFC 3261 §22 - Usage of HTTP Authentication
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

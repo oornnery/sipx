@@ -1,3 +1,15 @@
+"""SIP dialog identity and state (sans-I/O).
+
+Models a dialog keyed by Call-ID plus local and remote tags, created from a
+UAC INVITE response or a UAS INVITE request, and tracks the local CSeq and
+early/confirmed/terminated state.
+
+References:
+    RFC 3261 §12 - Dialogs
+    RFC 3261 §12.1.1 - UAS behavior (dialog creation)
+    RFC 3261 §12.1.2 - UAC behavior (dialog creation)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,7 +1,15 @@
-# RFC 3261 request/response builders.
-# These helpers assemble wire SIP messages: Via/From/To/Call-ID/CSeq routing
-# headers, Contact when applicable, and optional body Content-Type metadata.
-# SDP bodies are opaque bytes here; offer/answer rules live in `sipx.sdp`.
+"""RFC 3261 request and response builders (sans-I/O).
+
+Assembles wire SIP messages (REGISTER, INVITE, ACK, BYE, INFO, generic
+requests, and responses) with the routing headers Via, From, To, Call-ID,
+CSeq, Contact, and Max-Forwards. Bodies are opaque bytes; SDP offer/answer
+rules live in ``sipx.sdp``.
+
+References:
+    RFC 3261 §8.1.1 - Generating the Request
+    RFC 3261 §8.2.6 - Generating the Response
+    RFC 3261 §20 - Header Field Definitions
+"""
 
 from __future__ import annotations
 

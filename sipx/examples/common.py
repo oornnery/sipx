@@ -1,3 +1,14 @@
+"""Shared helpers for the runnable SIP examples.
+
+Provides wire-level debug printers for requests/responses, a default demo
+account resolved from ``SIPX_*`` environment variables, and small JSON
+output utilities. Imported by the example scripts; not part of the client
+runtime.
+
+References:
+    RFC 3261 §7 - SIP Messages (printed verbatim for inspection)
+"""
+
 from __future__ import annotations
 
 import json

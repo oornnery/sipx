@@ -1,3 +1,16 @@
+"""SIP message model, parser, and serializer (sans-I/O).
+
+``SipRequest``/``SipResponse`` plus ``parse_sip_message`` and wire
+serialization. Handles the start line, folded headers, the header/body
+separator, and Content-Length validation.
+
+References:
+    RFC 3261 §7 - SIP Messages
+    RFC 3261 §7.3.1 - Header Field Format (line folding)
+    RFC 3261 §20.14 - Content-Length
+    RFC 3261 §25 - Augmented BNF
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

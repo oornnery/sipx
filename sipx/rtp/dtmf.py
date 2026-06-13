@@ -1,3 +1,13 @@
+"""DTMF (telephone-event) RTP payload encode and decode.
+
+Maps DTMF digits (0-9, *, #, A-D) to RFC 4733 named-event codes and packs or
+unpacks the 4-byte telephone-event payload (event, end bit, volume, duration).
+
+References:
+    RFC 4733 §2.3 - Telephone-Event Payload Format
+    RFC 4733 §3.2 - DTMF Events (obsoletes RFC 2833)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

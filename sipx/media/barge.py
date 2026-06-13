@@ -1,3 +1,14 @@
+"""Barge-in policy for interrupting audio playback.
+
+Models whether in-progress playback should be interrupted when the remote
+party starts speaking or sends a DTMF digit, a common IVR / voice-bot
+behavior. A pure policy object with no I/O.
+
+References:
+    RFC 4733 - RTP Payload for DTMF Digits (DTMF interruption signal)
+    RFC 3550 - RTP (speech detected on the audio plane)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

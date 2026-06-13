@@ -1,3 +1,16 @@
+"""Abstract transport interface for sending and receiving SIP messages.
+
+Defines ``TransportConfig`` and the ``Transport`` ABC that the UDP, TCP, and
+TLS implementations satisfy: an async ``send``/``receive`` pair over raw
+bytes plus the bound local address and transport type. Keeps wire I/O behind
+a single boundary so the client stays transport-agnostic.
+
+References:
+    RFC 3261 §18 - Transport
+    RFC 3261 §18.1 - Clients (sending requests, receiving responses)
+    RFC 3261 §18.2 - Servers
+"""
+
 from __future__ import annotations
 
 import abc

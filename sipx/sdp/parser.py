@@ -1,3 +1,15 @@
+"""Parser for SDP text into the structured session model.
+
+Reads ``<type>=<value>`` SDP lines into ``SessionDescription``, extracting
+audio media, rtpmap/fmtp codec attributes, and stream direction, and fills in
+well-known static payload types (PCMU=0, PCMA=8).
+
+References:
+    RFC 4566 §5 - SDP field grammar
+    RFC 4566 §6 - rtpmap/fmtp attributes
+    RFC 3551 - Static payload type assignments
+"""
+
 from __future__ import annotations
 
 from sipx.sdp.model import (

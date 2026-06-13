@@ -1,3 +1,15 @@
+"""Optional microphone capture source backed by PyAudio.
+
+Wraps the optional ``pyaudio`` dependency to read linear 16-bit PCM
+``AudioFrame`` chunks from a local input device for transmission over RTP.
+Raises ``PyAudioError`` when the dependency is missing so callers can fall
+back to synthetic audio.
+
+References:
+    RFC 3550 - RTP (captured PCM is encoded and sent as RTP)
+    ITU-T G.711 - PCM of voice frequencies (sample format)
+"""
+
 from __future__ import annotations
 
 import importlib

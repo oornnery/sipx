@@ -1,3 +1,13 @@
+"""Audio media primitives for the RTP media plane.
+
+Aggregates PCM frame types and audio sources (synthetic silence/noise and
+optional PyAudio capture) plus the ``MediaPort`` protocol and barge-in
+policy. These feed encoded audio into RTP sessions (see ``sipx.rtp``).
+
+References:
+    RFC 3550 - RTP: A Transport Protocol for Real-Time Applications
+"""
+
 from sipx.media.barge import BargeInPolicy, BargeInSignal
 from sipx.media.frame import AudioFrame, AudioSource
 from sipx.media.ports import MediaPort

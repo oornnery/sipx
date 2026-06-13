@@ -1,3 +1,14 @@
+"""SIP and SIPS URI parsing and serialization.
+
+``SipUri`` parses and renders ``sip:``/``sips:`` URIs including user, host,
+port, URI parameters, and header parameters, with IPv6 host handling and
+percent-encoding.
+
+References:
+    RFC 3261 §19.1 - SIP and SIPS URI Components
+    RFC 3261 §25.1 - Basic Rules (URI ABNF)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

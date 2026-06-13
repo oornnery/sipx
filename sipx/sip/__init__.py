@@ -1,3 +1,15 @@
+"""Sans-I/O SIP toolkit: URIs, headers, messages, dialogs, transactions.
+
+Pure (no socket I/O) building blocks for SIP per RFC 3261: URI and header
+parsing, message parse/serialize, identifier generation, Digest auth, dialog
+and transaction state machines, a REGISTER flow, and a thin UDP endpoint.
+This is a standalone toolkit; the ``AsyncClient`` runtime lives in
+``sipx.client`` and ``sipx.protocol``.
+
+References:
+    RFC 3261 - SIP: Session Initiation Protocol
+"""
+
 from sipx.sip.auth import (
     DigestChallenge,
     SipAuthError,

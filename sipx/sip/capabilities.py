@@ -1,3 +1,15 @@
+"""UA capability headers (Allow, Accept, Supported, Allow-Events).
+
+``SipCapabilities`` renders a UA's supported methods, body types, extensions,
+and event packages as the corresponding SIP headers on an outgoing message.
+
+References:
+    RFC 3261 §20.5 - Allow
+    RFC 3261 §20.1 - Accept
+    RFC 3261 §20.37 - Supported
+    RFC 6665 §8.2.2 - Allow-Events (SIP-Specific Event Notification)
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

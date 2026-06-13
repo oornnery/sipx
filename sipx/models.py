@@ -1,3 +1,17 @@
+"""First-class SIP request and response models used by the AsyncClient.
+
+Lightweight, typed dataclasses that hold a SIP message (method/URI or
+status/reason, headers, optional body) and serialize back to wire bytes.
+``Response.history`` records the intermediate provisional (1xx) and
+authentication-challenge (401/407) responses that preceded a final response.
+
+References:
+    RFC 3261 §7 - SIP Messages (requests, responses, headers, bodies)
+    RFC 3261 §7.1 - Requests
+    RFC 3261 §7.2 - Responses
+    RFC 3261 §25 - Augmented BNF for the SIP Protocol
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

@@ -1,3 +1,14 @@
+"""G.711 audio codec (PCMU/mu-law and PCMA/A-law) encode and decode.
+
+Converts between linear 16-bit PCM and the 8-bit logarithmic G.711 companding
+laws used by the static RTP payload types PCMU (0) and PCMA (8).
+
+References:
+    ITU-T G.711 - Pulse code modulation (PCM) of voice frequencies
+    RFC 3551 §4.5.14 - PCMU (payload type 0)
+    RFC 3551 §4.5.10 - PCMA (payload type 8)
+"""
+
 from __future__ import annotations
 
 

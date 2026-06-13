@@ -1,3 +1,15 @@
+"""SDP offer/answer construction for audio media.
+
+Builds audio offers and computes answers by intersecting offered codecs with
+locally supported ones (PCMU/PCMA, optional telephone-event) and mirroring the
+stream direction, per the SDP offer/answer model.
+
+References:
+    RFC 3264 - An Offer/Answer Model with SDP
+    RFC 4733 - telephone-event (DTMF) media format
+    RFC 3551 - Audio payload types
+"""
+
 from __future__ import annotations
 
 from sipx.sdp.model import AudioMedia, SdpCodec, SdpDirection, SessionDescription
