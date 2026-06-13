@@ -56,6 +56,12 @@ class Response:
     headers: dict[HeaderName, HeaderValue] = field(default_factory=dict)
     body: bytes | None = None
     request: Request | None = None
+    history: list[Response] = field(default_factory=list)
+    """Intermediate responses (provisional 1xx + 401/407 auth challenges).
+
+    Populated by the client on the final response in arrival order. Each
+    entry carries its own ``request`` so the full exchange is reconstructable.
+    """
 
     @classmethod
     def from_request(

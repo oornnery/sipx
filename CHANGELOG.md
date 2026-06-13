@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 3.1.1 - 2026-06-13
+
+- Documented `Response.history` in the `README.md` AsyncClient section.
+- Updated `.spec/*` and `.mem/*` state files for the `Response.history` block.
+
+## 3.1.0 - 2026-06-13
+
+- Added `Response.history`: every `AsyncClient` UAC call (`invite`, `register`, `message`, `options`, `subscribe`, `request`, `bye`) returns the first final (`>= 200`) response, and now attaches all intermediate responses — provisional `1xx` plus `401`/`407` Digest challenges — to `response.history` in arrival order. Each history entry carries its own `.request`, so the full request/response exchange is recoverable from a single call.
+- Fixed `_send_and_receive` to collect any number of provisional (`1xx`) responses before the final response; previously it only handled a single provisional and discarded the rest.
+- Added `tests/test_client_uac.py` coverage for multi-provisional history ordering and `401` challenge capture in history.
+- Validation: 503 core + 65 app tests pass (3 opt-in skips), ruff lint/format clean, `uv run ty check` clean.
+
 ## 3.0.0 - 2026-06-12
 
 - BREAKING: removed the legacy API entirely. Deleted `sipx/legacy.py` (`SipUserAgent`, `SipUac`, `SipUas`, `SipCall`, `SipRetransmissionPolicy`, runtimes, and related errors) and all root exports of those symbols; `AsyncClient` is the only client runtime.

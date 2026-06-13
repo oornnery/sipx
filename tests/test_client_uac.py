@@ -487,6 +487,31 @@ class TestTransactionManagement:
 
         assert response.status_code == 200
         assert 180 in provisional_called
+        assert [r.status_code for r in response.history] == [180]
+        assert response.history[0].request is not None
+
+    @pytest.mark.asyncio
+    async def test_history_collects_multiple_provisionals(
+        self, client_with_mock, mock_transport
+    ):
+        """The final response must carry every provisional in arrival order."""
+        call_id = "test-history-prov"
+        for status, reason in ((100, "Trying"), (180, "Ringing"), (183, "Progress")):
+            mock_transport.add_response(
+                status, reason, {"Call-ID": call_id, "CSeq": "1 INVITE"}
+            )
+        mock_transport.add_response(
+            200,
+            "OK",
+            {"Call-ID": call_id, "CSeq": "1 INVITE", "Contact": "<sip:bob@127.0.0.1>"},
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            response = await client_with_mock.invite("sip:bob@example.com")
+
+        assert response.status_code == 200
+        assert [r.status_code for r in response.history] == [100, 180, 183]
+        assert all(r.request is not None for r in response.history)
 
 
 class TestDialogManagement:
@@ -551,6 +576,9 @@ class TestAuthFlow:
 
         assert response.status_code == 200
         assert len(mock_transport.sent_data) == 2
+        assert any(r.status_code == 401 for r in response.history)
+        challenge = next(r for r in response.history if r.status_code == 401)
+        assert challenge.request is not None
         await client.aclose()
 
     @pytest.mark.asyncio

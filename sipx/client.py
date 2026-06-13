@@ -565,20 +565,28 @@ class AsyncClient:
         if self._auth:
             flow = self._auth.auth_flow(request)
             current_request = next(flow)
+            history: list[Response] = []
 
             while True:
                 response = await self._send_and_receive(
                     current_request, remote, transaction
                 )
+                # Provisional responses for this attempt become history.
+                history.extend(response.history)
+                response.history = []
                 await run_hooks(self._event_hooks, "response", response)
 
                 if response.status_code in (401, 407):
                     try:
                         current_request = flow.send(response)
-                        transaction = ClientTransaction(current_request)
                     except StopIteration:
+                        response.history = history
                         return response
+                    # The challenge response is part of the exchange history.
+                    history.append(response)
+                    transaction = ClientTransaction(current_request)
                 else:
+                    response.history = history
                     return response
         else:
             response = await self._send_and_receive(request, remote, transaction)
@@ -591,7 +599,12 @@ class AsyncClient:
         remote: tuple[str, int],
         transaction: ClientTransaction,
     ) -> Response:
-        """Send request and wait for final response."""
+        """Send a request and wait for the final response.
+
+        Provisional (1xx) responses are collected on the returned response's
+        ``history`` in arrival order; the returned response is the first
+        final (>= 200) response.
+        """
         call_id = request.headers.get("Call-ID", "")
         cseq_header = request.headers.get("CSeq", "")
         cseq_num = (
@@ -600,53 +613,42 @@ class AsyncClient:
             else "1"
         )
         key = f"{call_id}:{cseq_num}"
+        timeout = self._config.timeout
+        provisionals: list[Response] = []
 
-        future: asyncio.Future[Response] = asyncio.get_event_loop().create_future()
+        loop = asyncio.get_event_loop()
+        future: asyncio.Future[Response] = loop.create_future()
         self._pending_responses[key] = future
 
         try:
             await self._transport.send(request.to_bytes(), remote)
 
-            timeout = self._config.timeout
-            try:
-                data = await asyncio.wait_for(future, timeout)
-            except asyncio.TimeoutError:
-                raise SipTimeoutError(
-                    f"Timeout waiting for response to {request.method}",
-                    rfc_ref="RFC 3261 §17",
-                )
-
-            response = _parse_response(data, request)
-
-            transaction.receive_response(
-                status_code=response.status_code,
-                reason=response.reason,
-                headers=response.headers,
-                body=response.body,
-            )
-
-            if 100 <= response.status_code < 200:
-                await run_hooks(self._event_hooks, "provisional", response)
-                future2: asyncio.Future[Response] = (
-                    asyncio.get_event_loop().create_future()
-                )
-                self._pending_responses[key] = future2
+            while True:
                 try:
-                    data2 = await asyncio.wait_for(future2, timeout)
-                    response = _parse_response(data2, request)
-                    transaction.receive_response(
-                        status_code=response.status_code,
-                        reason=response.reason,
-                        headers=response.headers,
-                        body=response.body,
-                    )
+                    data = await asyncio.wait_for(future, timeout)
                 except asyncio.TimeoutError:
                     raise SipTimeoutError(
-                        f"Timeout waiting for final response to {request.method}",
+                        f"Timeout waiting for response to {request.method}",
                         rfc_ref="RFC 3261 §17",
                     )
 
-            return response
+                response = _parse_response(data, request)
+                transaction.receive_response(
+                    status_code=response.status_code,
+                    reason=response.reason,
+                    headers=response.headers,
+                    body=response.body,
+                )
+
+                if 100 <= response.status_code < 200:
+                    provisionals.append(response)
+                    future = loop.create_future()
+                    self._pending_responses[key] = future
+                    await run_hooks(self._event_hooks, "provisional", response)
+                    continue
+
+                response.history = provisionals
+                return response
         finally:
             self._pending_responses.pop(key, None)
 
