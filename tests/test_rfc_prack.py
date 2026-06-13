@@ -1,4 +1,4 @@
-"""Tests for RFC 3262 PRACK handling in sipx.rfc.prack."""
+"""Tests for RFC 3262 PRACK handling in sipx.extensions.prack."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 
 from sipx.exceptions import ProtocolError
 from sipx.models import Request, Response
-from sipx.rfc.prack import PrackHandler
+from sipx.extensions.prack import PrackHandler
 
 
 # ---------------------------------------------------------------------------
@@ -48,8 +48,8 @@ class TestPrackHandlerImport:
     """Basic import and instantiation tests."""
 
     def test_import_prack_handler(self):
-        """PrackHandler can be imported from sipx.rfc.prack."""
-        from sipx.rfc.prack import PrackHandler as PH
+        """PrackHandler can be imported from sipx.extensions.prack."""
+        from sipx.extensions.prack import PrackHandler as PH
 
         assert PH is not None
 

@@ -1,4 +1,4 @@
-"""Tests for RFC 3856/3858 Presence Event Package in sipx.rfc.presence."""
+"""Tests for RFC 3856/3858 Presence Event Package in sipx.extensions.presence."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import pytest
 
 from sipx.exceptions import ProtocolError
 from sipx.models import Request
-from sipx.rfc.events import SubscriptionDialog, SubscriptionState
-from sipx.rfc.presence import (
+from sipx.extensions.events import SubscriptionDialog, SubscriptionState
+from sipx.extensions.presence import (
     PIDF_NS,
     PRESENCE_EVENT_PACKAGE,
     PresenceEventPackage,
@@ -84,13 +84,13 @@ class TestPresenceImport:
 
     def test_import_presence_event_package(self):
         """PresenceEventPackage can be imported."""
-        from sipx.rfc.presence import PresenceEventPackage as PEP
+        from sipx.extensions.presence import PresenceEventPackage as PEP
 
         assert PEP is not None
 
     def test_import_presence_tuple(self):
         """PresenceTuple can be imported."""
-        from sipx.rfc.presence import PresenceTuple as PT
+        from sipx.extensions.presence import PresenceTuple as PT
 
         assert PT is not None
 

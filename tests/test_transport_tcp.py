@@ -278,7 +278,13 @@ async def _test_close() -> None:
     await server.wait_closed()
 
 
-def test_send_after_close_raises() -> None:
+def test_extract_message_rejects_oversized_content_length() -> None:
+    """_extract_message must reject declared bodies above max_message_size."""
+    config = TransportConfig(max_message_size=128)
+    transport = TcpTransport(config)
+    headers = b"OPTIONS sip:bob@example.com SIP/2.0\r\nContent-Length: 9999\r\n\r\n"
+    with pytest.raises(TransportError):
+        transport._extract_message(headers)
     """send() raises TransportError after close()."""
     asyncio.run(_test_send_after_close_raises())
 

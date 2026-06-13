@@ -160,6 +160,16 @@ class TcpTransport(Transport):
                     break  # Connection closed by peer
                 buffer += chunk
 
+                if (
+                    buffer.find(b"\r\n\r\n") == -1
+                    and len(buffer) > self._config.max_message_size
+                ):
+                    raise TransportError(
+                        f"SIP header block exceeds max_message_size "
+                        f"({self._config.max_message_size})",
+                        rfc_ref="RFC 3261 §18.3",
+                    )
+
                 # Extract complete messages
                 while True:
                     msg, buffer = self._extract_message(buffer)
@@ -182,7 +192,18 @@ class TcpTransport(Transport):
 
         Returns:
             Tuple of (message or None, remaining buffer).
+
+        Raises:
+            TransportError: If the reassembly buffer or declared body exceeds
+                ``max_message_size``.
         """
+        max_size = self._config.max_message_size
+        if len(buffer) > max_size:
+            raise TransportError(
+                f"SIP reassembly buffer exceeds max_message_size ({max_size})",
+                rfc_ref="RFC 3261 §18.3",
+            )
+
         # Find end of headers
         header_end = buffer.find(b"\r\n\r\n")
         if header_end == -1:
@@ -201,6 +222,16 @@ class TcpTransport(Transport):
                 except ValueError:
                     raise TransportError(f"Invalid Content-Length: {value!r}")
                 break
+
+        if content_length < 0:
+            raise TransportError(f"Invalid Content-Length: {content_length}")
+
+        if body_start + content_length > max_size:
+            raise TransportError(
+                f"SIP message size {body_start + content_length} exceeds "
+                f"max_message_size ({max_size})",
+                rfc_ref="RFC 3261 §18.3",
+            )
 
         # Check if we have the full body
         total_length = body_start + content_length

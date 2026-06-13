@@ -1,5 +1,31 @@
 # CHANGELOG
 
+## 3.2.0 - 2026-06-13
+
+### Security (P0)
+
+- **Strict response correlation.** `AsyncClient` now matches inbound responses
+  by `Call-ID`, CSeq number/method, top Via `branch`, and the destination
+  address of the outstanding request (RFC 3261 §17.1.3). Forged replies with
+  a matching `Call-ID` but wrong branch or source are dropped.
+- **CR/LF sanitization.** `sipx.wire.sanitize_sip_token` rejects CR/LF in SIP
+  methods, URIs, header names/values, and reason phrases; `AsyncClient._build_request`
+  and `Request`/`Response.to_bytes()` use it before serialization.
+- **Content-Length everywhere.** `Request.to_bytes()` and `Response.to_bytes()`
+  add `Content-Length` when absent so stream transports can frame messages.
+- **TCP reassembly cap.** `TcpTransport._extract_message` rejects buffers and
+  declared `Content-Length` values above `TransportConfig.max_message_size`.
+
+### Reorganization (Phase 2)
+
+- Renamed `sipx/rfc/` to `sipx/extensions/` (standalone SIP extension handlers:
+  PRACK, events, presence, outbound, DNS — still test-only, not wired into
+  `AsyncClient`).
+- Removed dead `sipx/protocol/provisional.py` and `tests/test_protocol_provisional.py`.
+- Exported runtime protocol types from root `sipx`: `ClientTransaction`,
+  `ServerTransaction`, `ProtocolDialog`, `ProtocolDialogId`, `ProtocolDialogState`,
+  `ProtocolDigestChallenge` (alongside the existing sans-I/O `sipx.sip` toolkit).
+
 ## 3.1.4 - 2026-06-13
 
 - Refreshed `README.md` to match the real core: framed the `sipx_harness` scenario API as a planned design (not yet implemented), removed the false `AsyncClient` "timers, retransmissions" claim, replaced the bogus `response.summary()` snippet with the actual `Response` fields (`status_code`/`reason`/`headers`/`body`/`history`), documented `response.history`, listed the six new examples, and added an honest "AsyncClient status and RFC limitations" section (no retransmission/timer firing, no auto-ACK for non-2xx INVITE / no CANCEL, loose `Call-ID`+CSeq response correlation, MD5-only Digest, inbound requests not auto-routed, `Content-Length` not added everywhere).

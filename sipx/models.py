@@ -18,9 +18,32 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from sipx.types import HeaderName, HeaderValue, SipMethod, StatusCode, Uri
+from sipx.wire import sanitize_sip_token
 
 if TYPE_CHECKING:
     from sipx.transport.base import Transport
+
+
+def _sanitize_headers(
+    headers: dict[HeaderName, HeaderValue],
+) -> dict[HeaderName, HeaderValue]:
+    """Reject CR/LF injection in header names and values."""
+    clean: dict[HeaderName, HeaderValue] = {}
+    for name, value in headers.items():
+        safe_name = sanitize_sip_token(name, field="header name")
+        if isinstance(value, list):
+            clean[safe_name] = [
+                sanitize_sip_token(v, field=f"header {safe_name}") for v in value
+            ]
+        else:
+            clean[safe_name] = sanitize_sip_token(value, field=f"header {safe_name}")
+    return clean
+
+
+def _content_length(headers: dict[HeaderName, HeaderValue], body_len: int) -> None:
+    """Set Content-Length when absent (required for stream transports)."""
+    if not any(k.lower() == "content-length" for k in headers):
+        headers["Content-Length"] = str(body_len)
 
 
 @dataclass
@@ -48,8 +71,13 @@ class Request:
 
     def to_bytes(self) -> bytes:
         """Serialize to raw SIP request bytes."""
-        lines = [f"{self.method} {self.uri} SIP/2.0"]
-        for name, value in self.headers.items():
+        method = sanitize_sip_token(self.method, field="method")
+        uri = sanitize_sip_token(self.uri, field="URI")
+        headers = _sanitize_headers(dict(self.headers))
+        body = self.body or b""
+        _content_length(headers, len(body))
+        lines = [f"{method} {uri} SIP/2.0"]
+        for name, value in headers.items():
             if isinstance(value, list):
                 for v in value:
                     lines.append(f"{name}: {v}")
@@ -57,7 +85,6 @@ class Request:
                 lines.append(f"{name}: {value}")
         lines.append("")
         lines.append("")
-        body = self.body or b""
         return "\r\n".join(lines).encode("utf-8") + body
 
 
@@ -99,8 +126,12 @@ class Response:
 
     def to_bytes(self) -> bytes:
         """Serialize to raw SIP response bytes."""
-        lines = [f"SIP/2.0 {self.status_code} {self.reason}"]
-        for name, value in self.headers.items():
+        reason = sanitize_sip_token(self.reason, field="reason phrase")
+        headers = _sanitize_headers(dict(self.headers))
+        body = self.body or b""
+        _content_length(headers, len(body))
+        lines = [f"SIP/2.0 {self.status_code} {reason}"]
+        for name, value in headers.items():
             if isinstance(value, list):
                 for v in value:
                     lines.append(f"{name}: {v}")
@@ -108,5 +139,4 @@ class Response:
                 lines.append(f"{name}: {value}")
         lines.append("")
         lines.append("")
-        body = self.body or b""
         return "\r\n".join(lines).encode("utf-8") + body

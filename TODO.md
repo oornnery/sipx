@@ -529,6 +529,15 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 3.2.0 Done (core review Phase 2 partial + Phase 3 P0)
+
+- [x] P0 security: strict response correlation (Call-ID + CSeq method + Via branch + remote); `sipx.wire` CR/LF sanitization; `Content-Length` on all requests/responses; TCP reassembly cap.
+- [x] Renamed `sipx/rfc/` → `sipx/extensions/`; updated tests/imports.
+- [x] Removed dead `protocol/provisional.py` + `tests/test_protocol_provisional.py`.
+- [x] Exported runtime protocol types from root: `ClientTransaction`, `ServerTransaction`, `ProtocolDialog*`, `ProtocolDigestChallenge`.
+- [x] Validation: 498 tests pass, ruff lint/format clean, `uv run ty check` clean.
+- [ ] Deferred: full removal of `sip/` sans-I/O toolkit (unique, tested; not duplicate of `protocol/`).
+
 ## Block 3.1.2-3.1.4 Done (core review Phase 1, docs only)
 
 - [x] Reviewed core `sipx` for security, performance, RFC compliance, and file organization; executed Phase 1 (low-risk, direct asks).

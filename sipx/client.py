@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING, Awaitable, Callable
 
 from sipx.config import ClientConfig
@@ -19,9 +20,24 @@ from sipx.protocol.hooks import EventHooks, run_hooks
 from sipx.protocol.transaction import ClientTransaction, ServerTransaction
 from sipx.transport.base import Transport, TransportConfig
 from sipx.transport.registry import TransportRegistry
+from sipx.wire import (
+    extract_cseq_parts,
+    extract_top_via_branch,
+    sanitize_sip_token,
+)
 
 if TYPE_CHECKING:
     pass
+
+
+@dataclass(slots=True)
+class _PendingMatch:
+    """In-flight UAC response waiter with strict correlation fields."""
+
+    future: asyncio.Future[bytes]
+    branch: str | None
+    remote: tuple[str, int]
+    cseq_method: str
 
 
 def _new_call_id() -> str:
@@ -174,7 +190,7 @@ class AsyncClient:
         self._receive_task: asyncio.Task | None = None
         self._uas_handlers: dict[str, Callable[[Request], Awaitable[Response]]] = {}
         self._dialogs: dict[str, Dialog] = {}
-        self._pending_responses: dict[str, asyncio.Future[Response]] = {}
+        self._pending_responses: dict[str, _PendingMatch] = {}
 
         # Create transport using registry
         registry = TransportRegistry()
@@ -253,9 +269,9 @@ class AsyncClient:
     async def _receive_loop(self) -> None:
         """Background receive loop that dispatches responses to UAC methods."""
         try:
-            async for data, _remote in self._transport.receive():
+            async for data, remote in self._transport.receive():
                 try:
-                    self._dispatch_response(data)
+                    self._dispatch_response(data, remote)
                 except Exception:
                     pass
         except asyncio.CancelledError:
@@ -263,8 +279,12 @@ class AsyncClient:
         except Exception:
             pass
 
-    def _dispatch_response(self, data: bytes) -> None:
-        """Parse a response and dispatch to waiting UAC method."""
+    def _dispatch_response(self, data: bytes, remote: tuple[str, int]) -> None:
+        """Parse a response and dispatch to a waiting UAC transaction.
+
+        Matches Call-ID, CSeq number/method, top Via branch, and source
+        address per RFC 3261 §17.1.3. Unmatched datagrams are dropped.
+        """
         text = data.decode("utf-8", errors="replace")
         lines = text.split("\r\n")
         if not lines:
@@ -299,14 +319,27 @@ class AsyncClient:
         if not call_id or not cseq:
             return
 
-        cseq_parts = cseq.split(" ", 1)
-        if len(cseq_parts) < 2:
+        cseq_parts = extract_cseq_parts(cseq)
+        if cseq_parts is None:
+            return
+        cseq_num, cseq_method = cseq_parts
+
+        key = f"{call_id}:{cseq_num}"
+        pending = self._pending_responses.get(key)
+        if pending is None or pending.future.done():
             return
 
-        key = f"{call_id}:{cseq_parts[0]}"
-        future = self._pending_responses.get(key)
-        if future and not future.done():
-            future.set_result(data)
+        if pending.cseq_method.upper() != cseq_method.upper():
+            return
+
+        response_branch = extract_top_via_branch(headers)
+        if pending.branch and response_branch != pending.branch:
+            return
+
+        if remote != pending.remote:
+            return
+
+        pending.future.set_result(data)
 
     @property
     def is_closed(self) -> bool:
@@ -515,6 +548,9 @@ class AsyncClient:
         **extra_headers: Any,
     ) -> Request:
         """Build a SIP request with required headers."""
+        method = sanitize_sip_token(method.upper(), field="method")
+        uri = sanitize_sip_token(uri, field="URI")
+
         call_id = extra_headers.pop("Call-ID", _new_call_id())
         from_uri = extra_headers.pop(
             "From", self._config.from_uri or f"sip:user@{self._config.local_host}"
@@ -531,19 +567,33 @@ class AsyncClient:
 
         headers: dict[str, str | list[str]] = {
             "Via": via,
-            "From": f"<{from_uri}>;tag={from_tag}",
-            "To": f"<{to_uri}>",
-            "Call-ID": call_id,
+            "From": f"<{sanitize_sip_token(str(from_uri), field='From URI')}>;tag={from_tag}",
+            "To": f"<{sanitize_sip_token(str(to_uri), field='To URI')}>",
+            "Call-ID": sanitize_sip_token(str(call_id), field="Call-ID"),
             "CSeq": f"{cseq} {method}",
             "Max-Forwards": "70",
-            "User-Agent": self._config.user_agent,
+            "User-Agent": sanitize_sip_token(
+                self._config.user_agent, field="User-Agent"
+            ),
         }
 
         if method in ("INVITE", "REGISTER", "SUBSCRIBE"):
-            contact_uri = self._config.contact_uri or from_uri
-            headers["Contact"] = f"<{contact_uri}>"
+            contact_uri = self._config.contact_uri or str(from_uri)
+            headers["Contact"] = (
+                f"<{sanitize_sip_token(str(contact_uri), field='Contact URI')}>"
+            )
 
-        headers.update(extra_headers)
+        for name, value in extra_headers.items():
+            safe_name = sanitize_sip_token(str(name), field="header name")
+            if isinstance(value, list):
+                headers[safe_name] = [
+                    sanitize_sip_token(str(v), field=f"header {safe_name}")
+                    for v in value
+                ]
+            else:
+                headers[safe_name] = sanitize_sip_token(
+                    str(value), field=f"header {safe_name}"
+                )
 
         return Request(
             method=method,
@@ -607,18 +657,26 @@ class AsyncClient:
         """
         call_id = request.headers.get("Call-ID", "")
         cseq_header = request.headers.get("CSeq", "")
-        cseq_num = (
-            cseq_header.split(" ", 1)[0]
+        cseq_parts = (
+            extract_cseq_parts(cseq_header)
             if isinstance(cseq_header, str) and cseq_header
-            else "1"
+            else None
         )
+        cseq_num = cseq_parts[0] if cseq_parts else "1"
+        cseq_method = cseq_parts[1] if cseq_parts else request.method
         key = f"{call_id}:{cseq_num}"
         timeout = self._config.timeout
         provisionals: list[Response] = []
+        branch = extract_top_via_branch(request.headers)
 
         loop = asyncio.get_event_loop()
-        future: asyncio.Future[Response] = loop.create_future()
-        self._pending_responses[key] = future
+        future: asyncio.Future[bytes] = loop.create_future()
+        self._pending_responses[key] = _PendingMatch(
+            future=future,
+            branch=branch,
+            remote=remote,
+            cseq_method=cseq_method,
+        )
 
         try:
             await self._transport.send(request.to_bytes(), remote)
@@ -643,7 +701,12 @@ class AsyncClient:
                 if 100 <= response.status_code < 200:
                     provisionals.append(response)
                     future = loop.create_future()
-                    self._pending_responses[key] = future
+                    self._pending_responses[key] = _PendingMatch(
+                        future=future,
+                        branch=branch,
+                        remote=remote,
+                        cseq_method=cseq_method,
+                    )
                     await run_hooks(self._event_hooks, "provisional", response)
                     continue
 
@@ -830,7 +893,7 @@ class AsyncClient:
         elif isinstance(body, bytes):
             kwargs.setdefault("Content-Type", "application/octet-stream")
 
-        kwargs["Content-Length"] = str(len(body))
+        kwargs["Content-Type"] = kwargs.get("Content-Type", "text/plain")
 
         request = self._build_request("MESSAGE", uri, body=body, **kwargs)
         remote = _parse_remote(uri)

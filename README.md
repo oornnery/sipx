@@ -174,17 +174,17 @@ cooperative peer. The following gaps are known and intentional for now:
 - **INVITE error ACK / CANCEL not automated.** ACK is sent for a 2xx via
   `ack(call_id)`; there is no automatic ACK for a non-2xx INVITE final
   (§17.1.1.3) and no `CANCEL` yet.
-- **Loose response correlation.** Replies are matched by `Call-ID` + CSeq
-  number only (not Via `branch`, CSeq method, tags, or source address), so the
-  client should not face untrusted networks.
+- **Strict response correlation (since 3.2.0).** Replies must match `Call-ID`,
+  CSeq number/method, top Via `branch`, and the request destination address.
+  Forged datagrams with a matching `Call-ID` but wrong branch or source are
+  dropped.
 - **Digest is MD5-only.** No SHA-256 (RFC 8760), single challenge, fixed
   nonce-count.
 - **Inbound requests are not auto-routed.** The receive loop dispatches
   responses to in-flight calls; deliver inbound requests to `handle_request`
   yourself to reach the `on_*` UAS handlers.
-- **Content-Length is not added to every request.** `message()` sets it (and
-  you can pass it explicitly), but other helpers do not, which matters for
-  stream transports.
+- **Content-Length on every outbound request (since 3.2.0).** ``Request.to_bytes()``
+  adds ``Content-Length`` when absent, which matters for TCP/TLS framing.
 
 PRACK/100rel, `rport`, and dialog matching by tags are likewise not wired into
 the client path yet.

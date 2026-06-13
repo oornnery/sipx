@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 
 from sipx.exceptions import ProtocolError
 from sipx.models import Request
-from sipx.rfc.events import SubscriptionDialog, SubscriptionState
+from sipx.extensions.events import SubscriptionDialog, SubscriptionState
 
 if TYPE_CHECKING:
     pass

@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from sipx.exceptions import TransportError
-from sipx.rfc.dns import SipDnsResolver
+from sipx.extensions.dns import SipDnsResolver
 from sipx.transport.registry import TransportRegistry
 
 

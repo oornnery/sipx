@@ -22,6 +22,9 @@ from sipx.models import Request
 from sipx.protocol.auth import AuthFlow
 
 
+from sipx.wire import extract_branch_from_via
+
+
 class MockTransport:
     """Mock transport for testing UAC methods."""
 
@@ -29,16 +32,18 @@ class MockTransport:
         self.transport_type = "udp"
         self.sent_data: list[tuple[bytes, tuple[str, int]]] = []
         self._response_queue: asyncio.Queue[bytes] = asyncio.Queue()
+        self._last_remote: tuple[str, int] = ("127.0.0.1", 5060)
         self._closed = False
 
     async def send(self, data: bytes, remote: tuple[str, int]) -> None:
         self.sent_data.append((data, remote))
+        self._last_remote = remote
 
     async def receive(self):
         while not self._closed:
             try:
                 data = await asyncio.wait_for(self._response_queue.get(), timeout=0.1)
-                yield data, ("127.0.0.1", 5060)
+                yield data, self._last_remote
                 await asyncio.sleep(0.01)
             except asyncio.TimeoutError:
                 continue
@@ -56,16 +61,19 @@ class MockTransport:
         reason: str,
         headers: dict | None = None,
         body: bytes | None = None,
+        *,
+        branch: str = "z9hG4bKtest",
     ):
         """Add a response to be returned by the mock transport."""
         header_lines = []
-        if headers:
-            for name, value in headers.items():
-                if isinstance(value, list):
-                    for v in value:
-                        header_lines.append(f"{name}: {v}")
-                else:
-                    header_lines.append(f"{name}: {value}")
+        merged = dict(headers or {})
+        merged.setdefault("Via", f"SIP/2.0/UDP 127.0.0.1:5060;branch={branch}")
+        for name, value in merged.items():
+            if isinstance(value, list):
+                for v in value:
+                    header_lines.append(f"{name}: {v}")
+            else:
+                header_lines.append(f"{name}: {value}")
 
         response_text = f"SIP/2.0 {status_code} {reason}\r\n"
         response_text += "\r\n".join(header_lines)
@@ -76,6 +84,15 @@ class MockTransport:
         self._response_queue.put_nowait(response_text.encode("utf-8"))
 
 
+def _branch_from_sent(sent: bytes, *, fallback: str = "z9hG4bKtest") -> str:
+    for line in sent.decode("utf-8", errors="replace").split("\r\n"):
+        if line.lower().startswith("via:"):
+            branch = extract_branch_from_via(line[4:].strip())
+            if branch:
+                return branch
+    return fallback
+
+
 def make_response(
     status_code: int,
     reason: str,
@@ -83,12 +100,14 @@ def make_response(
     cseq: str,
     headers: dict | None = None,
     body: bytes | None = None,
+    *,
+    branch: str = "z9hG4bKtest",
 ) -> bytes:
     """Build a raw SIP response for testing."""
     header_lines = [
         f"Call-ID: {call_id}",
         f"CSeq: {cseq}",
-        "Via: SIP/2.0/UDP 127.0.0.1:5060;branch=z9hG4bKtest",
+        f"Via: SIP/2.0/UDP 127.0.0.1:5060;branch={branch}",
         "From: <sip:user@example.com>;tag=abc123",
         "To: <sip:bob@example.com>;tag=def456",
     ]
@@ -122,8 +141,9 @@ async def client_with_mock(mock_transport):
     client = AsyncClient(config=config)
     client._transport = mock_transport
     client._closed = False
-    client._receive_task = asyncio.create_task(client._receive_loop())
-    yield client
+    with patch("sipx.client._new_branch", return_value="z9hG4bKtest"):
+        client._receive_task = asyncio.create_task(client._receive_loop())
+        yield client
     await client.aclose()
 
 
@@ -513,6 +533,24 @@ class TestTransactionManagement:
         assert [r.status_code for r in response.history] == [100, 180, 183]
         assert all(r.request is not None for r in response.history)
 
+    @pytest.mark.asyncio
+    async def test_rejects_forged_response_wrong_branch(
+        self, client_with_mock, mock_transport
+    ):
+        """Responses with a mismatched Via branch must be ignored."""
+        call_id = "test-forged-branch"
+        client_with_mock._config = client_with_mock._config.merge(timeout=0.2)
+        mock_transport.add_response(
+            200,
+            "OK",
+            {"Call-ID": call_id, "CSeq": "1 OPTIONS"},
+            branch="z9hG4bKwrong",
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            with pytest.raises(SipTimeoutError):
+                await client_with_mock.options("sip:bob@example.com")
+
 
 class TestDialogManagement:
     """Tests for dialog management."""
@@ -571,7 +609,10 @@ class TestAuthFlow:
             {"Call-ID": call_id, "CSeq": "1 REGISTER"},
         )
 
-        with patch("sipx.client._new_call_id", return_value=call_id):
+        with (
+            patch("sipx.client._new_call_id", return_value=call_id),
+            patch("sipx.client._new_branch", return_value="z9hG4bKtest"),
+        ):
             response = await client.register("sip:example.com")
 
         assert response.status_code == 200
@@ -607,7 +648,10 @@ class TestAuthFlow:
             {"Call-ID": call_id, "CSeq": "1 OPTIONS"},
         )
 
-        with patch("sipx.client._new_call_id", return_value=call_id):
+        with (
+            patch("sipx.client._new_call_id", return_value=call_id),
+            patch("sipx.client._new_branch", return_value="z9hG4bKtest"),
+        ):
             response = await client.options("sip:bob@example.com")
 
         assert response.status_code == 200

@@ -95,8 +95,14 @@ from sipx.sip import (
 from sipx.client import AsyncClient
 from sipx.config import ClientConfig
 from sipx.models import Request, Response
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthFlow, DigestChallenge as ProtocolDigestChallenge
+from sipx.protocol.dialog import (
+    Dialog as ProtocolDialog,
+    DialogId as ProtocolDialogId,
+    DialogState as ProtocolDialogState,
+)
 from sipx.protocol.hooks import EventHooks
+from sipx.protocol.transaction import ClientTransaction, ServerTransaction
 from sipx.types import (
     HeaderName,
     HeaderValue,
@@ -118,8 +124,14 @@ __all__ = [
     "AuthFlow",
     "AudioFrame",
     "ClientConfig",
+    "ClientTransaction",
+    "ProtocolDigestChallenge",
+    "ProtocolDialog",
+    "ProtocolDialogId",
+    "ProtocolDialogState",
     "Request",
     "Response",
+    "ServerTransaction",
     "HeaderName",
     "HeaderValue",
     "SipMethod",

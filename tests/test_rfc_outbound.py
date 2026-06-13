@@ -1,4 +1,4 @@
-"""Tests for RFC 5626 Outbound connection management in sipx.rfc.outbound."""
+"""Tests for RFC 5626 Outbound connection management in sipx.extensions.outbound."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Literal
 import pytest
 
 from sipx.exceptions import TransportError
-from sipx.rfc.outbound import OutboundHandler
+from sipx.extensions.outbound import OutboundHandler
 from sipx.transport.base import Transport
 
 
@@ -50,8 +50,8 @@ class TestOutboundImport:
     """Basic import and instantiation tests."""
 
     def test_import_outbound_handler(self):
-        """OutboundHandler can be imported from sipx.rfc.outbound."""
-        from sipx.rfc.outbound import OutboundHandler as OH
+        """OutboundHandler can be imported from sipx.extensions.outbound."""
+        from sipx.extensions.outbound import OutboundHandler as OH
 
         assert OH is not None
 
