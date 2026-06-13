@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 3.1.3 - 2026-06-13
+
+- Added six runnable `AsyncClient` examples under `sipx/examples/`: `options.py` (capability query), `unregister.py` (REGISTER with `Expires: 0`), `call.py` (full `INVITE` -> `ACK` -> `BYE` using dialog tracking and `response.history`), `info_dtmf.py` (DTMF via in-dialog `INFO` through `request()`), `server.py` (offline UAS `on_*` handlers fed via `handle_request`), and `hooks_history.py` (event hooks plus `response.history` inspection). All use `SIPX_*` env vars only (no `argparse`, invariant V64).
+- Registered the six new scripts in `tests/test_examples.py` `ROOT_EXAMPLES` so the example invariants (callable `main`, no `argparse`, env-driven config) cover them.
+- Documentation/examples only: no runtime behavior change.
+
 ## 3.1.2 - 2026-06-13
 
 - Added RFC-referencing module docstrings to the 36 core modules that lacked one (`config.py`, `models.py`, `summary.py`, `transport/base.py`, all of `media/`, `rtp/`, `sdp/`, `sip/`, plus `examples/__init__.py` and `examples/common.py`), each in the PRACK-style format (purpose + explanation + `References:` block with the relevant RFC/ITU-T citations).

@@ -7,6 +7,12 @@ ROOT_EXAMPLES = (
     Path("sipx/examples/invite.py"),
     Path("sipx/examples/message.py"),
     Path("sipx/examples/subscribe.py"),
+    Path("sipx/examples/options.py"),
+    Path("sipx/examples/call.py"),
+    Path("sipx/examples/info_dtmf.py"),
+    Path("sipx/examples/unregister.py"),
+    Path("sipx/examples/server.py"),
+    Path("sipx/examples/hooks_history.py"),
 )
 
 
