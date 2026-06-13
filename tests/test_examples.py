@@ -13,6 +13,7 @@ ROOT_EXAMPLES = (
     Path("sipx/examples/unregister.py"),
     Path("sipx/examples/server.py"),
     Path("sipx/examples/hooks_history.py"),
+    Path("sipx/examples/cancel.py"),
 )
 
 

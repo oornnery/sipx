@@ -529,6 +529,14 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 3.7.0 Done (correlation fix + surfaces)
+
+- [x] Fixed response correlation for hostname targets (RFC 3261 §18): `_remote_matches` requires exact host only for IP-literal targets; hostname targets match on port (Call-ID/CSeq/branch still bind). This was the cause of the public Mizu `options.py` timeout.
+- [x] Added `sipx/examples/cancel.py` (concurrent CANCEL of a pending INVITE, RFC §9); registered in `tests/test_examples.py`.
+- [x] CLI: added `--no-rport` / `--no-retransmit` flags wired into `ClientConfig`.
+- [x] FastAPI: added `/sip/invite` (optional `call_id`) and `/sip/cancel` (409 when no pending INVITE) + tests.
+- [x] Tests: `_remote_matches` cases in `test_client_uac.py`, invite/cancel in `apps/fastapi/tests/test_app.py`; 521 core + app tests pass, ruff + ty clean.
+
 ## Block 3.6.0 Done (P2 RFC)
 
 - [x] PRACK/100rel (RFC 3262): `AsyncClient._maybe_send_prack` auto-PRACKs reliable provisionals (RSeq + 100rel) in the early dialog with `RAck`.

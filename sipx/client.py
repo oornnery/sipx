@@ -7,6 +7,7 @@ for multiple transports, event hooks, and authentication flows.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import uuid
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING, Awaitable, Callable
@@ -127,6 +128,30 @@ def _contact_uri(contact: str) -> str:
     else:
         value = value.split(";", 1)[0].strip()
     return value
+
+
+def _is_ip_literal(host: str) -> bool:
+    """Return True if *host* is a literal IPv4/IPv6 address (not a hostname)."""
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
+
+
+def _remote_matches(source: tuple[str, int], expected: tuple[str, int]) -> bool:
+    """Check a response source against the request destination (RFC 3261 §18).
+
+    Exact ``(host, port)`` match passes. When the request targeted a hostname,
+    the datagram arrives from the resolved IP, so the host cannot be compared
+    directly; a matching port is accepted (Call-ID/CSeq/branch still bind the
+    response). When the request targeted an IP literal, the host must match.
+    """
+    if source == expected:
+        return True
+    if source[1] != expected[1]:
+        return False
+    return not _is_ip_literal(expected[0])
 
 
 def _parse_remote(uri: str) -> tuple[str, int]:
@@ -348,7 +373,7 @@ class AsyncClient:
         if pending.branch and response_branch != pending.branch:
             return
 
-        if remote != pending.remote:
+        if not _remote_matches(remote, pending.remote):
             return
 
         self._learn_via_address(headers)

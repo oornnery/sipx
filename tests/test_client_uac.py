@@ -15,6 +15,7 @@ from sipx.client import (
     _new_tag,
     _parse_remote,
     _parse_response,
+    _remote_matches,
 )
 from sipx.config import ClientConfig
 from sipx.exceptions import TimeoutError as SipTimeoutError
@@ -187,6 +188,26 @@ class TestHelperFunctions:
         host, port = _parse_remote("sips:bob@example.com")
         assert host == "example.com"
         assert port == 5060
+
+    def test_remote_matches_exact(self):
+        """Exact (host, port) match passes."""
+        assert _remote_matches(("1.2.3.4", 5060), ("1.2.3.4", 5060)) is True
+
+    def test_remote_matches_hostname_target_accepts_resolved_ip(self):
+        """A hostname target accepts a datagram from the resolved IP (same port)."""
+        assert (
+            _remote_matches(("203.0.113.9", 37075), ("demo.example.com", 37075)) is True
+        )
+
+    def test_remote_matches_ip_literal_target_requires_host(self):
+        """An IP-literal target rejects a different source host."""
+        assert _remote_matches(("9.9.9.9", 5060), ("1.2.3.4", 5060)) is False
+
+    def test_remote_matches_rejects_wrong_port(self):
+        """A different port is always rejected."""
+        assert (
+            _remote_matches(("203.0.113.9", 6000), ("demo.example.com", 37075)) is False
+        )
 
     def test_parse_response_basic(self):
         """_parse_response must parse basic SIP responses."""

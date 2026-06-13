@@ -2,6 +2,8 @@
 
 ## Summary
 
+Block `3.7.0` fixed response correlation for hostname targets (RFC 3261 §18): `AsyncClient._dispatch_response`/`_send_and_receive` now use `_remote_matches`, which enforces an exact source host only when the request targeted an IP literal; hostname targets match on port (the datagram arrives from the resolved IP). This was the root cause of the public Mizu `options.py` timeout. It also added the `cancel.py` example, CLI `--no-rport`/`--no-retransmit` flags, and FastAPI `/sip/invite` + `/sip/cancel`.
+
 Block `3.6.0` added P2 RFC: PRACK/100rel (RFC 3262) auto-sent for reliable provisionals via `AsyncClient._maybe_send_prack`, Digest SHA-256/SHA-256-sess (RFC 8760) in `AuthFlow`, and UAC dialog From/To tag matching (RFC §12.2.2; UAS stays Call-ID-only). The full P0/P1/P2 security/RFC hardening roadmap is now complete.
 
 Block `3.5.0` added P1 RFC part 2: RFC 3261 §17 retransmission in `AsyncClient._await_response` (UDP T1/T2 backoff bounded by `timeout`, INVITE stops after first provisional, TCP/TLS never retransmit, `ClientConfig.retransmit` toggle).

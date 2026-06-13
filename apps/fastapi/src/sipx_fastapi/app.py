@@ -36,6 +36,24 @@ class MessageRequest(BaseModel):
     )
 
 
+class InviteRequest(BaseModel):
+    target: str = Field(..., description="Target SIP URI to call.")
+    call_id: str | None = Field(
+        default=None,
+        description="Optional Call-ID; supply it to cancel the call concurrently.",
+    )
+    body: str | None = Field(default=None, description="Optional SDP/offer body.")
+    content_type: str | None = Field(
+        default="application/sdp",
+        description="Content-Type when body is set.",
+    )
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
+class CancelRequest(BaseModel):
+    call_id: str = Field(..., description="Call-ID of the pending INVITE to cancel.")
+
+
 class GenericSipRequest(BaseModel):
     method: str = Field(..., description="SIP method, for example INFO or NOTIFY.")
     target: str = Field(..., description="Request-URI.")
@@ -102,13 +120,13 @@ def create_app(
     if settings is None and client is None:
         app = FastAPI(
             title="sipx FastAPI",
-            description="REST endpoints over sipx AsyncClient for OPTIONS, REGISTER, MESSAGE, and raw SIP requests.",
+            description="REST endpoints over sipx AsyncClient for OPTIONS, REGISTER, MESSAGE, INVITE, CANCEL, and raw SIP requests.",
             lifespan=lifespan,
         )
     else:
         app = FastAPI(
             title="sipx FastAPI",
-            description="REST endpoints over sipx AsyncClient for OPTIONS, REGISTER, MESSAGE, and raw SIP requests.",
+            description="REST endpoints over sipx AsyncClient for OPTIONS, REGISTER, MESSAGE, INVITE, CANCEL, and raw SIP requests.",
         )
         app.state.settings = settings or load_settings()
         app.state.sip_client = client
@@ -155,6 +173,30 @@ def create_app(
         client = _get_client(request)
         headers = {"Content-Type": body.content_type}
         return await _run_sip(client.message(body.target, body.text, **headers))
+
+    @app.post("/sip/invite")
+    async def sip_invite(body: InviteRequest, request: Request) -> dict[str, Any]:
+        client = _get_client(request)
+        kwargs: dict[str, Any] = dict(body.headers)
+        if body.call_id:
+            kwargs["Call-ID"] = body.call_id
+        if body.body is not None:
+            payload = body.body.encode("utf-8")
+            kwargs["body"] = payload
+            kwargs.setdefault("Content-Length", str(len(payload)))
+            if body.content_type:
+                kwargs["Content-Type"] = body.content_type
+        return await _run_sip(client.invite(body.target, **kwargs))
+
+    @app.post("/sip/cancel")
+    async def sip_cancel(body: CancelRequest, request: Request) -> dict[str, Any]:
+        client = _get_client(request)
+        if body.call_id not in client._pending_invites:
+            raise HTTPException(
+                status_code=409,
+                detail="no pending INVITE for that Call-ID",
+            )
+        return await _run_sip(client.cancel(body.call_id))
 
     @app.post("/sip/request")
     async def sip_request(body: GenericSipRequest, request: Request) -> dict[str, Any]:

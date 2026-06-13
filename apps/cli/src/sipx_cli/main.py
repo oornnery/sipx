@@ -189,6 +189,16 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Print redacted SIP messages to stderr as they are sent and received.",
     )
+    parser.add_argument(
+        "--no-rport",
+        action="store_true",
+        help="Do not add the rport parameter (RFC 3581) to outgoing Via headers.",
+    )
+    parser.add_argument(
+        "--no-retransmit",
+        action="store_true",
+        help="Disable RFC 3261 §17 request retransmission on unreliable transports.",
+    )
 
 
 def _build_client(args: argparse.Namespace, from_uri: str) -> AsyncClient:
@@ -203,6 +213,8 @@ def _build_client(args: argparse.Namespace, from_uri: str) -> AsyncClient:
         timeout=args.timeout,
         from_uri=str(from_uri),
         contact_uri=contact_uri,
+        rport=not getattr(args, "no_rport", False),
+        retransmit=not getattr(args, "no_retransmit", False),
     )
     auth = None
     if args.username and args.password:

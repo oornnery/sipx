@@ -15,6 +15,9 @@
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-06-13 | `uv run pytest -q` (block 3.7.0) | pass | 517 core pass incl. `_remote_matches` correlation-fix tests. |
+| 2026-06-13 | `uv run pytest apps -q` (block 3.7.0) | pass | CLI 20, FastAPI 9 (incl. invite/cancel), all app tests pass. |
+| 2026-06-13 | `uv run ruff check` / `ruff format --check` / `ty check` (3.7.0) | pass | Clean after hostname correlation fix + new surfaces. |
 | 2026-06-13 | `uv run pytest -q` (block 3.6.0) | pass | 513 core pass incl. PRACK/SHA-256/tag-mismatch tests. |
 | 2026-06-13 | `uv run pytest apps -q` (block 3.6.0) | pass | 71 pass, 3 opt-in skips. |
 | 2026-06-13 | `uv run ruff check` / `ruff format --check` / `ty check` (3.6.0) | pass | Clean after P2 RFC. |

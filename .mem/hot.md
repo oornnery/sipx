@@ -4,7 +4,7 @@
 - Project name in `pyproject.toml`: `sipx`; public package/import name `sipx`; CLI command `sipx`.
 - Python requirement: `>=3.14`.
 - Dev deps: `pytest`, `pytest-asyncio`, `pytest-cov`, `ruff`, `ty`, `taskipy`, `pre-commit`, `cryptography` (TLS test certs).
-- Current implementation version: `3.6.0`.
+- Current implementation version: `3.7.0`.
 - `IDEA.md` is historical source material only; maintained English files in the current structure are source of truth; no separate `/docs` tree (only `docs/migration.md`).
 - `FORMAT.md` defines compact `SPEC.md` section/table/invariant/task/backprop format.
 - `AGENTS.md` requires small commit blocks with version bump, `CHANGELOG.md`, `TODO.md`, `.spec/*`, `.mem/*`, validation, and explicit staged paths.
@@ -27,8 +27,9 @@
 - `AsyncClient` P1 RFC part 1 (3.4.0): outgoing UDP Via carries `;rport` (toggle `ClientConfig.rport`, default on); learns public `(host,port)` from `received`/`rport` echoed on response Via, exposed as `learned_address`; `invite()` auto-ACKs non-2xx final responses on the INVITE branch (RFC §17.1.1.3); new `cancel(call_id)` matches a pending INVITE (RFC §9); correlation key now `Call-ID:CSeq-number:method`. Pending INVITEs tracked in `_pending_invites`.
 - `AsyncClient` P1 RFC part 2 (3.5.0): RFC 3261 §17 retransmission in `_await_response` — UDP resends at T1 doubling (cap T2 for non-INVITE) until response or `timeout`; INVITE stops after first provisional; TCP/TLS never retransmit; toggle `ClientConfig.retransmit` (default on). Uses `asyncio.shield` so the pending future survives per-interval timeouts. P1 RFC roadmap now complete.
 - `AsyncClient` P2 RFC (3.6.0): PRACK/100rel (RFC 3262) via `_maybe_send_prack` — auto-PRACKs reliable provisionals (RSeq + 100rel in Require/Supported) in the early dialog to the provisional Contact with `RAck`; Digest SHA-256/SHA-256-sess (RFC 8760) in `AuthFlow._build_digest_authorization` via `_DIGEST_ALGORITHMS`; UAC `Dialog.update` strict From/To tag matching (RFC §12.2.2), UAS stays Call-ID-only (`Dialog._uac` flag). Full P0/P1/P2 security/RFC hardening roadmap (open loop O17) now complete.
+- `AsyncClient` correlation fix (3.7.0): response source check uses `_remote_matches(source, expected)` — exact host required only when the request targeted an IP literal; for hostname targets only the port must match (the datagram arrives from the resolved IP). Fixes dropped replies / timeouts against hostname peers like the public Mizu `options.py`. Call-ID/CSeq-number/method/branch still bind the response. Also added `cancel.py` example, CLI `--no-rport`/`--no-retransmit`, and FastAPI `/sip/invite` (optional `call_id`) + `/sip/cancel` (409 when no pending INVITE).
 - Repo is a `uv` workspace: root `sipx` is SIP-only; apps under `apps/*` (`harness`, `cli`, `fastapi`, `asterisk`, `llm`, `scenarios`, `stt`, `tts`) import root as workspace dep.
-- `sipx-fastapi` (`apps/fastapi`): FastAPI REST wrapper with lifespan-managed `AsyncClient`; endpoints `/health`, `/sip/options`, `/sip/register`, `/sip/unregister`, `/sip/message`, `/sip/request`; run via `uv run --package sipx-fastapi sipx-fastapi`; see `apps/fastapi/README.md`.
+- `sipx-fastapi` (`apps/fastapi`): FastAPI REST wrapper with lifespan-managed `AsyncClient`; endpoints `/health`, `/sip/options`, `/sip/register`, `/sip/unregister`, `/sip/message`, `/sip/invite`, `/sip/cancel`, `/sip/request`; run via `uv run --package sipx-fastapi sipx-fastapi`; see `apps/fastapi/README.md`.
 - Root `pytest` collects only core `tests/`; app tests are opt-in by explicit path (`pytest apps` works too).
 - `sipx-harness`: `Harness`, `Actor`, `Scenario`, `Expect`, `Timeline`, `Verdict`, `Artifact`, capabilities, profiles (`harness.toml`), reports, recorder, redaction (`sipx_harness.redaction`); `MockRuntime` is the deterministic no-network runtime.
 - Harness symbols import from `sipx_harness`, not root `sipx`; root must not export harness/redaction/speech-protocol surfaces.

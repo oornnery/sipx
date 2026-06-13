@@ -21,6 +21,7 @@ class FakeAsyncClient:
     def __init__(self, **kwargs: Any) -> None:
         self.kwargs = kwargs
         self.calls: list[tuple[str, tuple, dict]] = []
+        self._pending_invites: dict[str, Any] = {}
         FakeAsyncClient.instances.append(self)
 
     async def __aenter__(self) -> "FakeAsyncClient":
@@ -50,6 +51,15 @@ class FakeAsyncClient:
     async def request(self, method: str, uri: str, **kwargs: Any) -> Response:
         self.calls.append(("request", (method, uri), kwargs))
         return Response(status_code=200, reason="OK", headers={})
+
+    async def invite(self, uri: str, **kwargs: Any) -> Response:
+        self.calls.append(("invite", (uri,), kwargs))
+        call_id = kwargs.get("Call-ID", "generated-call-id")
+        return Response(status_code=200, reason="OK", headers={"Call-ID": call_id})
+
+    async def cancel(self, call_id: str, **kwargs: Any) -> Response:
+        self.calls.append(("cancel", (call_id,), kwargs))
+        return Response(status_code=200, reason="OK", headers={"Call-ID": call_id})
 
 
 @pytest.fixture
@@ -120,6 +130,35 @@ def test_message_endpoint(client: TestClient) -> None:
     assert payload["status_code"] == 202
     fake: FakeAsyncClient = client.app.state.fake_client  # type: ignore[attr-defined]
     assert fake.calls[-1][0] == "message"
+
+
+def test_invite_endpoint(client: TestClient) -> None:
+    response = client.post(
+        "/sip/invite",
+        json={"target": "sip:2002@example.com", "call_id": "call-xyz"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status_code"] == 200
+    assert payload["headers"]["Call-ID"] == "call-xyz"
+    fake: FakeAsyncClient = client.app.state.fake_client  # type: ignore[attr-defined]
+    name, args, kwargs = fake.calls[-1]
+    assert name == "invite"
+    assert args == ("sip:2002@example.com",)
+    assert kwargs["Call-ID"] == "call-xyz"
+
+
+def test_cancel_endpoint_without_pending_returns_409(client: TestClient) -> None:
+    response = client.post("/sip/cancel", json={"call_id": "missing"})
+    assert response.status_code == 409
+
+
+def test_cancel_endpoint_with_pending(client: TestClient) -> None:
+    fake: FakeAsyncClient = client.app.state.fake_client  # type: ignore[attr-defined]
+    fake._pending_invites["call-xyz"] = object()
+    response = client.post("/sip/cancel", json={"call_id": "call-xyz"})
+    assert response.status_code == 200
+    assert fake.calls[-1] == ("cancel", ("call-xyz",), {})
 
 
 def test_generic_request_endpoint(client: TestClient) -> None:

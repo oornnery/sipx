@@ -593,7 +593,7 @@ wheels = [
 
 [[package]]
 name = "sipx"
-version = "3.3.0"
+version = "3.7.0"
 source = { editable = "." }
 
 [package.dev-dependencies]

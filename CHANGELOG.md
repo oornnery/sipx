@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## 3.7.0 - 2026-06-13
+
+### Fixed
+
+- **Response correlation for hostname targets (RFC 3261 §18).** Strict source
+  `(host, port)` matching dropped replies when the request targeted a hostname,
+  because the datagram arrives from the resolved IP (this caused the public Mizu
+  examples, e.g. `options.py`, to time out). The source check now requires an
+  exact host only when the target was an IP literal; for hostname targets the
+  port must match and Call-ID/CSeq/branch still bind the response.
+
+### Added
+
+- **`cancel.py` example.** Demonstrates aborting a pending INVITE with a
+  concurrent `cancel(call_id)` task (RFC 3261 §9).
+- **CLI flags `--no-rport` / `--no-retransmit`.** Disable rport (RFC 3581) and
+  RFC 3261 §17 retransmission from `sipx` CLI commands.
+- **FastAPI `/sip/invite` and `/sip/cancel`.** INVITE accepts an optional
+  `call_id` so a concurrent CANCEL can target the in-flight call; CANCEL returns
+  409 when no pending INVITE matches the Call-ID.
+
 ## 3.6.0 - 2026-06-13
 
 ### Added (P2 RFC)
