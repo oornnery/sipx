@@ -6,6 +6,8 @@ Implement `sipx` in verified commit blocks. Block `3.0.0` is complete: the legac
 
 Block `3.1.0` is complete: answered the user's observability question ("o request/options retorna todas as transacoes e respostas?") by adding `Response.history`. UAC calls still return one final `Response`, but it now carries every intermediate response (provisional `1xx` + `401`/`407` challenges) in arrival order, each with its `.request`. `_send_and_receive` was fixed to collect any number of provisionals (was one). Validation: 503 core + 65 app tests pass (3 opt-in skips), ruff lint/format, `uv run ty check`.
 
+Blocks `3.1.2`-`3.1.4` are complete (core review Phase 1, docs only): added RFC-referencing module docstrings to the 36 modules that lacked one and rewrote the misleading `protocol/__init__.py`/`rfc/__init__.py` docstrings (`3.1.2`); added six runnable `AsyncClient` examples — `options`, `unregister`, `call`, `info_dtmf`, `server`, `hooks_history` — registered in `tests/test_examples.py` (`3.1.3`); refreshed `README.md` to remove false claims (`timers, retransmissions`, `response.summary()`, implemented `softphone()`), document `response.history`, and add an honest "AsyncClient status and RFC limitations" section (`3.1.4`). The `.omo` agent scratch dir was untracked earlier (`git rm -r --cached` + `.gitignore`). Phase 2 (reorg of duplicated `sip/`+`protocol/` stacks) and Phase 3 (security/RFC hardening roadmap) are written up but await user OK (see `.mem/open-loops.md` O16/O17). Validation: 503 core tests pass, ruff lint/format clean, `uv run ty check` clean. Stray untracked `qa_tls_scenarios.py` left for user decision.
+
 ## Sources Read
 
 - `IDEA.md`: 5270 lines; source of product architecture and roadmap.
@@ -324,6 +326,12 @@ Block `3.1.0` is complete: answered the user's observability question ("o reques
 - Added `Response.history` (block `3.1.0`): UAC calls attach provisional `1xx` and `401`/`407` challenge responses to the final `Response.history` in arrival order, each with its `.request`; `_send_and_receive` now collects 0+ provisionals (was one). Added multi-provisional and auth-challenge history tests.
 - Bumped root package version to `3.1.0`.
 - Documented `Response.history` in `README.md` and refreshed `.spec/*`/`.mem/*` state; bumped root package version to `3.1.1`.
+- Reviewed the core `sipx` package (security, performance, RFC compliance, organization) and executed Phase 1 of the review.
+- Untracked the `.omo` agent scratch dir (`git rm -r --cached .omo`, added `.omo/`/`.opencode/` to `.gitignore`).
+- Added RFC-referencing module docstrings to the 36 modules without one; rewrote misleading `protocol/__init__.py` and `rfc/__init__.py` docstrings; bumped to `3.1.2`.
+- Added six `AsyncClient` examples (`options`, `unregister`, `call`, `info_dtmf`, `server`, `hooks_history`) and registered them in `tests/test_examples.py`; bumped to `3.1.3`.
+- Refreshed `README.md` (removed false `timers, retransmissions`/`response.summary()`/implemented-`softphone()` claims, documented `response.history`, listed new examples, added "AsyncClient status and RFC limitations" section); bumped to `3.1.4`.
+- Recorded Phase 2 (stack reorg) and Phase 3 (security/RFC hardening) as awaiting-OK open loops O16/O17 instead of executing them.
 
 ## Active Decision
 
@@ -333,8 +341,9 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. Decide license before public distribution and Asterisk/commercial positioning.
-2. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest apps/asterisk/tests/test_asterisk_integration.py` after starting `docker/asterisk`.
+1. Get user OK on core-review Phase 2 (unify duplicated `sip/`+`protocol/` stacks, remove `rfc/` orphan, rename `rfc/`, align public API) and Phase 3 P0 security fixes (response correlation by branch+source, CRLF sanitization, `Content-Length` everywhere, TCP/TLS reassembly cap). See `.mem/open-loops.md` O16/O17.
+2. Decide license before public distribution and Asterisk/commercial positioning.
+3. Run `SIPX_ASTERISK_INTEGRATION=1 python -m pytest apps/asterisk/tests/test_asterisk_integration.py` after starting `docker/asterisk`.
 3. Add richer fake media events, recording/transcript artifacts, and retention policy.
 4. Add live SIP inspector events, RFC4733 DTMF over RTP, then advanced RTP/media runtime behavior.
 5. Decide whether generic OpenAI-compatible LLM support is enough for the next AI block or whether to add a provider protocol before vendor-specific adapters.

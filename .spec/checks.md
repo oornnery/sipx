@@ -15,6 +15,10 @@
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-06-13 | `uv run pytest -q` (blocks 3.1.2-3.1.4) | pass | 503 core pass after docstrings, six new examples (`ROOT_EXAMPLES` updated), and README refresh. |
+| 2026-06-13 | `uv run ruff check .` (blocks 3.1.2-3.1.4) | pass | All checks passed. |
+| 2026-06-13 | `uv run ruff format --check .` (blocks 3.1.2-3.1.4) | pass | 152 files already formatted. |
+| 2026-06-13 | `uv run ty check` (blocks 3.1.2-3.1.4) | pass | Clean; docs/examples only, no type surface change. |
 | 2026-06-13 | `uv run pytest` (block 3.1.0) | pass | 503 core pass incl. new `Response.history` multi-provisional + 401-challenge tests. |
 | 2026-06-13 | `uv run pytest apps` (block 3.1.0) | pass | 65 pass, 3 opt-in skips after `Response.history` addition. |
 | 2026-06-13 | `uv run ruff check .` (block 3.1.0) | pass | All checks passed. |

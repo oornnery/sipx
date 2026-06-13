@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 3.1.4 - 2026-06-13
+
+- Refreshed `README.md` to match the real core: framed the `sipx_harness` scenario API as a planned design (not yet implemented), removed the false `AsyncClient` "timers, retransmissions" claim, replaced the bogus `response.summary()` snippet with the actual `Response` fields (`status_code`/`reason`/`headers`/`body`/`history`), documented `response.history`, listed the six new examples, and added an honest "AsyncClient status and RFC limitations" section (no retransmission/timer firing, no auto-ACK for non-2xx INVITE / no CANCEL, loose `Call-ID`+CSeq response correlation, MD5-only Digest, inbound requests not auto-routed, `Content-Length` not added everywhere).
+- Updated `.spec/*` and `.mem/*` state files for the docstring/examples/README review block.
+- Documentation only: no runtime behavior change.
+
 ## 3.1.3 - 2026-06-13
 
 - Added six runnable `AsyncClient` examples under `sipx/examples/`: `options.py` (capability query), `unregister.py` (REGISTER with `Expires: 0`), `call.py` (full `INVITE` -> `ACK` -> `BYE` using dialog tracking and `response.history`), `info_dtmf.py` (DTMF via in-dialog `INFO` through `request()`), `server.py` (offline UAS `on_*` handlers fed via `handle_request`), and `hooks_history.py` (event hooks plus `response.history` inspection). All use `SIPX_*` env vars only (no `argparse`, invariant V64).

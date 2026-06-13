@@ -529,6 +529,18 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 3.1.2-3.1.4 Done (core review Phase 1, docs only)
+
+- [x] Reviewed core `sipx` for security, performance, RFC compliance, and file organization; executed Phase 1 (low-risk, direct asks).
+- [x] Untracked `.omo` agent scratch dir (`git rm -r --cached .omo`; added `.omo/`/`.opencode/` to `.gitignore`).
+- [x] Added RFC-referencing module docstrings to the 36 modules without one; rewrote misleading `protocol/__init__.py` and `rfc/__init__.py` docstrings. Bumped to `3.1.2`.
+- [x] Added six `AsyncClient` examples (`options`, `unregister`, `call`, `info_dtmf`, `server`, `hooks_history`); registered them in `tests/test_examples.py` `ROOT_EXAMPLES`. Bumped to `3.1.3`.
+- [x] Refreshed `README.md`: removed false `timers, retransmissions`/`response.summary()`/implemented-`softphone()` claims, documented `response.history`, listed new examples, added "AsyncClient status and RFC limitations". Bumped to `3.1.4`.
+- [x] Validation: 503 core tests pass, `ruff check .` clean, `ruff format --check .` clean (152 files), `uv run ty check` clean.
+- [ ] Awaiting user OK: Phase 2 stack reorg (unify `sip/`+`protocol/`, remove `rfc/` orphan, rename `rfc/`, align public API) — open loop O16.
+- [ ] Awaiting user OK: Phase 3 security/RFC hardening roadmap (response correlation by branch+source, CRLF sanitization, `Content-Length`, §17 timers/retransmission, CANCEL, PRACK, Digest SHA-256) — open loop O17.
+- [ ] Stray untracked `qa_tls_scenarios.py` left for user decision (not committed).
+
 ## Block 3.0.0 Done
 
 - [x] Bumped package version to `3.0.0`.

@@ -26,7 +26,9 @@ The implementation should follow:
 
 ## Core Idea
 
-`sipx` should let engineers model voice systems as executable scenarios:
+`sipx` aims to let engineers model voice systems as executable scenarios. The
+scenario API below is the **planned harness design** (to be provided by
+`sipx-harness`), not an API implemented by the core `sipx` package today:
 
 ```python
 from sipx_harness import Harness, expect, scenario
@@ -148,7 +150,7 @@ This runtime is the fastest path to IVR automation, AI voice bots, contact-cente
 The SIP client runtime is required for what Asterisk intentionally hides or normalizes:
 
 - Raw SIP wire-level assertions.
-- Exact headers, CSeq, Via branch, tags, timers, retransmissions.
+- Exact headers, CSeq, Via branch, and tags.
 - Malformed SIP/SDP/RTP tests.
 - Fuzzing and parser robustness.
 - RTP impairment, payload validation, jitter/loss measurement.
@@ -158,6 +160,34 @@ The SIP client runtime is required for what Asterisk intentionally hides or norm
 Every UAC call returns one final `Response` (the first `>= 200` reply). Intermediate responses — provisional `1xx` and `401`/`407` Digest challenges — are collected on `response.history` in arrival order, each carrying its own `.request`, so the full request/response exchange is recoverable from a single call. Live streaming of each event is still available through `event_hooks`.
 
 The SIP/SDP/RTP core should be sans-I/O so protocol logic can be tested without sockets.
+
+#### AsyncClient status and RFC limitations
+
+`AsyncClient` is an early UAC/UAS runtime. It sends a request, correlates the
+reply, and runs the Digest `AuthFlow`, which is enough for REGISTER, OPTIONS,
+MESSAGE, INVITE/ACK/BYE, SUBSCRIBE, and arbitrary `request()` calls against a
+cooperative peer. The following gaps are known and intentional for now:
+
+- **No retransmission or timer firing.** RFC 3261 §17 timers are modeled in
+  `protocol/transaction.py` but are not driven; UDP requests are not
+  retransmitted and the only timeout is the configured `ClientConfig.timeout`.
+- **INVITE error ACK / CANCEL not automated.** ACK is sent for a 2xx via
+  `ack(call_id)`; there is no automatic ACK for a non-2xx INVITE final
+  (§17.1.1.3) and no `CANCEL` yet.
+- **Loose response correlation.** Replies are matched by `Call-ID` + CSeq
+  number only (not Via `branch`, CSeq method, tags, or source address), so the
+  client should not face untrusted networks.
+- **Digest is MD5-only.** No SHA-256 (RFC 8760), single challenge, fixed
+  nonce-count.
+- **Inbound requests are not auto-routed.** The receive loop dispatches
+  responses to in-flight calls; deliver inbound requests to `handle_request`
+  yourself to reach the `on_*` UAS handlers.
+- **Content-Length is not added to every request.** `message()` sets it (and
+  you can pass it explicitly), but other helpers do not, which matters for
+  stream transports.
+
+PRACK/100rel, `rport`, and dialog matching by tags are likewise not wired into
+the client path yet.
 
 ## Expectations
 
@@ -273,6 +303,9 @@ auth = AuthFlow(username="1001", password="secret")
 
 async with AsyncClient(config=config, auth=auth) as client:
     response = await client.register("sip:pbx.example.com")
+    # Intermediate 1xx and 401/407 challenges are kept on response.history:
+    challenge_codes = [r.status_code for r in response.history]
+
     response = await client.options("sip:pbx.example.com")
     response = await client.message("sip:1002@example.com", "hello")
 
@@ -296,13 +329,16 @@ client = AsyncClient(
 )
 ```
 
-Summaries are dataclasses. Convert them to JSON at the CLI/example edge with `dataclasses.asdict()` or a JSON helper:
+An `AsyncClient` response exposes `status_code`, `reason`, `headers`, `body`, and
+`history` directly. Convert what you need to JSON at the CLI/example edge:
 
 ```python
-from dataclasses import asdict
-
-summary = response.summary()
-payload = asdict(summary)
+payload = {
+    "status_code": response.status_code,
+    "reason": response.reason,
+    "headers": dict(response.headers),
+    "history": [r.status_code for r in response.history],
+}
 ```
 
 ## Examples
@@ -354,12 +390,21 @@ export SIPX_REMOTE_HOST=pbx.example.com
 export SIPX_REMOTE_PORT=5060
 
 uv run python -m sipx.examples.register
-uv run python -m sipx.examples.invite
+uv run python -m sipx.examples.unregister
+uv run python -m sipx.examples.options
 uv run python -m sipx.examples.message
 uv run python -m sipx.examples.subscribe
+uv run python -m sipx.examples.invite
+uv run python -m sipx.examples.call
+uv run python -m sipx.examples.info_dtmf
+uv run python -m sipx.examples.hooks_history
+uv run python -m sipx.examples.server
 ```
 
-Call examples require `SIPX_TARGET`; without it they print a structured JSON configuration error instead of opening a network call to the demo account itself.
+The `register`, `options`, `message`, `subscribe`, `invite`, `call`,
+`info_dtmf`, and `hooks_history` examples talk to a live SIP peer (default: the
+public Mizu demo account). `server` is offline: it registers UAS handlers and
+feeds them synthetic requests via `handle_request` to show response shaping.
 
 LLM examples use a generic OpenAI-compatible `/chat/completions` provider and read provider settings only from runtime environment variables:
 
