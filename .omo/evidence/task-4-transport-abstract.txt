@@ -1,9 +1,0 @@
-Scenario: Transport is abstract
-  Tool: Bash (python REPL)
-  Steps:
-    1. Run: python -c "from sipx.transport.base import Transport; t = Transport(); print('ERROR: should not instantiate')" 2>&1
-    2. Assert: exit code != 0, stderr contains "TypeError" or "abstract"
-  Expected Result: Cannot instantiate abstract Transport
-  Evidence: PASS
-  Output: TypeError: Can't instantiate abstract class Transport without an implementation for abstract methods 'close', 'local_address', 'receive', 'send', 'transport_type'
-  Exit code: 1

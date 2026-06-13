@@ -1,8 +1,0 @@
-Scenario: TransportConfig is dataclass
-  Tool: Bash (python REPL)
-  Steps:
-    1. Run: python -c "from sipx.transport.base import TransportConfig; c = TransportConfig(local_host='0.0.0.0', local_port=5060); assert c.local_host == '0.0.0.0'; assert c.local_port == 5060; print('OK')"
-    2. Assert: exit code 0, stdout contains "OK"
-  Expected Result: TransportConfig works as dataclass
-  Evidence: PASS
-  Output: OK

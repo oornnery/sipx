@@ -1,8 +1,0 @@
-Scenario: Import transport interface
-  Tool: Bash (python REPL)
-  Steps:
-    1. Run: python -c "from sipx.transport.base import Transport, TransportConfig; print('OK')"
-    2. Assert: exit code 0, stdout contains "OK"
-  Expected Result: Transport interface importable
-  Evidence: PASS
-  Output: OK

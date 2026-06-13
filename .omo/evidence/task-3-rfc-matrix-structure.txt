@@ -1,3 +1,0 @@
-QA Evidence: task-3-rfc-matrix-structure
-Requirement headers: 10
-MUST/SHOULD/MAY headers: 10

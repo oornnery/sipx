@@ -1,4 +1,0 @@
-QA Evidence: task-3-rfc-matrix-exists
-File exists
-RFC 3261 count: 1
-RFC 3581 count: 1

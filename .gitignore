@@ -78,3 +78,7 @@ __pypackages__/
 *.log
 
 artifacts/
+
+# Agent scratch / evidence dirs (not project artifacts)
+.omo/
+.opencode/

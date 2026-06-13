@@ -1,2 +1,0 @@
-TransportError is subclass of SipError
-Exit code: 0
