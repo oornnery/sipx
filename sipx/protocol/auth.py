@@ -21,6 +21,16 @@ def _first_header_value(value: str | list[str] | None) -> str | None:
     return value
 
 
+# Supported Digest algorithms mapped to (hashlib name, session-variant flag).
+# MD5 per RFC 7616; SHA-256/SHA-256-sess per RFC 8760.
+_DIGEST_ALGORITHMS: dict[str, tuple[str, bool]] = {
+    "MD5": ("md5", False),
+    "MD5-SESS": ("md5", True),
+    "SHA-256": ("sha256", False),
+    "SHA-256-SESS": ("sha256", True),
+}
+
+
 @dataclass(frozen=True, slots=True)
 class DigestChallenge:
     """Parsed Digest authentication challenge."""
@@ -158,11 +168,18 @@ class AuthFlow:
         challenge: DigestChallenge,
     ) -> str:
         """Build a Digest authorization header value."""
-        if challenge.algorithm.upper() != "MD5":
+        algo_spec = _DIGEST_ALGORITHMS.get(challenge.algorithm.upper())
+        if algo_spec is None:
             raise AuthError(
                 f"Unsupported Digest algorithm: {challenge.algorithm}",
-                rfc_ref="RFC 7616",
+                rfc_ref="RFC 8760",
             )
+        hash_name, session = algo_spec
+
+        def digest(value: str) -> str:
+            return hashlib.new(
+                hash_name, value.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()
 
         # Select qop
         qop = self._select_qop(challenge.qop)
@@ -171,17 +188,19 @@ class AuthFlow:
         cnonce = self._generate_cnonce()
         nonce_count = "00000001"
 
-        # Calculate HA1 and HA2
-        ha1 = self._md5(f"{self.username}:{challenge.realm}:{self.password}")
-        ha2 = self._md5(f"{request.method}:{request.uri}")
+        # Calculate HA1 (with -sess variant) and HA2
+        ha1 = digest(f"{self.username}:{challenge.realm}:{self.password}")
+        if session:
+            ha1 = digest(f"{ha1}:{challenge.nonce}:{cnonce}")
+        ha2 = digest(f"{request.method}:{request.uri}")
 
         # Calculate response
         if qop:
-            response = self._md5(
+            response = digest(
                 f"{ha1}:{challenge.nonce}:{nonce_count}:{cnonce}:{qop}:{ha2}"
             )
         else:
-            response = self._md5(f"{ha1}:{challenge.nonce}:{ha2}")
+            response = digest(f"{ha1}:{challenge.nonce}:{ha2}")
 
         # Build header parts
         parts = [
@@ -244,7 +263,3 @@ class AuthFlow:
     def _generate_cnonce(self) -> str:
         """Generate a client nonce value."""
         return os.urandom(8).hex()
-
-    def _md5(self, value: str) -> str:
-        """Calculate MD5 hash."""
-        return hashlib.md5(value.encode("utf-8"), usedforsecurity=False).hexdigest()

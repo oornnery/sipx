@@ -313,6 +313,52 @@ class TestDialogMatching:
         with pytest.raises(DialogError, match="Call-ID"):
             dialog.update(bad_resp)
 
+    def test_update_rejects_remote_tag_mismatch(self) -> None:
+        """update() raises DialogError when the To (remote) tag differs."""
+        req = make_invite_request(call_id="call-123", from_tag="from-tag")
+        resp = make_invite_response(req, 200, "OK", to_tag="to-tag")
+        dialog = Dialog.from_invite(req, resp)
+
+        bad_resp = Response(
+            status_code=200,
+            reason="OK",
+            headers={
+                "Call-ID": "call-123",
+                "From": "<sip:alice@example.com>;tag=from-tag",
+                "To": "<sip:bob@example.com>;tag=other-tag",
+                "CSeq": "1 INVITE",
+                "Contact": "<sip:bob@192.0.2.2:5060>",
+            },
+            body=None,
+            request=req,
+        )
+
+        with pytest.raises(DialogError, match="remote tag"):
+            dialog.update(bad_resp)
+
+    def test_update_rejects_local_tag_mismatch(self) -> None:
+        """update() raises DialogError when the From (local) tag differs."""
+        req = make_invite_request(call_id="call-123", from_tag="from-tag")
+        resp = make_invite_response(req, 200, "OK", to_tag="to-tag")
+        dialog = Dialog.from_invite(req, resp)
+
+        bad_resp = Response(
+            status_code=200,
+            reason="OK",
+            headers={
+                "Call-ID": "call-123",
+                "From": "<sip:alice@example.com>;tag=wrong-local",
+                "To": "<sip:bob@example.com>;tag=to-tag",
+                "CSeq": "1 INVITE",
+                "Contact": "<sip:bob@192.0.2.2:5060>",
+            },
+            body=None,
+            request=req,
+        )
+
+        with pytest.raises(DialogError, match="local tag"):
+            dialog.update(bad_resp)
+
 
 # --- Route Set Management Tests ---
 

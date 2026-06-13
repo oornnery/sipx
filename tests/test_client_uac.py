@@ -700,6 +700,75 @@ class TestRportAndAck:
             await client_with_mock.cancel("missing")
 
 
+class TestPrack:
+    """Tests for RFC 3262 PRACK on reliable provisional responses."""
+
+    @pytest.mark.asyncio
+    async def test_reliable_provisional_triggers_prack(
+        self, client_with_mock, mock_transport
+    ):
+        """A 1xx with RSeq + Require:100rel must trigger an auto PRACK."""
+        call_id = "test-prack"
+        mock_transport.add_response(
+            183,
+            "Session Progress",
+            {
+                "Call-ID": call_id,
+                "CSeq": "1 INVITE",
+                "Require": "100rel",
+                "RSeq": "1",
+                "Contact": "<sip:bob@example.com:5060>",
+                "To": "<sip:bob@example.com>;tag=prk1",
+            },
+        )
+        mock_transport.add_response(200, "OK", {"Call-ID": call_id, "CSeq": "2 PRACK"})
+        mock_transport.add_response(
+            200,
+            "OK",
+            {
+                "Call-ID": call_id,
+                "CSeq": "1 INVITE",
+                "Contact": "<sip:bob@example.com:5060>",
+                "To": "<sip:bob@example.com>;tag=prk1",
+            },
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            response = await client_with_mock.invite("sip:bob@example.com")
+
+        assert response.status_code == 200
+        pracks = [d for d, _ in mock_transport.sent_data if d.startswith(b"PRACK")]
+        assert len(pracks) == 1
+        assert b"CSeq: 2 PRACK" in pracks[0]
+        assert b"RAck: 1 1 INVITE" in pracks[0]
+
+    @pytest.mark.asyncio
+    async def test_unreliable_provisional_skips_prack(
+        self, client_with_mock, mock_transport
+    ):
+        """A plain 180 (no RSeq/100rel) must not trigger a PRACK."""
+        call_id = "test-no-prack"
+        mock_transport.add_response(
+            180, "Ringing", {"Call-ID": call_id, "CSeq": "1 INVITE"}
+        )
+        mock_transport.add_response(
+            200,
+            "OK",
+            {
+                "Call-ID": call_id,
+                "CSeq": "1 INVITE",
+                "Contact": "<sip:bob@127.0.0.1>",
+            },
+        )
+
+        with patch("sipx.client._new_call_id", return_value=call_id):
+            response = await client_with_mock.invite("sip:bob@example.com")
+
+        assert response.status_code == 200
+        pracks = [d for d, _ in mock_transport.sent_data if d.startswith(b"PRACK")]
+        assert not pracks
+
+
 class TestDialogManagement:
     """Tests for dialog management."""
 

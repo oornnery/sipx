@@ -2,7 +2,9 @@
 
 ## Summary
 
-Block `3.5.0` added P1 RFC part 2: RFC 3261 §17 retransmission in `AsyncClient._await_response` (UDP T1/T2 backoff bounded by `timeout`, INVITE stops after first provisional, TCP/TLS never retransmit, `ClientConfig.retransmit` toggle). The P1 RFC roadmap is now complete.
+Block `3.6.0` added P2 RFC: PRACK/100rel (RFC 3262) auto-sent for reliable provisionals via `AsyncClient._maybe_send_prack`, Digest SHA-256/SHA-256-sess (RFC 8760) in `AuthFlow`, and UAC dialog From/To tag matching (RFC §12.2.2; UAS stays Call-ID-only). The full P0/P1/P2 security/RFC hardening roadmap is now complete.
+
+Block `3.5.0` added P1 RFC part 2: RFC 3261 §17 retransmission in `AsyncClient._await_response` (UDP T1/T2 backoff bounded by `timeout`, INVITE stops after first provisional, TCP/TLS never retransmit, `ClientConfig.retransmit` toggle).
 
 Block `3.4.0` added P1 RFC part 1 to `AsyncClient`: rport (RFC 3581) on outgoing UDP Via with `learned_address`, non-2xx INVITE auto-ACK (RFC §17.1.1.3), `cancel(call_id)` (RFC §9), and CSeq-method-scoped response correlation.
 
@@ -35,7 +37,12 @@ Block `3.2.0` completed P0 security (strict response correlation, CR/LF sanitiza
 
 ## Recommended Next Task
 
-1. P2: PRACK/100rel in client path, Digest SHA-256 (RFC 8760), dialog tag matching (Block 3.6.0).
+Security/RFC hardening (P0/P1/P2) is complete. Open items now are product decisions, not protocol work:
+
+1. Decide whether `AsyncClient` should gain SDP/RTP orchestration for softphone-style call/listen ergonomics.
+2. Decide license before public distribution.
+3. Decide the fate of the untracked `qa_tls_scenarios.py` (move into `apps/`/`tests/`, formalize, or delete).
+4. Optional: full removal of the `sip/` sans-I/O toolkit (breaking; no safe migration yet).
 3. Decide whether `AsyncClient` should gain SDP/RTP orchestration for softphone-style call/listen ergonomics.
 4. Decide license before public distribution.
 

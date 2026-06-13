@@ -163,32 +163,43 @@ The SIP/SDP/RTP core should be sans-I/O so protocol logic can be tested without 
 
 #### AsyncClient status and RFC limitations
 
-`AsyncClient` is an early UAC/UAS runtime. It sends a request, correlates the
-reply, and runs the Digest `AuthFlow`, which is enough for REGISTER, OPTIONS,
-MESSAGE, INVITE/ACK/BYE, SUBSCRIBE, and arbitrary `request()` calls against a
-cooperative peer. The following gaps are known and intentional for now:
+`AsyncClient` is a UAC/UAS runtime. It sends a request, correlates the reply,
+and runs the Digest `AuthFlow`, which is enough for REGISTER, OPTIONS, MESSAGE,
+INVITE/ACK/BYE, SUBSCRIBE, and arbitrary `request()` calls against a cooperative
+peer. The P0/P1/P2 security and RFC hardening roadmap is complete:
 
-- **No retransmission or timer firing.** RFC 3261 §17 timers are modeled in
-  `protocol/transaction.py` but are not driven; UDP requests are not
-  retransmitted and the only timeout is the configured `ClientConfig.timeout`.
-- **INVITE error ACK / CANCEL not automated.** ACK is sent for a 2xx via
-  `ack(call_id)`; there is no automatic ACK for a non-2xx INVITE final
-  (§17.1.1.3) and no `CANCEL` yet.
+- **Retransmission and §17 timers (since 3.5.0).** On UDP, requests are
+  retransmitted starting at T1 and doubling (capped at T2 for non-INVITE) until
+  a reply arrives or `ClientConfig.timeout` elapses; INVITE stops retransmitting
+  after the first provisional; TCP/TLS never retransmit. Toggle with
+  `ClientConfig.retransmit`.
+- **INVITE error ACK and CANCEL (since 3.4.0).** Non-2xx INVITE finals are
+  auto-ACKed on the INVITE branch (§17.1.1.3); `cancel(call_id)` cancels a
+  pending INVITE (§9) from a concurrent task; `ack(call_id)` still sends the
+  in-dialog 2xx ACK.
+- **rport / learned address (since 3.4.0).** Outgoing UDP Via carries `;rport`
+  (RFC 3581, toggle `ClientConfig.rport`); the public `(host, port)` learned
+  from `received`/`rport` is exposed as `AsyncClient.learned_address`.
+- **PRACK / 100rel (since 3.6.0).** Reliable provisionals (RSeq + `100rel`) are
+  auto-PRACKed in the early dialog with a `RAck` header (RFC 3262).
 - **Strict response correlation (since 3.2.0).** Replies must match `Call-ID`,
   CSeq number/method, top Via `branch`, and the request destination address.
   Forged datagrams with a matching `Call-ID` but wrong branch or source are
   dropped.
-- **Digest is MD5-only.** No SHA-256 (RFC 8760), single challenge, fixed
-  nonce-count.
+- **Digest MD5 and SHA-256 (since 3.6.0).** `AuthFlow` supports `MD5`,
+  `MD5-sess`, `SHA-256`, and `SHA-256-sess` (RFC 7616/8760); single challenge,
+  fixed nonce-count.
+- **Dialog tag matching (since 3.6.0).** UAC `Dialog.update` rejects responses
+  whose From/To tags conflict with the dialog (§12.2.2); UAS dialogs stay
+  Call-ID-matched.
+- **Content-Length on every outbound request (since 3.2.0).** ``Request.to_bytes()``
+  adds ``Content-Length`` when absent, which matters for TCP/TLS framing.
 - **Inbound requests are not auto-routed.** The receive loop dispatches
   responses to in-flight calls; deliver inbound requests to `handle_request`
   yourself to reach the `on_*` UAS handlers.
-- **Content-Length on every outbound request (since 3.2.0).** ``Request.to_bytes()``
-  adds ``Content-Length`` when absent, which matters for TCP/TLS framing.
 
-PRACK/100rel, `rport`, and dialog matching by tags are likewise not wired into
-the client path yet. Standalone extension handlers live under `sipx/extensions/`
-(PRACK, DNS, events, presence, outbound) and are exercised by tests only.
+Standalone extension handlers under `sipx/extensions/` (PRACK, DNS, events,
+presence, outbound) remain test-only and are not wired into the client path.
 
 ## Expectations
 

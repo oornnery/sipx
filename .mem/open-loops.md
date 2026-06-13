@@ -17,4 +17,4 @@
 | O14 | Release draft policy? | keep latest draft only, publish manually, automate cleanup | Before first public `sipx` release is published. |
 | O15 | LLM provider scope? | OpenAI-compatible client only, provider protocol, or vendor-specific adapters | Before building AI media agents beyond templates. |
 | O16 | Reorg of duplicated SIP stacks? | unify on `protocol/` + remove `sip/` duplicate; `rfc/` renamed to `extensions/` in 3.2.0; `sip/` sans-I/O toolkit kept (unique parsers/builders) | Phase 2 partial done 3.2.0; full `sip/` removal still open if desired. |
-| O17 | Security/RFC hardening roadmap? | P0 done 3.2.0; P1 complete (3.4.0 rport/non-2xx ACK/CANCEL, 3.5.0 §17 timers/retransmission); P2 = PRACK/100rel client, Digest SHA-256, dialog tag matching | P2 still open (Block 3.6.0). |
+| O17 | Security/RFC hardening roadmap? | COMPLETE: P0 (3.2.0), P1 (3.4.0 rport/non-2xx ACK/CANCEL, 3.5.0 §17 timers), P2 (3.6.0 PRACK/100rel, Digest SHA-256, dialog tag matching) | Closed. |

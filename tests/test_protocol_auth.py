@@ -236,13 +236,70 @@ class TestAuthFlowErrors:
             401,
             "Unauthorized",
             headers={
-                "WWW-Authenticate": 'Digest realm="example.com", nonce="abc123", algorithm=SHA-256'
+                "WWW-Authenticate": 'Digest realm="example.com", nonce="abc123", algorithm=SHA-512-256'
             },
             request=req,
         )
 
         with pytest.raises(AuthError, match="Unsupported Digest algorithm"):
             flow.send(resp)
+
+    def test_digest_auth_supports_sha256(self) -> None:
+        """Digest auth should produce a 64-char SHA-256 response (RFC 8760)."""
+        import hashlib
+        import re
+
+        auth = AuthFlow(username="alice", password="secret")
+        req = make_request(method="REGISTER", uri="sip:example.com")
+        flow = auth.auth_flow(req)
+
+        next(flow)
+        resp = make_response(
+            401,
+            "Unauthorized",
+            headers={
+                "WWW-Authenticate": 'Digest realm="example.com", nonce="abc123", algorithm=SHA-256'
+            },
+            request=req,
+        )
+
+        auth_req = flow.send(resp)
+        auth_header = auth_req.headers["Authorization"]
+        assert isinstance(auth_header, str)
+
+        match = re.search(r'response="([a-f0-9]{64})"', auth_header)
+        assert match is not None
+
+        # Verify the digest matches the RFC 7616 computation (no qop).
+        ha1 = hashlib.sha256(b"alice:example.com:secret").hexdigest()
+        ha2 = hashlib.sha256(b"REGISTER:sip:example.com").hexdigest()
+        expected = hashlib.sha256(f"{ha1}:abc123:{ha2}".encode()).hexdigest()
+        assert match.group(1) == expected
+
+    def test_digest_auth_supports_sha256_sess(self) -> None:
+        """Digest auth should support the SHA-256-sess session variant."""
+        import re
+
+        auth = AuthFlow(username="alice", password="secret")
+        req = make_request()
+        flow = auth.auth_flow(req)
+
+        next(flow)
+        resp = make_response(
+            401,
+            "Unauthorized",
+            headers={
+                "WWW-Authenticate": 'Digest realm="example.com", nonce="abc123", '
+                'algorithm=SHA-256-sess, qop="auth"'
+            },
+            request=req,
+        )
+
+        auth_req = flow.send(resp)
+        auth_header = auth_req.headers["Authorization"]
+        assert isinstance(auth_header, str)
+        assert re.search(r'response="[a-f0-9]{64}"', auth_header) is not None
+        assert "qop=auth" in auth_header
 
     def test_auth_flow_raises_on_max_retries_exceeded(self) -> None:
         """Auth flow should raise AuthError when max retries exceeded."""

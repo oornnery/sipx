@@ -15,6 +15,9 @@
 
 | Date | Command | Result | Notes |
 | --- | --- | --- | --- |
+| 2026-06-13 | `uv run pytest -q` (block 3.6.0) | pass | 513 core pass incl. PRACK/SHA-256/tag-mismatch tests. |
+| 2026-06-13 | `uv run pytest apps -q` (block 3.6.0) | pass | 71 pass, 3 opt-in skips. |
+| 2026-06-13 | `uv run ruff check` / `ruff format --check` / `ty check` (3.6.0) | pass | Clean after P2 RFC. |
 | 2026-06-13 | `uv run pytest -q` (block 3.5.0) | pass | 507 core pass incl. retransmission tests. |
 | 2026-06-13 | `uv run ruff check` / `ruff format` / `ty check` (3.5.0) | pass | Clean after §17 retransmission. |
 | 2026-06-13 | `uv run pytest -q` (block 3.4.0) | pass | 504 core pass incl. rport/learned-address/non-2xx-ACK/CANCEL tests. |

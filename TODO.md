@@ -529,6 +529,14 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] Bumped root package version to `1.12.0`.
 - [x] Updated CHANGELOG.md.
 
+## Block 3.6.0 Done (P2 RFC)
+
+- [x] PRACK/100rel (RFC 3262): `AsyncClient._maybe_send_prack` auto-PRACKs reliable provisionals (RSeq + 100rel) in the early dialog with `RAck`.
+- [x] Digest SHA-256/SHA-256-sess (RFC 8760) in `AuthFlow` alongside MD5/MD5-sess.
+- [x] Dialog tag matching (RFC 3261 §12.2.2): UAC `Dialog.update` rejects conflicting From/To tags; UAS stays Call-ID-matched (`_uac` flag).
+- [x] Tests: PRACK (`test_client_uac.py`), SHA-256 (`test_protocol_auth.py`), tag mismatch (`test_protocol_dialog.py`); 513 core + 71 app tests pass, ruff + ty clean.
+- [x] P2 RFC roadmap complete.
+
 ## Block 3.5.0 Done (P1 RFC part 2 - timers)
 
 - [x] RFC 3261 §17 retransmission in `AsyncClient._await_response`: UDP retransmits at T1, doubling, capped at T2 for non-INVITE, bounded by `timeout`; INVITE stops after first provisional; TCP/TLS never retransmit; toggle `ClientConfig.retransmit`.
@@ -569,7 +577,7 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] Refreshed `README.md`: removed false `timers, retransmissions`/`response.summary()`/implemented-`softphone()` claims, documented `response.history`, listed new examples, added "AsyncClient status and RFC limitations". Bumped to `3.1.4`.
 - [x] Validation: 503 core tests pass, `ruff check .` clean, `ruff format --check .` clean (152 files), `uv run ty check` clean.
 - [ ] Awaiting user OK: Phase 2 stack reorg (unify `sip/`+`protocol/`, remove `rfc/` orphan, rename `rfc/`, align public API) — open loop O16.
-- [ ] Awaiting user OK: Phase 3 security/RFC hardening roadmap (response correlation by branch+source, CRLF sanitization, `Content-Length`, §17 timers/retransmission, CANCEL, PRACK, Digest SHA-256) — open loop O17.
+- [x] Phase 3 security/RFC hardening roadmap complete: P0 (3.2.0), P1 (3.4.0 rport/non-2xx ACK/CANCEL, 3.5.0 §17 timers), P2 (3.6.0 PRACK/100rel, Digest SHA-256, dialog tag matching) — open loop O17 closed.
 - [ ] Stray untracked `qa_tls_scenarios.py` left for user decision (not committed).
 
 ## Block 3.0.0 Done

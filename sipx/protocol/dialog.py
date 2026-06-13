@@ -102,6 +102,7 @@ class Dialog:
     route_set: list[str] = field(default_factory=list)
     _state: DialogState = DialogState.EARLY
     _secure: bool = False
+    _uac: bool = True
 
     @property
     def state(self) -> str:
@@ -260,6 +261,7 @@ class Dialog:
             route_set=route_set,
             _state=DialogState.EARLY,
             _secure=request.uri.startswith("sips:"),
+            _uac=False,
         )
 
     def update(self, response: Response) -> None:
@@ -348,13 +350,49 @@ class Dialog:
         self._state = target
 
     def _assert_matches(self, response: Response) -> None:
-        """Verify a response belongs to this dialog."""
+        """Verify a response belongs to this dialog (Call-ID + tags).
+
+        Per RFC 3261 §12.2.2 a dialog is identified by Call-ID, local tag, and
+        remote tag. For a UAC the response carries the local tag in From and the
+        remote tag in To; mismatched tags (when present) are rejected.
+        """
         call_id = _require_header(response, "Call-ID")
         if call_id != self.dialog_id.call_id:
             raise DialogError(
                 f"Call-ID mismatch: expected {self.dialog_id.call_id}, got {call_id}",
                 rfc_ref="RFC 3261 §12.2.2",
             )
+
+        # Strict tag matching applies to UAC dialogs, where the response From
+        # carries our local tag and To carries the peer's remote tag. UAS
+        # dialogs created via from_request synthesize the local tag separately,
+        # so only Call-ID is enforced there.
+        if not self._uac:
+            return
+
+        from_value = response.headers.get("From")
+        if isinstance(from_value, list):
+            from_value = from_value[0] if from_value else None
+        if isinstance(from_value, str):
+            local_tag = _extract_tag(from_value, "From")
+            if local_tag and local_tag != self.dialog_id.local_tag:
+                raise DialogError(
+                    f"local tag mismatch: expected {self.dialog_id.local_tag}, "
+                    f"got {local_tag}",
+                    rfc_ref="RFC 3261 §12.2.2",
+                )
+
+        to_value = response.headers.get("To")
+        if isinstance(to_value, list):
+            to_value = to_value[0] if to_value else None
+        if isinstance(to_value, str):
+            remote_tag = _extract_tag(to_value, "To")
+            if remote_tag and remote_tag != self.dialog_id.remote_tag:
+                raise DialogError(
+                    f"remote tag mismatch: expected {self.dialog_id.remote_tag}, "
+                    f"got {remote_tag}",
+                    rfc_ref="RFC 3261 §12.2.2",
+                )
 
 
 def _ensure_tag(header_value: str, tag: str) -> str:

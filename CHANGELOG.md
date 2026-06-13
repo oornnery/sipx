@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 3.6.0 - 2026-06-13
+
+### Added (P2 RFC)
+
+- **PRACK / 100rel (RFC 3262).** When an INVITE provisional response carries an
+  `RSeq` and advertises `100rel` in `Require`/`Supported`, `AsyncClient` now
+  auto-sends a PRACK in the early dialog to the provisional's Contact, with a
+  `RAck` header tying it to the RSeq and INVITE CSeq.
+- **Digest SHA-256 (RFC 8760).** `AuthFlow` now supports `SHA-256` and
+  `SHA-256-sess` (plus `MD5`/`MD5-sess`) Digest algorithms in addition to MD5.
+
+### Changed
+
+- **Dialog tag matching (RFC 3261 §12.2.2).** `Dialog.update` now rejects
+  responses whose From (local) or To (remote) tag conflicts with the dialog for
+  UAC dialogs; UAS dialogs remain Call-ID-matched (synthesized local tag).
+
 ## 3.5.0 - 2026-06-13
 
 ### Added (P1 RFC, part 2)

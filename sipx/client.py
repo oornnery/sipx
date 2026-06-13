@@ -720,6 +720,10 @@ class AsyncClient:
         reliable = self._transport.transport_type in ("tcp", "tls")
         retransmit = self._config.retransmit and not reliable
         got_provisional = False
+        try:
+            prack_cseq = int(cseq_num)
+        except ValueError:
+            prack_cseq = 1
 
         loop = asyncio.get_event_loop()
         deadline = loop.time() + self._config.timeout
@@ -767,6 +771,10 @@ class AsyncClient:
                         cseq_method=cseq_method,
                     )
                     await run_hooks(self._event_hooks, "provisional", response)
+                    if is_invite and await self._maybe_send_prack(
+                        request, response, prack_cseq + 1
+                    ):
+                        prack_cseq += 1
                     continue
 
                 response.history = provisionals
@@ -814,6 +822,91 @@ class AsyncClient:
                     )
                 await self._transport.send(request.to_bytes(), remote)
                 interval = interval * 2 if invite else min(interval * 2, T2)
+
+    async def _maybe_send_prack(
+        self,
+        invite: Request,
+        provisional: Response,
+        prack_cseq: int,
+    ) -> bool:
+        """Send PRACK for a reliable provisional response (RFC 3262).
+
+        Triggers only when the provisional carries an ``RSeq`` and advertises
+        ``100rel`` in ``Require``/``Supported``. The PRACK is sent in the early
+        dialog to the provisional's Contact, with a ``RAck`` header tying it to
+        the provisional's RSeq and the INVITE CSeq.
+
+        Returns:
+            True if a PRACK was sent, False otherwise.
+        """
+        rseq = provisional.headers.get("RSeq")
+        if isinstance(rseq, list):
+            rseq = rseq[0] if rseq else None
+        if not isinstance(rseq, str) or not rseq.strip():
+            return False
+
+        tokens: list[str] = []
+        for header in ("Require", "Supported"):
+            value = provisional.headers.get(header)
+            if isinstance(value, list):
+                tokens.extend(value)
+            elif isinstance(value, str):
+                tokens.append(value)
+        if not any("100rel" in token.lower() for token in tokens):
+            return False
+
+        from_hdr = invite.headers.get("From")
+        call_id = invite.headers.get("Call-ID")
+        inv_cseq = invite.headers.get("CSeq")
+        if not (
+            isinstance(from_hdr, str)
+            and isinstance(call_id, str)
+            and isinstance(inv_cseq, str)
+        ):
+            return False
+        to_hdr = provisional.headers.get("To") or invite.headers.get("To")
+        if isinstance(to_hdr, list):
+            to_hdr = to_hdr[0] if to_hdr else ""
+        if not isinstance(to_hdr, str):
+            return False
+
+        inv_parts = extract_cseq_parts(inv_cseq)
+        inv_num = inv_parts[0] if inv_parts else "1"
+        inv_method = inv_parts[1] if inv_parts else "INVITE"
+
+        contact = provisional.headers.get("Contact")
+        if isinstance(contact, list):
+            contact = contact[0] if contact else None
+        target = _contact_uri(contact) if isinstance(contact, str) else invite.uri
+
+        branch = _new_branch()
+        transport_type = self._transport.transport_type.upper()
+        via = (
+            f"SIP/2.0/{transport_type} "
+            f"{self._config.local_host}:{self._config.local_port};branch={branch}"
+        )
+        if self._config.rport and transport_type == "UDP":
+            via += ";rport"
+
+        headers: dict[str, str | list[str]] = {
+            "Via": via,
+            "From": from_hdr,
+            "To": to_hdr,
+            "Call-ID": call_id,
+            "CSeq": f"{prack_cseq} PRACK",
+            "Max-Forwards": "70",
+            "RAck": f"{rseq.strip()} {inv_num} {inv_method}",
+            "User-Agent": self._config.user_agent,
+        }
+        prack = Request(
+            method="PRACK",
+            uri=target,
+            headers=headers,
+            body=None,
+            transport=self._transport,
+        )
+        await self._send_request(prack, _parse_remote(target))
+        return True
 
     async def request(self, method: str, uri: str, **kwargs: Any) -> Response:
         """Send a SIP request with an arbitrary method (curl-like escape hatch).
