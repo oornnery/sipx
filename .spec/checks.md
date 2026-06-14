@@ -170,6 +170,11 @@
 | 2026-06-09 | root redaction boundary scan | pass/no matches | No `sipx.security`, root `Redactor`, root `default_redactor`, or `sipx/security/**` remains. |
 | 2026-06-09 | secret/auth marker scan | pass/no matches | Python and Markdown scans found no unredacted SIP auth headers, inline LLM keys, ARI password assignments, or literal password assignments. |
 | 2026-06-09 | `uv build --all-packages --out-dir /tmp/opencode/sipx-build-1.8.1-redaction` | pass | Built root plus all app package sdists/wheels outside repo after moving redaction to `sipx_harness`. |
+| 2026-06-14 | GitHub Actions CI run `27492140958` | pass | Post-release-pipeline push; ruff, ty, pytest, build all green. |
+| 2026-06-14 | GitHub Actions Publish Package run `27489883310` | pass | Republished `sipx` 4.0.0 (sdist uploaded; wheel skipped via `skip-existing`). |
+| 2026-06-14 | GitHub Actions Create Release run `27492147682` | pass | Triggered after CI; skipped `v4.0.0` because release already exists. |
+| 2026-06-14 | PyPI `sipx==4.0.0` artifacts | pass | `sipx-4.0.0-py3-none-any.whl` and `sipx-4.0.0.tar.gz` on https://pypi.org/project/sipx/4.0.0/ |
+| 2026-06-14 | `uv run pytest` | pass | 517 passed after state/docs update. |
 
 ## Validation Policy
 

@@ -683,6 +683,16 @@ Implement `sipx` in small verified blocks. Current code has root `sipx` package 
 - [x] All 90 core tests pass; ruff/type-check clean.
 - [x] Bumped root package version to `1.19.0`.
 
+## Block 4.0.0 Done (API rename + PyPI)
+
+- [x] Renamed `AuthFlow` → `AuthDigest`, `ClientConfig` → `Settings`; deprecated aliases kept.
+- [x] `AsyncClient(settings=...)`, `client.settings`, `merged_settings()`; `config=`/`config`/`merged_config()` deprecated.
+- [x] Updated examples, tests, CLI, FastAPI to new names.
+- [x] Rewrote `README.md` for core `sipx` + `sipx.examples` only.
+- [x] Published `sipx==4.0.0` on PyPI (wheel + sdist).
+- [x] Fixed `release.yml` to publish root `sipx` only; added `workflow_dispatch` and `skip-existing`.
+- [x] Automated `create-release.yml`: published GitHub release after CI on `master`.
+
 ## Blocked Or Pending
 
 - [ ] `python -m ty check` still needs the system interpreter environment synced; configured validation now uses passing `uv run ty check`.

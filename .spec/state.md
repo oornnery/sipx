@@ -2,7 +2,7 @@
 
 ## Current Objective
 
-Implement `sipx` in verified commit blocks. Block `3.7.0` is complete: fixed response correlation for hostname targets (RFC 3261 §18) — `_remote_matches` only enforces exact host for IP-literal targets, so replies from a resolved IP (e.g. public Mizu `options.py`) are no longer dropped; added `cancel.py` example, CLI `--no-rport`/`--no-retransmit` flags, and FastAPI `/sip/invite` + `/sip/cancel`. Block `3.6.0` is complete: P2 RFC — PRACK/100rel (RFC 3262) auto-sent for reliable provisionals, Digest SHA-256/SHA-256-sess (RFC 8760) in `AuthFlow`, and UAC dialog From/To tag matching (RFC §12.2.2). The full P0/P1/P2 security/RFC hardening roadmap is now complete. Block `3.5.0`: P1 part 2 — RFC 3261 §17 retransmission in `AsyncClient._await_response`. Block `3.4.0`: P1 part 1 — rport (RFC 3581) + `learned_address`, non-2xx INVITE auto-ACK (RFC §17.1.1.3), `cancel(call_id)` (RFC §9), CSeq-method-scoped correlation. Block `3.3.0` added `apps/fastapi` (`sipx-fastapi`). Block `3.2.0` completed P0 security and `sipx/extensions/` rename. Block `3.0.0` removed legacy API; `AsyncClient` is the only client runtime.
+`sipx` **4.0.0** is on PyPI. Release pipeline is automated: CI on `master` → published GitHub release → PyPI publish (root `sipx` only). API rename complete: `AuthDigest` + `Settings` (deprecated `AuthFlow`/`ClientConfig` aliases). Block `3.7.0` fixed hostname response correlation; added `cancel.py`, CLI `--no-rport`/`--no-retransmit`, FastAPI `/sip/invite` + `/sip/cancel`. P0/P1/P2 RFC hardening complete.
 
 ## Sources Read
 
@@ -337,11 +337,10 @@ Maintained English files in the current structure are the source of truth. `IDEA
 
 ## Next
 
-1. P1 RFC: §17 timers/retransmission, auto-ACK for non-2xx INVITE, CANCEL, real Via sent-by + rport (documented in README/TODO; not yet implemented).
-2. P2: PRACK/100rel in client path, Digest SHA-256, dialog tag matching.
-3. Decide license before public distribution and Asterisk/commercial positioning.
-4. Optional: unify `sip/` sans-I/O toolkit with `protocol/` (deferred — unique, tested).
-5. Run live smoke of FastAPI app and root examples against a cooperative SIP peer.
+1. Decide license before public distribution and Asterisk/commercial positioning.
+2. Optional: unify `sip/` sans-I/O toolkit with `protocol/` (deferred — unique, tested).
+3. Run live smoke of FastAPI app and root examples against a cooperative SIP peer.
+4. Decide fate of untracked `qa_tls_scenarios.py`.
 
 ## Risks
 

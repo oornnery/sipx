@@ -14,6 +14,17 @@
   deprecated alias. Internal storage is `_settings`.
 - **`AsyncClient.merged_settings()`.** Renamed from `merged_config()`; the old
   name remains as a deprecated alias.
+- **`README.md`.** Documents core `sipx` and `sipx.examples` only; harness and
+  app packages are out of scope for the root README.
+
+### Fixed (release)
+
+- **PyPI publish.** `release.yml` builds and publishes only the root `sipx`
+  package (not workspace apps); trusted publishing is configured for `sipx` only.
+- **Release automation.** `create-release.yml` waits for CI on `master`, then
+  creates a published GitHub release (or publishes an existing draft), which
+  triggers PyPI publish. `release.yml` supports `workflow_dispatch` and
+  `skip-existing` for retries.
 
 ## 3.7.0 - 2026-06-13
 
