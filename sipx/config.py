@@ -75,9 +75,7 @@ class Settings:
             overrides = {}
 
         if isinstance(overrides, Settings):
-            overrides = {
-                f.name: getattr(overrides, f.name) for f in fields(Settings)
-            }
+            overrides = {f.name: getattr(overrides, f.name) for f in fields(Settings)}
         else:
             overrides = dict(overrides)
 

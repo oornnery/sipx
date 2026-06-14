@@ -95,7 +95,11 @@ from sipx.sip import (
 from sipx.client import AsyncClient
 from sipx.config import ClientConfig, Settings
 from sipx.models import Request, Response
-from sipx.protocol.auth import AuthDigest, AuthFlow, DigestChallenge as ProtocolDigestChallenge
+from sipx.protocol.auth import (
+    AuthDigest,
+    AuthFlow,
+    DigestChallenge as ProtocolDigestChallenge,
+)
 from sipx.protocol.dialog import (
     Dialog as ProtocolDialog,
     DialogId as ProtocolDialogId,

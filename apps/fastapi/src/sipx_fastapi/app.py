@@ -78,7 +78,9 @@ def build_client(app_settings: Settings) -> AsyncClient:
     )
     auth = None
     if app_settings.auth_configured:
-        auth = AuthDigest(username=app_settings.username, password=app_settings.password)
+        auth = AuthDigest(
+            username=app_settings.username, password=app_settings.password
+        )
     return AsyncClient(
         transport=app_settings.transport, settings=sip_settings, auth=auth
     )
