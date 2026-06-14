@@ -3,6 +3,12 @@ name: Publish Package
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        required: true
+        default: v4.0.0
 
 permissions:
   contents: read
@@ -16,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
           fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v6
@@ -32,7 +38,7 @@ jobs:
       - name: Verify release tag matches package version
         run: |
           expected="v$(uv run python -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
-          actual="${{ github.event.release.tag_name }}"
+          actual="${{ github.event.release.tag_name || inputs.tag }}"
           test "$actual" = "$expected"
 
       - name: Format check
@@ -47,8 +53,10 @@ jobs:
       - name: Test
         run: uv run pytest
 
-      - name: Build workspace packages
-        run: uv build --all-packages
+      - name: Build package
+        run: uv build
 
       - name: Publish package to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
