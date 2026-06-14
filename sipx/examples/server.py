@@ -32,7 +32,7 @@ import os
 import sys
 
 from sipx import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.examples.common import account_settings, print_json
 from sipx.models import Request, Response
 
@@ -72,14 +72,14 @@ async def serve(server_aor: str) -> None:
         server_aor: The address-of-record this UAS answers for.
     """
     s = account_settings()
-    config = ClientConfig(
+    settings = Settings(
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
         user_agent="sipx/2.0",
     )
 
-    async with AsyncClient(transport="udp", config=config) as client:
+    async with AsyncClient(transport="udp", settings=settings) as client:
 
         @client.on_options
         async def handle_options(request: Request) -> Response:

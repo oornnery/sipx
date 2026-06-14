@@ -40,7 +40,7 @@ import os
 import sys
 
 from sipx import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import (
     AuthError,
     ProtocolError,
@@ -52,7 +52,7 @@ from sipx.examples.common import (
     debug_response,
     print_json,
 )
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 from sipx.sdp import create_audio_offer
 
 
@@ -82,7 +82,7 @@ async def call(
     """
     s = account_settings()
 
-    config = ClientConfig(
+    settings = Settings(
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
@@ -90,7 +90,7 @@ async def call(
         contact_uri=s["aor"],
         user_agent="sipx/2.0",
     )
-    auth = AuthFlow(username=s["username"], password=s["credential"])
+    auth = AuthDigest(username=s["username"], password=s["credential"])
 
     # SDP needs a routable address; 0.0.0.0 is not valid in a c= line.
     sdp_host = s["local_host"] if s["local_host"] != "0.0.0.0" else "127.0.0.1"
@@ -109,7 +109,7 @@ async def call(
 
     async with AsyncClient(
         transport="udp",
-        config=config,
+        settings=settings,
         auth=auth,
         event_hooks=event_hooks,
     ) as client:

@@ -17,10 +17,10 @@ from sipx.client import (
     _parse_response,
     _remote_matches,
 )
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import TimeoutError as SipTimeoutError
 from sipx.models import Request
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 
 
 from sipx.wire import extract_branch_from_via
@@ -138,8 +138,8 @@ async def mock_transport():
 @pytest_asyncio.fixture
 async def client_with_mock(mock_transport):
     """Create an AsyncClient with a mock transport."""
-    config = ClientConfig(local_host="127.0.0.1", local_port=5060, timeout=5.0)
-    client = AsyncClient(config=config)
+    settings = Settings(local_host="127.0.0.1", local_port=5060, timeout=5.0)
+    client = AsyncClient(settings=settings)
     client._transport = mock_transport
     client._closed = False
     with patch("sipx.client._new_branch", return_value="z9hG4bKtest"):
@@ -560,7 +560,7 @@ class TestTransactionManagement:
     ):
         """Responses with a mismatched Via branch must be ignored."""
         call_id = "test-forged-branch"
-        client_with_mock._config = client_with_mock._config.merge(timeout=0.2)
+        client_with_mock._settings = client_with_mock._settings.merge(timeout=0.2)
         mock_transport.add_response(
             200,
             "OK",
@@ -598,10 +598,10 @@ class TestRportAndAck:
     @pytest.mark.asyncio
     async def test_rport_disabled_omits_parameter(self, mock_transport):
         """With rport disabled, the Via must not include rport."""
-        config = ClientConfig(
+        settings = Settings(
             local_host="127.0.0.1", local_port=5060, timeout=5.0, rport=False
         )
-        client = AsyncClient(config=config)
+        client = AsyncClient(settings=settings)
         client._transport = mock_transport
         client._closed = False
         client._receive_task = asyncio.create_task(client._receive_loop())
@@ -818,15 +818,15 @@ class TestDialogManagement:
         assert call_id in client_with_mock._dialogs
 
 
-class TestAuthFlow:
+class TestAuthDigest:
     """Tests for authentication flow integration."""
 
     @pytest.mark.asyncio
     async def test_auth_flow_handles_401(self, mock_transport):
-        """AuthFlow must handle 401 Unauthorized challenges."""
-        config = ClientConfig(local_host="127.0.0.1", local_port=5060, timeout=5.0)
-        auth = AuthFlow(username="alice", password="secret")
-        client = AsyncClient(config=config, auth=auth)
+        """AuthDigest must handle 401 Unauthorized challenges."""
+        settings = Settings(local_host="127.0.0.1", local_port=5060, timeout=5.0)
+        auth = AuthDigest(username="alice", password="secret")
+        client = AsyncClient(settings=settings, auth=auth)
         client._transport = mock_transport
         client._closed = False
         client._receive_task = asyncio.create_task(client._receive_loop())
@@ -862,10 +862,10 @@ class TestAuthFlow:
 
     @pytest.mark.asyncio
     async def test_auth_flow_handles_407(self, mock_transport):
-        """AuthFlow must handle 407 Proxy Authentication Required."""
-        config = ClientConfig(local_host="127.0.0.1", local_port=5060, timeout=5.0)
-        auth = AuthFlow(username="alice", password="secret")
-        client = AsyncClient(config=config, auth=auth)
+        """AuthDigest must handle 407 Proxy Authentication Required."""
+        settings = Settings(local_host="127.0.0.1", local_port=5060, timeout=5.0)
+        auth = AuthDigest(username="alice", password="secret")
+        client = AsyncClient(settings=settings, auth=auth)
         client._transport = mock_transport
         client._closed = False
         client._receive_task = asyncio.create_task(client._receive_loop())
@@ -953,7 +953,7 @@ class TestTimeoutHandling:
         self, client_with_mock, mock_transport
     ):
         """Timeout must raise SipTimeoutError."""
-        client_with_mock._config.timeout = 0.1
+        client_with_mock._settings.timeout = 0.1
 
         with pytest.raises(SipTimeoutError):
             await client_with_mock.options("sip:bob@example.com")
@@ -965,8 +965,8 @@ class TestRetransmission:
     @pytest.mark.asyncio
     async def test_retransmits_until_response(self, mock_transport):
         """A non-INVITE request must be retransmitted while no response arrives."""
-        config = ClientConfig(local_host="127.0.0.1", local_port=5060, timeout=5.0)
-        client = AsyncClient(config=config)
+        settings = Settings(local_host="127.0.0.1", local_port=5060, timeout=5.0)
+        client = AsyncClient(settings=settings)
         client._transport = mock_transport
         client._closed = False
 
@@ -996,10 +996,10 @@ class TestRetransmission:
     @pytest.mark.asyncio
     async def test_no_retransmit_when_disabled(self, mock_transport):
         """With retransmit disabled, only the initial request is sent."""
-        config = ClientConfig(
+        settings = Settings(
             local_host="127.0.0.1", local_port=5060, timeout=0.2, retransmit=False
         )
-        client = AsyncClient(config=config)
+        client = AsyncClient(settings=settings)
         client._transport = mock_transport
         client._closed = False
 
@@ -1018,8 +1018,8 @@ class TestRetransmission:
     @pytest.mark.asyncio
     async def test_invite_stops_retransmit_after_provisional(self, mock_transport):
         """INVITE must stop retransmitting once a provisional response arrives."""
-        config = ClientConfig(local_host="127.0.0.1", local_port=5060, timeout=5.0)
-        client = AsyncClient(config=config)
+        settings = Settings(local_host="127.0.0.1", local_port=5060, timeout=5.0)
+        client = AsyncClient(settings=settings)
         client._transport = mock_transport
         client._closed = False
 

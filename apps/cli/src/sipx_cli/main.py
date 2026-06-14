@@ -9,7 +9,7 @@ from collections.abc import Coroutine, Sequence
 from pathlib import Path
 from typing import Any
 
-from sipx import AsyncClient, AuthFlow, ClientConfig, Request, Response
+from sipx import AsyncClient, AuthDigest, Settings, Request, Response
 
 
 class CliError(RuntimeError):
@@ -206,7 +206,7 @@ def _build_client(args: argparse.Namespace, from_uri: str) -> AsyncClient:
     if args.contact_user:
         contact_uri = f"sip:{args.contact_user}@{args.local_host}"
 
-    config = ClientConfig(
+    settings = Settings(
         transport=args.transport,
         local_host=args.local_host,
         local_port=args.local_port,
@@ -218,7 +218,7 @@ def _build_client(args: argparse.Namespace, from_uri: str) -> AsyncClient:
     )
     auth = None
     if args.username and args.password:
-        auth = AuthFlow(username=args.username, password=args.password)
+        auth = AuthDigest(username=args.username, password=args.password)
 
     event_hooks = None
     if args.debug_sip:
@@ -230,7 +230,7 @@ def _build_client(args: argparse.Namespace, from_uri: str) -> AsyncClient:
 
     return AsyncClient(
         transport=args.transport,
-        config=config,
+        settings=settings,
         event_hooks=event_hooks,
         auth=auth,
     )

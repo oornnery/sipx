@@ -10,12 +10,13 @@ References:
     RFC 3261 §22 - Usage of HTTP Authentication
 """
 
-from sipx.protocol.auth import AuthFlow, DigestChallenge
+from sipx.protocol.auth import AuthDigest, AuthFlow, DigestChallenge
 from sipx.protocol.dialog import Dialog, DialogId, DialogState
 from sipx.protocol.hooks import EventHooks
 from sipx.protocol.transaction import ClientTransaction, ServerTransaction
 
 __all__ = [
+    "AuthDigest",
     "AuthFlow",
     "ClientTransaction",
     "DigestChallenge",

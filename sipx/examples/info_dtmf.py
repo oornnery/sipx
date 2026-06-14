@@ -38,7 +38,7 @@ import os
 import sys
 
 from sipx import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import (
     AuthError,
     ProtocolError,
@@ -50,7 +50,7 @@ from sipx.examples.common import (
     debug_response,
     print_json,
 )
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 
 
 def _dtmf_relay_body(digit: str, duration: int) -> bytes:
@@ -69,7 +69,7 @@ async def send_dtmf(target: str, digits: str, duration: int, debug: bool) -> Non
     """
     s = account_settings()
 
-    config = ClientConfig(
+    settings = Settings(
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
@@ -77,7 +77,7 @@ async def send_dtmf(target: str, digits: str, duration: int, debug: bool) -> Non
         contact_uri=s["aor"],
         user_agent="sipx/2.0",
     )
-    auth = AuthFlow(username=s["username"], password=s["credential"])
+    auth = AuthDigest(username=s["username"], password=s["credential"])
 
     event_hooks = {}
     if debug:
@@ -87,7 +87,7 @@ async def send_dtmf(target: str, digits: str, duration: int, debug: bool) -> Non
     results = []
     async with AsyncClient(
         transport="udp",
-        config=config,
+        settings=settings,
         auth=auth,
         event_hooks=event_hooks,
     ) as client:

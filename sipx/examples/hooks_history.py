@@ -36,18 +36,18 @@ import asyncio
 import sys
 
 from sipx import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import SipError
 from sipx.examples.common import account_settings, print_json
 from sipx.models import Request, Response
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 
 
 async def show_hooks_and_history() -> None:
     """Send a REGISTER while recording hook events and response history."""
     s = account_settings()
 
-    config = ClientConfig(
+    settings = Settings(
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
@@ -55,7 +55,7 @@ async def show_hooks_and_history() -> None:
         contact_uri=s["aor"],
         user_agent="sipx/2.0",
     )
-    auth = AuthFlow(username=s["username"], password=s["credential"])
+    auth = AuthDigest(username=s["username"], password=s["credential"])
 
     seen: list[str] = []
 
@@ -76,7 +76,7 @@ async def show_hooks_and_history() -> None:
 
     async with AsyncClient(
         transport="udp",
-        config=config,
+        settings=settings,
         auth=auth,
         event_hooks=event_hooks,
     ) as client:

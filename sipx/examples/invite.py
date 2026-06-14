@@ -43,7 +43,7 @@ import sys
 from typing import Any
 
 from sipx import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import (
     AuthError,
     ProtocolError,
@@ -55,7 +55,7 @@ from sipx.examples.common import (
     debug_response,
     print_json,
 )
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 from sipx.sdp import create_audio_offer, parse_sdp
 
 
@@ -69,8 +69,8 @@ async def invite(
 
     This function demonstrates the complete call setup flow:
     1. Load account settings from environment variables
-    2. Create a ClientConfig with local bind address and timeout
-    3. Create an AuthFlow for automatic digest authentication
+    2. Create a Settings with local bind address and timeout
+    3. Create an AuthDigest for automatic digest authentication
     4. Build an SDP offer with audio codecs
     5. Create an AsyncClient with the config and auth
     6. Send an INVITE request with the SDP body
@@ -85,10 +85,10 @@ async def invite(
     # Load account settings from environment variables
     s = account_settings()
 
-    # Step 1: Create ClientConfig
+    # Step 1: Create Settings
     # For INVITE, we need to set from_uri and contact_uri for proper
     # dialog establishment per RFC 3261 §13.
-    config = ClientConfig(
+    settings = Settings(
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
@@ -97,10 +97,10 @@ async def invite(
         user_agent="sipx/2.0",
     )
 
-    # Step 2: Create AuthFlow for automatic digest authentication
+    # Step 2: Create AuthDigest for automatic digest authentication
     # INVITE requests often require authentication, especially for
     # outbound calls through a PBX or proxy.
-    auth = AuthFlow(
+    auth = AuthDigest(
         username=s["username"],
         password=s["credential"],
     )
@@ -138,7 +138,7 @@ async def invite(
     # Step 5: Create and use the AsyncClient
     async with AsyncClient(
         transport="udp",
-        config=config,
+        settings=settings,
         auth=auth,
         event_hooks=event_hooks,
     ) as client:
@@ -147,7 +147,7 @@ async def invite(
         # - Builds an INVITE request with proper dialog headers
         # - Includes the SDP offer in the body
         # - Sends it to the target (extracted from URI)
-        # - Handles auth challenges automatically via AuthFlow
+        # - Handles auth challenges automatically via AuthDigest
         # - Waits for provisional (1xx) and final (2xx/3xx-6xx) responses
         # - Returns the final Response
         #

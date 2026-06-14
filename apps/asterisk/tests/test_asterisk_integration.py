@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from sipx import AsyncClient, ClientConfig
+from sipx import AsyncClient, Settings
 from sipx_asterisk import AsteriskAriClient, AsteriskAriConfig
 
 
@@ -43,12 +43,12 @@ def test_async_client_calls_asterisk_as_uas() -> None:
 async def _async_client_calls_asterisk_as_uas() -> None:
     host = os.getenv("SIPX_ASTERISK_SIP_HOST", "127.0.0.1")
     port = int(os.getenv("SIPX_ASTERISK_SIP_PORT", "5060"))
-    config = ClientConfig(
+    settings = Settings(
         local_host="127.0.0.1",
         timeout=3.0,
         from_uri="sip:alice@sipx.local",
     )
-    async with AsyncClient(config=config) as client:
+    async with AsyncClient(settings=settings) as client:
         response = await client.invite(f"sip:1001@{host}:{port}")
         assert 200 <= response.status_code < 300
 

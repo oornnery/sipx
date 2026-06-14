@@ -12,10 +12,10 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING, Awaitable, Callable
 
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import ProtocolError, TimeoutError as SipTimeoutError
 from sipx.models import Request, Response
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 from sipx.protocol.dialog import Dialog
 from sipx.protocol.hooks import EventHooks, run_hooks
 from sipx.protocol.transaction import (
@@ -206,22 +206,28 @@ class AsyncClient:
     def __init__(
         self,
         transport: str = "udp",
-        config: ClientConfig | None = None,
+        settings: Settings | None = None,
         event_hooks: EventHooks | None = None,
-        auth: AuthFlow | None = None,
+        auth: AuthDigest | None = None,
+        *,
+        config: Settings | None = None,
     ) -> None:
         """Initialize AsyncClient.
 
         Args:
             transport: Transport type ("udp", "tcp", or "tls").
-            config: Client configuration. Uses defaults if None.
+            settings: Client defaults merged into every request.
             event_hooks: Dict mapping event names to lists of callables.
-            auth: Authentication flow for automatic challenge handling.
+            auth: Digest auth for automatic 401/407 challenge handling.
+            config: Deprecated alias for ``settings``.
 
         Raises:
-            ValueError: If transport type is not supported.
+            ValueError: If transport type is not supported or both ``settings``
+                and ``config`` are passed.
         """
-        self._config = config or ClientConfig()
+        if settings is not None and config is not None:
+            raise ValueError("pass only settings=, not both settings= and config=")
+        self._settings = settings or config or Settings()
         self._event_hooks: EventHooks = dict(event_hooks) if event_hooks else {}
         self._auth = auth
         self._closed = True
@@ -235,10 +241,10 @@ class AsyncClient:
         # Create transport using registry
         registry = TransportRegistry()
         transport_config = TransportConfig(
-            local_host=self._config.local_host,
-            local_port=self._config.local_port,
-            timeout=self._config.timeout,
-            max_message_size=self._config.max_message_size,
+            local_host=self._settings.local_host,
+            local_port=self._settings.local_port,
+            timeout=self._settings.timeout,
+            max_message_size=self._settings.max_message_size,
         )
         self._transport = registry.create(transport, transport_config)
 
@@ -414,9 +420,14 @@ class AsyncClient:
         return self._transport
 
     @property
-    def config(self) -> ClientConfig:
-        """Return the client configuration."""
-        return self._config
+    def settings(self) -> Settings:
+        """Return the client settings."""
+        return self._settings
+
+    @property
+    def config(self) -> Settings:
+        """Deprecated alias for :attr:`settings`."""
+        return self._settings
 
     @property
     def event_hooks(self) -> EventHooks:
@@ -424,7 +435,7 @@ class AsyncClient:
         return self._event_hooks
 
     @property
-    def auth(self) -> AuthFlow | None:
+    def auth(self) -> AuthDigest | None:
         """Return the authentication flow, if configured."""
         return self._auth
 
@@ -566,7 +577,7 @@ class AsyncClient:
 
         return response
 
-    def merged_config(
+    def merged_settings(
         self,
         *,
         transport: str | None = None,
@@ -574,13 +585,13 @@ class AsyncClient:
         headers: dict[str, str] | None = None,
         params: dict[str, str] | None = None,
         cookies: dict[str, str] | None = None,
-        auth: AuthFlow | None = None,
+        auth: AuthDigest | None = None,
         **extra: Any,
-    ) -> tuple[ClientConfig, AuthFlow | None]:
+    ) -> tuple[Settings, AuthDigest | None]:
         """Merge per-request overrides into client defaults.
 
-        Returns a new ClientConfig and an optional AuthFlow.  The caller
-        should use the returned config/auth for the individual request.
+        Returns a new ``Settings`` and an optional ``AuthDigest``.  The caller
+        should use the returned values for the individual request.
 
         Args:
             transport: Override transport type.
@@ -588,11 +599,11 @@ class AsyncClient:
             headers: Extra headers merged with client defaults.
             params: Extra query params merged with client defaults.
             cookies: Extra cookies merged with client defaults.
-            auth: Override auth flow (falls back to client auth if None).
-            **extra: Additional config fields forwarded to ClientConfig.merge().
+            auth: Override auth (falls back to client auth if None).
+            **extra: Additional fields forwarded to ``Settings.merge()``.
 
         Returns:
-            (merged_config, effective_auth)
+            ``(merged_settings, effective_auth)``
         """
         overrides: dict[str, Any] = {}
         if transport is not None:
@@ -607,9 +618,31 @@ class AsyncClient:
             overrides["cookies"] = cookies
         overrides.update(extra)
 
-        merged = self._config.merge(overrides)
+        merged = self._settings.merge(overrides)
         effective_auth = auth if auth is not None else self._auth
         return merged, effective_auth
+
+    def merged_config(
+        self,
+        *,
+        transport: str | None = None,
+        timeout: float | None = None,
+        headers: dict[str, str] | None = None,
+        params: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
+        auth: AuthDigest | None = None,
+        **extra: Any,
+    ) -> tuple[Settings, AuthDigest | None]:
+        """Deprecated alias for :meth:`merged_settings`."""
+        return self.merged_settings(
+            transport=transport,
+            timeout=timeout,
+            headers=headers,
+            params=params,
+            cookies=cookies,
+            auth=auth,
+            **extra,
+        )
 
     def _build_request(
         self,
@@ -625,7 +658,7 @@ class AsyncClient:
 
         call_id = extra_headers.pop("Call-ID", _new_call_id())
         from_uri = extra_headers.pop(
-            "From", self._config.from_uri or f"sip:user@{self._config.local_host}"
+            "From", self._settings.from_uri or f"sip:user@{self._settings.local_host}"
         )
         from_tag = _new_tag()
         to_uri = extra_headers.pop("To", uri)
@@ -633,10 +666,10 @@ class AsyncClient:
         branch = _new_branch()
 
         transport_type = self._transport.transport_type.upper()
-        local_host = self._config.local_host
-        local_port = self._config.local_port
+        local_host = self._settings.local_host
+        local_port = self._settings.local_port
         via = f"SIP/2.0/{transport_type} {local_host}:{local_port};branch={branch}"
-        if self._config.rport and transport_type == "UDP":
+        if self._settings.rport and transport_type == "UDP":
             via += ";rport"
 
         headers: dict[str, str | list[str]] = {
@@ -647,12 +680,12 @@ class AsyncClient:
             "CSeq": f"{cseq} {method}",
             "Max-Forwards": "70",
             "User-Agent": sanitize_sip_token(
-                self._config.user_agent, field="User-Agent"
+                self._settings.user_agent, field="User-Agent"
             ),
         }
 
         if method in ("INVITE", "REGISTER", "SUBSCRIBE"):
-            contact_uri = self._config.contact_uri or str(from_uri)
+            contact_uri = self._settings.contact_uri or str(from_uri)
             headers["Contact"] = (
                 f"<{sanitize_sip_token(str(contact_uri), field='Contact URI')}>"
             )
@@ -743,7 +776,7 @@ class AsyncClient:
         branch = extract_top_via_branch(request.headers)
         is_invite = request.method == "INVITE"
         reliable = self._transport.transport_type in ("tcp", "tls")
-        retransmit = self._config.retransmit and not reliable
+        retransmit = self._settings.retransmit and not reliable
         got_provisional = False
         try:
             prack_cseq = int(cseq_num)
@@ -751,7 +784,7 @@ class AsyncClient:
             prack_cseq = 1
 
         loop = asyncio.get_event_loop()
-        deadline = loop.time() + self._config.timeout
+        deadline = loop.time() + self._settings.timeout
         future: asyncio.Future[bytes] = loop.create_future()
         self._pending_responses[key] = _PendingMatch(
             future=future,
@@ -908,9 +941,9 @@ class AsyncClient:
         transport_type = self._transport.transport_type.upper()
         via = (
             f"SIP/2.0/{transport_type} "
-            f"{self._config.local_host}:{self._config.local_port};branch={branch}"
+            f"{self._settings.local_host}:{self._settings.local_port};branch={branch}"
         )
-        if self._config.rport and transport_type == "UDP":
+        if self._settings.rport and transport_type == "UDP":
             via += ";rport"
 
         headers: dict[str, str | list[str]] = {
@@ -921,7 +954,7 @@ class AsyncClient:
             "CSeq": f"{prack_cseq} PRACK",
             "Max-Forwards": "70",
             "RAck": f"{rseq.strip()} {inv_num} {inv_method}",
-            "User-Agent": self._config.user_agent,
+            "User-Agent": self._settings.user_agent,
         }
         prack = Request(
             method="PRACK",
@@ -1011,8 +1044,8 @@ class AsyncClient:
         cseq = dialog.next_cseq(method)
         branch = _new_branch()
         transport_type = self._transport.transport_type.upper()
-        local_host = self._config.local_host
-        local_port = self._config.local_port
+        local_host = self._settings.local_host
+        local_port = self._settings.local_port
 
         headers: dict[str, str | list[str]] = {
             "Via": f"SIP/2.0/{transport_type} {local_host}:{local_port};branch={branch}",
@@ -1021,7 +1054,7 @@ class AsyncClient:
             "Call-ID": dialog.call_id,
             "CSeq": f"{cseq} {method}",
             "Max-Forwards": "70",
-            "User-Agent": self._config.user_agent,
+            "User-Agent": self._settings.user_agent,
         }
         if dialog.route_set:
             headers["Route"] = list(dialog.route_set)
@@ -1114,7 +1147,7 @@ class AsyncClient:
             "Call-ID": call_id,
             "CSeq": f"{cseq_num} ACK",
             "Max-Forwards": "70",
-            "User-Agent": self._config.user_agent,
+            "User-Agent": self._settings.user_agent,
         }
         ack = Request(
             method="ACK",
@@ -1176,7 +1209,7 @@ class AsyncClient:
             "Call-ID": call_id,
             "CSeq": f"{cseq_num} CANCEL",
             "Max-Forwards": "70",
-            "User-Agent": self._config.user_agent,
+            "User-Agent": self._settings.user_agent,
         }
         cancel = Request(
             method="CANCEL",

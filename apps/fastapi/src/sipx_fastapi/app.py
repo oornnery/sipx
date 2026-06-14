@@ -8,7 +8,8 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from sipx import AsyncClient, AuthFlow, ClientConfig
+from sipx import AsyncClient, AuthDigest
+from sipx.config import Settings as SipSettings
 from sipx.exceptions import AuthError, ProtocolError, TimeoutError as SipTimeoutError
 
 from sipx_fastapi.config import Settings, load_settings
@@ -65,20 +66,22 @@ class GenericSipRequest(BaseModel):
     )
 
 
-def build_client(settings: Settings) -> AsyncClient:
+def build_client(app_settings: Settings) -> AsyncClient:
     """Create an AsyncClient from service settings."""
-    config = ClientConfig(
-        local_host=settings.local_host,
-        local_port=settings.local_port,
-        timeout=settings.timeout,
-        from_uri=settings.aor,
-        contact_uri=settings.aor,
-        user_agent=settings.user_agent,
+    sip_settings = SipSettings(
+        local_host=app_settings.local_host,
+        local_port=app_settings.local_port,
+        timeout=app_settings.timeout,
+        from_uri=app_settings.aor,
+        contact_uri=app_settings.aor,
+        user_agent=app_settings.user_agent,
     )
     auth = None
-    if settings.auth_configured:
-        auth = AuthFlow(username=settings.username, password=settings.password)
-    return AsyncClient(transport=settings.transport, config=config, auth=auth)
+    if app_settings.auth_configured:
+        auth = AuthDigest(username=app_settings.username, password=app_settings.password)
+    return AsyncClient(
+        transport=app_settings.transport, settings=sip_settings, auth=auth
+    )
 
 
 def _get_client(request: Request) -> AsyncClient:

@@ -43,7 +43,7 @@ import os
 import sys
 
 from sipx import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import (
     AuthError,
     ProtocolError,
@@ -55,7 +55,7 @@ from sipx.examples.common import (
     debug_response,
     print_json,
 )
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 
 
 async def message(
@@ -68,8 +68,8 @@ async def message(
 
     This function demonstrates the complete messaging flow:
     1. Load account settings from environment variables
-    2. Create a ClientConfig with local bind address and timeout
-    3. Create an AuthFlow for automatic digest authentication
+    2. Create a Settings with local bind address and timeout
+    3. Create an AuthDigest for automatic digest authentication
     4. Create an AsyncClient with the config and auth
     5. Send one or more MESSAGE requests
     6. Handle responses and delivery confirmations
@@ -83,11 +83,11 @@ async def message(
     # Load account settings from environment variables
     s = account_settings()
 
-    # Step 1: Create ClientConfig
+    # Step 1: Create Settings
     # For MESSAGE, we need from_uri for the From header.
     # MESSAGE is a standalone transaction (no dialog), so contact_uri
     # is optional but included for completeness.
-    config = ClientConfig(
+    settings = Settings(
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
@@ -96,10 +96,10 @@ async def message(
         user_agent="sipx/2.0",
     )
 
-    # Step 2: Create AuthFlow for automatic digest authentication
+    # Step 2: Create AuthDigest for automatic digest authentication
     # MESSAGE requests often require authentication when sent through
     # a proxy or to external domains.
-    auth = AuthFlow(
+    auth = AuthDigest(
         username=s["username"],
         password=s["credential"],
     )
@@ -113,7 +113,7 @@ async def message(
     # Step 4: Create and use the AsyncClient
     async with AsyncClient(
         transport="udp",
-        config=config,
+        settings=settings,
         auth=auth,
         event_hooks=event_hooks,
     ) as client:
@@ -122,7 +122,7 @@ async def message(
         # - Builds a MESSAGE request with proper headers
         # - Includes the text body with Content-Type
         # - Sends it to the target (extracted from URI)
-        # - Handles auth challenges automatically via AuthFlow
+        # - Handles auth challenges automatically via AuthDigest
         # - Returns the Response (2xx = delivered, 4xx/5xx = failed)
         #
         # MESSAGE is a standalone transaction per RFC 3428:

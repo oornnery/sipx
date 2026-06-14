@@ -11,8 +11,8 @@ This guide helps you move from the `SipUac` / `SipUas` API to the new `AsyncClie
 | `SipCall` object | `Response` object |
 | `SipProvisionalResponse` | Removed; handle provisional logic in your UAS handler |
 | `aor`, `registrar`, `remote` in constructor | Passed as URI strings to methods |
-| `username`, `password` in constructor | `AuthFlow` object passed to constructor |
-| `local_host`, `local_port`, `timeout` in constructor | `ClientConfig` dataclass |
+| `username`, `password` in constructor | `AuthDigest` object passed to constructor |
+| `local_host`, `local_port`, `timeout` in constructor | `Settings` dataclass |
 | `mode="strict"` / `mode="lab"` | Removed; lab hooks not supported |
 | UDP-only transport | UDP, TCP, and TLS supported |
 | `event_hooks` dict | Same pattern, but `sdp` and `retransmission` hooks removed |
@@ -45,16 +45,15 @@ uac = SipUac(
 **New API:**
 
 ```python
-from sipx import AsyncClient, ClientConfig
-from sipx.protocol.auth import AuthFlow
+from sipx import AsyncClient, AuthDigest, Settings
 
-config = ClientConfig(
+settings = Settings(
     local_host="0.0.0.0",
     local_port=5060,
     timeout=30.0,
 )
-auth = AuthFlow(username="alice", password="secret")
-client = AsyncClient(transport="udp", config=config, auth=auth)
+auth = AuthDigest(username="alice", password="secret")
+client = AsyncClient(transport="udp", settings=settings, auth=auth)
 ```
 
 
@@ -76,7 +75,7 @@ async with SipUac(
 **New API:**
 
 ```python
-async with AsyncClient(auth=AuthFlow(username="alice", password="secret")) as client:
+async with AsyncClient(auth=AuthDigest(username="alice", password="secret")) as client:
     response = await client.register("sip:example.com")
     print(response.status_code)
 ```
@@ -103,7 +102,7 @@ async with SipUac(
 ```python
 from sipx.sdp import create_audio_offer
 
-async with AsyncClient(auth=AuthFlow(username="alice", password="secret")) as client:
+async with AsyncClient(auth=AuthDigest(username="alice", password="secret")) as client:
     offer = create_audio_offer(
         connection_address="192.168.1.10",
         port=10000,
@@ -334,7 +333,7 @@ response = await client.subscribe(
 
 2. **SipCall removed.** The new API returns `Response` objects. Call state, dialogs, and media must be managed manually.
 
-3. **Constructor parameters moved.** `aor`, `registrar`, `remote`, `username`, `password`, and `contact_user` are no longer accepted by the client constructor. Pass URIs to methods and credentials via `AuthFlow`.
+3. **Constructor parameters moved.** `aor`, `registrar`, `remote`, `username`, `password`, and `contact_user` are no longer accepted by the client constructor. Pass URIs to methods and credentials via `AuthDigest`.
 
 4. **SipProvisionalResponse removed.** UAS provisional responses are no longer configured with `SipProvisionalResponse`. Build `Response` objects with status codes in the `1xx` range inside your handler.
 
@@ -375,12 +374,12 @@ You must build SDP bodies with `sipx.sdp.create_audio_offer` and `sipx.sdp.creat
 
 ### How do I handle authentication?
 
-Create an `AuthFlow` object and pass it to `AsyncClient`. The client automatically retries on `401` and `407` responses.
+Create an `AuthDigest` object and pass it to `AsyncClient`. The client automatically retries on `401` and `407` responses.
 
 ```python
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 
-auth = AuthFlow(username="alice", password="secret")
+auth = AuthDigest(username="alice", password="secret")
 client = AsyncClient(auth=auth)
 ```
 
@@ -431,11 +430,11 @@ curl -s http://127.0.0.1:8000/health
 
 ### How do I set custom headers on every request?
 
-Use `ClientConfig.headers` for default headers, or pass them as keyword arguments to individual methods.
+Use `Settings.headers` for default headers, or pass them as keyword arguments to individual methods.
 
 ```python
-config = ClientConfig(headers={"X-Custom": "value"})
-client = AsyncClient(config=config)
+config = Settings(headers={"X-Custom": "value"})
+client = AsyncClient(settings=settings)
 
 # Or per-request
 response = await client.options("sip:example.com", X_Custom="override")

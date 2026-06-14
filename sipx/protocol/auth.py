@@ -42,11 +42,11 @@ class DigestChallenge:
     opaque: str | None = None
 
 
-class AuthFlow:
-    """Generator-based authentication flow.
+class AuthDigest:
+    """Digest authentication with automatic 401/407 challenge retry.
 
     Usage:
-        auth = AuthFlow(username='alice', password='secret')
+        auth = AuthDigest(username='alice', password='secret')
         flow = auth.auth_flow(request)
 
         # First request (no auth)
@@ -263,3 +263,7 @@ class AuthFlow:
     def _generate_cnonce(self) -> str:
         """Generate a client nonce value."""
         return os.urandom(8).hex()
+
+
+# Deprecated alias; removed in a future release.
+AuthFlow = AuthDigest

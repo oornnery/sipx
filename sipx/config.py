@@ -1,8 +1,8 @@
-"""Client configuration for the sipx AsyncClient.
+"""Client settings for the sipx AsyncClient.
 
 Holds connection defaults (transport, bind address, timeout, max message
 size) and httpx-style request defaults (User-Agent, headers, params,
-cookies) that are merged into every outgoing request. ``ClientConfig.merge``
+cookies) that are merged into every outgoing request. ``Settings.merge``
 returns a new config with per-call overrides without mutating the base.
 
 References:
@@ -18,8 +18,8 @@ from typing import Any
 
 
 @dataclass
-class ClientConfig:
-    """Configuration for SIP client behavior.
+class Settings:
+    """Default SIP client settings merged into every outgoing request.
 
     Defaults match existing sipx behavior where applicable.
     New httpx-like fields (user_agent, headers, params, cookies) are added
@@ -56,37 +56,37 @@ class ClientConfig:
     cookies: dict[str, str] | None = None
 
     def merge(
-        self, overrides: dict[str, Any] | "ClientConfig" | None = None, **kwargs: Any
-    ) -> "ClientConfig":
-        """Merge overrides into this config and return a new ClientConfig.
+        self, overrides: dict[str, Any] | "Settings" | None = None, **kwargs: Any
+    ) -> "Settings":
+        """Merge overrides into these settings and return a new ``Settings``.
 
         Supports merging headers, params, cookies (dicts are shallow-merged).
         Simple fields are overridden.  None values in overrides are ignored
         so that ``merge(timeout=None)`` does not wipe the default.
 
         Args:
-            overrides: Mapping or ClientConfig with override values.
+            overrides: Mapping or Settings with override values.
             **kwargs: Additional override keyword arguments.
 
         Returns:
-            New ClientConfig with merged values.
+            New Settings with merged values.
         """
         if overrides is None:
             overrides = {}
 
-        if isinstance(overrides, ClientConfig):
+        if isinstance(overrides, Settings):
             overrides = {
-                f.name: getattr(overrides, f.name) for f in fields(ClientConfig)
+                f.name: getattr(overrides, f.name) for f in fields(Settings)
             }
         else:
             overrides = dict(overrides)
 
         overrides.update(kwargs)
 
-        current = {f.name: getattr(self, f.name) for f in fields(ClientConfig)}
+        current = {f.name: getattr(self, f.name) for f in fields(Settings)}
 
         merged: dict[str, Any] = {}
-        for f in fields(ClientConfig):
+        for f in fields(Settings):
             name = f.name
             old = current[name]
             new = overrides.get(name)
@@ -103,4 +103,8 @@ class ClientConfig:
             else:
                 merged[name] = deepcopy(old)
 
-        return ClientConfig(**merged)
+        return Settings(**merged)
+
+
+# Deprecated alias; removed in a future release.
+ClientConfig = Settings

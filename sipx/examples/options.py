@@ -30,7 +30,7 @@ import os
 import sys
 
 from sipx import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import (
     AuthError,
     ProtocolError,
@@ -42,7 +42,7 @@ from sipx.examples.common import (
     debug_response,
     print_json,
 )
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 
 
 async def options(target: str, debug: bool) -> None:
@@ -54,7 +54,7 @@ async def options(target: str, debug: bool) -> None:
     """
     s = account_settings()
 
-    config = ClientConfig(
+    settings = Settings(
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
@@ -62,7 +62,7 @@ async def options(target: str, debug: bool) -> None:
         contact_uri=s["aor"],
         user_agent="sipx/2.0",
     )
-    auth = AuthFlow(username=s["username"], password=s["credential"])
+    auth = AuthDigest(username=s["username"], password=s["credential"])
 
     event_hooks = {}
     if debug:
@@ -71,7 +71,7 @@ async def options(target: str, debug: bool) -> None:
 
     async with AsyncClient(
         transport="udp",
-        config=config,
+        settings=settings,
         auth=auth,
         event_hooks=event_hooks,
     ) as client:

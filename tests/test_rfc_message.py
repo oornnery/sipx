@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 
 from sipx.client import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import ProtocolError
 from sipx.models import Request
 
@@ -80,8 +80,8 @@ async def mock_transport():
 @pytest_asyncio.fixture
 async def client_with_mock(mock_transport):
     """Create an AsyncClient with a mock transport."""
-    config = ClientConfig(local_host="127.0.0.1", local_port=5060, timeout=5.0)
-    client = AsyncClient(config=config)
+    settings = Settings(local_host="127.0.0.1", local_port=5060, timeout=5.0)
+    client = AsyncClient(settings=settings)
     client._transport = mock_transport
     client._closed = False
     with patch("sipx.client._new_branch", return_value="z9hG4bKtest"):

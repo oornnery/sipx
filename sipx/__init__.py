@@ -93,9 +93,9 @@ from sipx.sip import (
     sip_wire_event_name,
 )
 from sipx.client import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import ClientConfig, Settings
 from sipx.models import Request, Response
-from sipx.protocol.auth import AuthFlow, DigestChallenge as ProtocolDigestChallenge
+from sipx.protocol.auth import AuthDigest, AuthFlow, DigestChallenge as ProtocolDigestChallenge
 from sipx.protocol.dialog import (
     Dialog as ProtocolDialog,
     DialogId as ProtocolDialogId,
@@ -121,9 +121,11 @@ from sipx.summary import (
 
 __all__ = [
     "AsyncClient",
+    "AuthDigest",
     "AuthFlow",
     "AudioFrame",
     "ClientConfig",
+    "Settings",
     "ClientTransaction",
     "ProtocolDigestChallenge",
     "ProtocolDialog",

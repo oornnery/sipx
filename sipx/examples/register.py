@@ -4,7 +4,7 @@ This example demonstrates how to register a SIP user agent with a registrar
 server using the AsyncClient. It shows:
 
 1. Creating an AsyncClient with configuration
-2. Setting up automatic digest authentication with AuthFlow
+2. Setting up automatic digest authentication with AuthDigest
 3. Sending a REGISTER request
 4. Handling the response and extracting registration state
 5. Proper error handling for common failures
@@ -40,7 +40,7 @@ import os
 import sys
 
 from sipx import AsyncClient
-from sipx.config import ClientConfig
+from sipx.config import Settings
 from sipx.exceptions import AuthError, ProtocolError, TimeoutError as SipTimeoutError
 from sipx.examples.common import (
     account_settings,
@@ -48,7 +48,7 @@ from sipx.examples.common import (
     debug_response,
     print_json,
 )
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 
 
 async def register(expires: int, debug: bool) -> None:
@@ -56,8 +56,8 @@ async def register(expires: int, debug: bool) -> None:
 
     This function demonstrates the complete registration flow:
     1. Load account settings from environment variables
-    2. Create a ClientConfig with local bind address and timeout
-    3. Create an AuthFlow for automatic digest authentication
+    2. Create a Settings with local bind address and timeout
+    3. Create an AuthDigest for automatic digest authentication
     4. Create an AsyncClient with the config and auth
     5. Send a REGISTER request to the registrar
     6. Handle the response and extract registration state
@@ -70,14 +70,14 @@ async def register(expires: int, debug: bool) -> None:
     # These defaults to the public Mizu demo account for easy testing
     s = account_settings()
 
-    # Step 1: Create ClientConfig
-    # ClientConfig holds transport and identity settings for the client.
+    # Step 1: Create Settings
+    # Settings holds transport and identity settings for the client.
     # - local_host/local_port: Where to bind the UDP socket
     # - timeout: How long to wait for responses
     # - from_uri: The From header URI (usually the AOR)
     # - contact_uri: The Contact header URI (where to receive requests)
     # - user_agent: The User-Agent header value
-    config = ClientConfig(
+    settings = Settings(
         local_host=s["local_host"],
         local_port=s["local_port"],
         timeout=s["timeout"],
@@ -86,13 +86,13 @@ async def register(expires: int, debug: bool) -> None:
         user_agent="sipx/2.0",
     )
 
-    # Step 2: Create AuthFlow for automatic digest authentication
-    # AuthFlow handles 401/407 challenges automatically:
+    # Step 2: Create AuthDigest for automatic digest authentication
+    # AuthDigest handles 401/407 challenges automatically:
     # - First request is sent without auth
-    # - If server responds with 401/407, AuthFlow extracts the challenge
+    # - If server responds with 401/407, AuthDigest extracts the challenge
     # - Second request is sent with proper Authorization header
     # This follows the httpx-style generator-based auth pattern.
-    auth = AuthFlow(
+    auth = AuthDigest(
         username=s["username"],
         password=s["credential"],
     )
@@ -113,7 +113,7 @@ async def register(expires: int, debug: bool) -> None:
     # - Closes everything on exit
     async with AsyncClient(
         transport="udp",
-        config=config,
+        settings=settings,
         auth=auth,
         event_hooks=event_hooks,
     ) as client:
@@ -121,7 +121,7 @@ async def register(expires: int, debug: bool) -> None:
         # The register() method:
         # - Builds a REGISTER request with proper headers
         # - Sends it to the registrar (extracted from URI)
-        # - Handles auth challenges automatically via AuthFlow
+        # - Handles auth challenges automatically via AuthDigest
         # - Returns the final Response
         #
         # The Expires header controls registration duration.

@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 4.0.0 - 2026-06-13
+
+### Changed (breaking)
+
+- **`ClientConfig` → `Settings`.** Renamed the client defaults dataclass;
+  `ClientConfig` remains as a deprecated alias.
+- **`AuthFlow` → `AuthDigest`.** Renamed Digest authentication helper;
+  `AuthFlow` remains as a deprecated alias.
+- **`AsyncClient` constructor.** Primary keyword is now `settings=` (was
+  `config=`); `config=` is still accepted as a deprecated alias.
+- **`AsyncClient.settings`.** New property for client defaults; `config` is a
+  deprecated alias. Internal storage is `_settings`.
+- **`AsyncClient.merged_settings()`.** Renamed from `merged_config()`; the old
+  name remains as a deprecated alias.
+
 ## 3.7.0 - 2026-06-13
 
 ### Fixed

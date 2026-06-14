@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from sipx.client import AsyncClient
-from sipx.config import ClientConfig
-from sipx.protocol.auth import AuthFlow
+from sipx.config import Settings
+from sipx.protocol.auth import AuthDigest
 from sipx.transport.tcp import TcpTransport
 from sipx.transport.tls import TlsTransport
 from sipx.transport.udp import UdpTransport
@@ -59,14 +59,14 @@ def test_asyncclient_invalid_transport_raises():
 
 
 def test_asyncclient_custom_config():
-    """AsyncClient must accept custom ClientConfig."""
-    config = ClientConfig(
+    """AsyncClient must accept custom Settings."""
+    settings = Settings(
         local_host="127.0.0.1",
         local_port=5060,
         timeout=60.0,
         user_agent="test-agent",
     )
-    client = AsyncClient(config=config)
+    client = AsyncClient(settings=settings)
     assert client.config.local_host == "127.0.0.1"
     assert client.config.local_port == 5060
     assert client.config.timeout == 60.0
@@ -84,7 +84,7 @@ def test_asyncclient_event_hooks():
 
 def test_asyncclient_auth_flow():
     """AsyncClient must store auth flow."""
-    auth = AuthFlow(username="alice", password="secret")
+    auth = AuthDigest(username="alice", password="secret")
     client = AsyncClient(auth=auth)
     assert client.auth is auth
     assert client.auth.username == "alice"
@@ -131,7 +131,7 @@ async def test_asyncclient_transport_property():
 @pytest.mark.asyncio
 async def test_asyncclient_config_property():
     """AsyncClient.config must return the configuration."""
-    config = ClientConfig(user_agent="test/1.0")
-    client = AsyncClient(config=config)
+    settings = Settings(user_agent="test/1.0")
+    client = AsyncClient(settings=settings)
     assert client.config.user_agent == "test/1.0"
     await client.aclose()

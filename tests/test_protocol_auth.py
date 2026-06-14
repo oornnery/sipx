@@ -6,7 +6,7 @@ import pytest
 
 from sipx.exceptions import AuthError
 from sipx.models import Request, Response
-from sipx.protocol.auth import AuthFlow
+from sipx.protocol.auth import AuthDigest
 
 
 def make_request(
@@ -33,12 +33,12 @@ def make_response(
     )
 
 
-class TestAuthFlowBasic:
+class TestAuthDigestBasic:
     """Basic auth flow tests."""
 
     def test_auth_flow_yields_initial_request_without_auth(self) -> None:
         """Auth flow should yield the original request first."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -49,7 +49,7 @@ class TestAuthFlowBasic:
 
     def test_auth_flow_completes_when_no_auth_required(self) -> None:
         """Auth flow should complete when response doesn't require auth."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -61,7 +61,7 @@ class TestAuthFlowBasic:
 
     def test_auth_flow_handles_non_auth_error(self) -> None:
         """Auth flow should complete on non-401/407 errors."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -77,7 +77,7 @@ class TestDigestAuthentication:
 
     def test_auth_flow_handles_401_challenge(self) -> None:
         """Auth flow should handle 401 WWW-Authenticate challenge."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -99,7 +99,7 @@ class TestDigestAuthentication:
 
     def test_auth_flow_handles_407_proxy_challenge(self) -> None:
         """Auth flow should handle 407 Proxy-Authenticate challenge."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -119,7 +119,7 @@ class TestDigestAuthentication:
 
     def test_digest_auth_includes_qop_when_present(self) -> None:
         """Digest auth should include qop when challenge specifies it."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -142,7 +142,7 @@ class TestDigestAuthentication:
 
     def test_digest_auth_includes_opaque_when_present(self) -> None:
         """Digest auth should include opaque when challenge specifies it."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -163,7 +163,7 @@ class TestDigestAuthentication:
 
     def test_digest_auth_calculates_response_hash(self) -> None:
         """Digest auth should calculate correct response hash."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -188,12 +188,12 @@ class TestDigestAuthentication:
         assert match is not None
 
 
-class TestAuthFlowErrors:
+class TestAuthDigestErrors:
     """Error handling tests."""
 
     def test_auth_flow_raises_on_malformed_challenge(self) -> None:
         """Auth flow should raise AuthError on malformed challenge."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -210,7 +210,7 @@ class TestAuthFlowErrors:
 
     def test_auth_flow_raises_on_missing_realm(self) -> None:
         """Auth flow should raise AuthError when realm is missing."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -227,7 +227,7 @@ class TestAuthFlowErrors:
 
     def test_auth_flow_raises_on_unsupported_algorithm(self) -> None:
         """Auth flow should raise AuthError on unsupported algorithm."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -249,7 +249,7 @@ class TestAuthFlowErrors:
         import hashlib
         import re
 
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request(method="REGISTER", uri="sip:example.com")
         flow = auth.auth_flow(req)
 
@@ -280,7 +280,7 @@ class TestAuthFlowErrors:
         """Digest auth should support the SHA-256-sess session variant."""
         import re
 
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -303,7 +303,7 @@ class TestAuthFlowErrors:
 
     def test_auth_flow_raises_on_max_retries_exceeded(self) -> None:
         """Auth flow should raise AuthError when max retries exceeded."""
-        auth = AuthFlow(username="alice", password="secret", max_retries=1)
+        auth = AuthDigest(username="alice", password="secret", max_retries=1)
         req = make_request()
         flow = auth.auth_flow(req)
 
@@ -334,7 +334,7 @@ class TestDigestChallengeParsing:
 
     def test_parse_digest_challenge_basic(self) -> None:
         """Should parse basic Digest challenge."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         challenge = auth._parse_digest_challenge(
             'Digest realm="example.com", nonce="abc123"'
         )
@@ -347,7 +347,7 @@ class TestDigestChallengeParsing:
 
     def test_parse_digest_challenge_with_all_fields(self) -> None:
         """Should parse Digest challenge with all fields."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         challenge = auth._parse_digest_challenge(
             'Digest realm="example.com", nonce="abc123", algorithm=MD5, '
             'qop="auth", opaque="xyz789"'
@@ -361,7 +361,7 @@ class TestDigestChallengeParsing:
 
     def test_parse_digest_challenge_without_prefix(self) -> None:
         """Should parse challenge without 'Digest' prefix."""
-        auth = AuthFlow(username="alice", password="secret")
+        auth = AuthDigest(username="alice", password="secret")
         challenge = auth._parse_digest_challenge('realm="example.com", nonce="abc123"')
 
         assert challenge.realm == "example.com"
