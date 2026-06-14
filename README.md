@@ -155,7 +155,7 @@ The SIP client runtime is required for what Asterisk intentionally hides or norm
 - Fuzzing and parser robustness.
 - RTP impairment, payload validation, jitter/loss measurement.
 
-`AsyncClient` is an httpx-style async SIP client. UAC methods (`invite`, `register`, `message`, `options`, `subscribe`, generic `request`, in-dialog `ack`/`bye`) and UAS handler decorators (`on_invite`, `on_message`, `on_options`, `on_subscribe`) share one client, one `ClientConfig`, event hooks (`request`, `response`, `provisional`), and a generator-based Digest `AuthFlow`.
+`AsyncClient` is an httpx-style async SIP client. UAC methods (`invite`, `register`, `message`, `options`, `subscribe`, generic `request`, in-dialog `ack`/`bye`, and `cancel`) and UAS handler decorators (`on_invite`, `on_message`, `on_options`, `on_subscribe`) share one client, one `ClientConfig`, event hooks (`request`, `response`, `provisional`), and a generator-based Digest `AuthFlow`.
 
 Every UAC call returns one final `Response` (the first `>= 200` reply). Intermediate responses — provisional `1xx` and `401`/`407` Digest challenges — are collected on `response.history` in arrival order, each carrying its own `.request`, so the full request/response exchange is recoverable from a single call. Live streaming of each event is still available through `event_hooks`.
 
@@ -182,10 +182,12 @@ peer. The P0/P1/P2 security and RFC hardening roadmap is complete:
   from `received`/`rport` is exposed as `AsyncClient.learned_address`.
 - **PRACK / 100rel (since 3.6.0).** Reliable provisionals (RSeq + `100rel`) are
   auto-PRACKed in the early dialog with a `RAck` header (RFC 3262).
-- **Strict response correlation (since 3.2.0).** Replies must match `Call-ID`,
-  CSeq number/method, top Via `branch`, and the request destination address.
-  Forged datagrams with a matching `Call-ID` but wrong branch or source are
-  dropped.
+- **Strict response correlation (since 3.2.0; hostname fix in 3.7.0).** Replies
+  must match `Call-ID`, CSeq number/method, top Via `branch`, and the request
+  destination port. The source host is enforced only when the target is an IP
+  literal; hostname targets accept the reply from the resolved IP (so peers
+  addressed by name, like the public Mizu demo, no longer time out). Forged
+  datagrams with a matching `Call-ID` but wrong branch are dropped.
 - **Digest MD5 and SHA-256 (since 3.6.0).** `AuthFlow` supports `MD5`,
   `MD5-sess`, `SHA-256`, and `SHA-256-sess` (RFC 7616/8760); single challenge,
   fixed nonce-count.
@@ -279,7 +281,7 @@ The repository is a `uv` workspace. `FORMAT.md` defines the `SPEC.md` format. Th
 
 - `apps/harness`: `sipx-harness`, owns `Harness`, `Actor`, `Timeline`, `Verdict`, artifacts, profiles, reports, and mock runtimes.
 - `apps/cli`: `sipx-cli`, owns the `sipx` console command.
-- `apps/fastapi`: `sipx-fastapi`, REST service demonstrating `AsyncClient` lifespan wiring (OPTIONS, REGISTER, MESSAGE, generic SIP).
+- `apps/fastapi`: `sipx-fastapi`, REST service demonstrating `AsyncClient` lifespan wiring (OPTIONS, REGISTER, MESSAGE, INVITE, CANCEL, generic SIP).
 - `apps/asterisk`: `sipx-asterisk`, owns ARI runtime and Stasis helpers.
 - `apps/llm`: `sipx-llm`, owns `LLMChatClient` and LLM examples.
 - `apps/scenarios`: `sipx-scenarios`, owns runnable scenario and SIP example templates.
@@ -287,23 +289,9 @@ The repository is a `uv` workspace. `FORMAT.md` defines the `SPEC.md` format. Th
 
 Integration tests that require Asterisk must be explicitly configured and must not depend on real secrets committed to the repository.
 
-The installed `sipx` command is SIP-only and curl-like. Top-level commands are `options`, `message`, `request`, `register`, and `unregister`; harness `scenario`, `profile`, `replay`, and `phone` subcommands are not part of this root command surface.
-
-Useful CLI commands:
-
-```bash
-uv run --package sipx-cli sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password "$SIP_PASSWORD"
-uv run --package sipx-cli sipx unregister --aor sip:1001@example.com --registrar sip:pbx.example.com:5060 --username 1001 --password "$SIP_PASSWORD"
-uv run --package sipx-cli sipx options sip:pbx.example.com --from sip:1001@example.com -i
-uv run --package sipx-cli sipx message sip:1002@pbx.example.com 'hello' --from sip:1001@example.com
-uv run --package sipx-cli sipx request INFO sip:1002@pbx.example.com --from sip:1001@example.com --username 1001 --password "$SIP_PASSWORD" --debug-sip -H 'Content-Type: application/dtmf-relay' -d $'Signal=1\r\nDuration=160\r\n'
-```
-
-`register` and `unregister` require explicit `--aor` and `--registrar` flags before network access. Raw SIP request commands require `--from`/`--aor`. The remote peer is derived from the target/registrar URI host and port.
-
-When `--username` and `--password` are provided, the client retries one `401` or `407` Digest challenge without persisting the password.
-
-Use `--debug-sip` to print redacted SIP messages to stderr as they are sent and received. `Authorization` and `Proxy-Authorization` lines are redacted before printing.
+A curl-like `sipx` console command built on `AsyncClient` lives in the `apps/cli`
+(`sipx-cli`) app; see `apps/cli/README.md`. The examples in this README use only
+the base `sipx` package.
 
 Current RTP media primitives include PCMU/PCMA encode/decode without `audioop`, deterministic synthetic `silence` and `noise` PCM sources, RFC3550-style jitter metrics, tx/rx packet metrics, a fixed target/max `RtpJitterBuffer` with concealment and late/drop counters, and `RtpAudioSession` for UDP RTP send/receive with metrics snapshots.
 
@@ -312,7 +300,13 @@ AsyncClient usage examples:
 ```python
 from sipx import AsyncClient, AuthFlow, ClientConfig
 
-config = ClientConfig(from_uri="sip:1001@example.com", timeout=5.0)
+# rport (RFC 3581) and §17 retransmission are on by default; toggle if needed.
+config = ClientConfig(
+    from_uri="sip:1001@example.com",
+    timeout=5.0,
+    rport=True,
+    retransmit=True,
+)
 auth = AuthFlow(username="1001", password="secret")
 
 async with AsyncClient(config=config, auth=auth) as client:
@@ -327,6 +321,23 @@ async with AsyncClient(config=config, auth=auth) as client:
     call_id = response.headers["Call-ID"]
     await client.ack(call_id)
     await client.bye(call_id)
+```
+
+`invite()` blocks until the final response, so to CANCEL a still-ringing call
+(RFC 3261 §9) run the INVITE in one task and cancel it from another. Set an
+explicit `Call-ID` so the second task knows what to target:
+
+```python
+import asyncio
+
+async with AsyncClient(config=config, auth=auth) as client:
+    call_id = "demo-call-1"
+    invite = asyncio.create_task(
+        client.invite("sip:6000@pbx.example.com", **{"Call-ID": call_id})
+    )
+    await asyncio.sleep(1)
+    await client.cancel(call_id)   # 200 OK to the CANCEL
+    response = await invite        # 487 Request Terminated for the INVITE
 ```
 
 Event hooks follow the httpx pattern: a dict mapping event names (`request`, `response`, `provisional`) to lists of sync or async callables. All hooks are side-effect only (return value is ignored):
@@ -357,39 +368,11 @@ payload = {
 
 ## Examples
 
-Use `uv run` from the repository root so the local package is importable.
-
-SIP operation examples live under `apps/scenarios/examples/sip`:
-
-```bash
-uv run --package sipx-cli sipx register --aor sip:1001@example.com --registrar sip:pbx.example.com --username 1001 --password "$SIP_PASSWORD" --debug-sip --keepalive 10
-uv run --package sipx-cli sipx options sip:pbx.example.com --from sip:1001@example.com --include --debug-sip
-uv run --package sipx-cli sipx message sip:1002@example.com 'hello from sipx' --from sip:1001@example.com --debug-sip
-uv run --package sipx-cli sipx request INFO sip:ivr@example.com --from sip:1001@example.com -H 'Content-Type: application/dtmf-relay' -d $'Signal=1\r\nDuration=160\r\n' --include --debug-sip
-```
-
-More command examples are in `apps/scenarios/examples/sip/README.md`. `apps/scenarios/examples/sip/sip_cli_flow.py` builds reusable command arrays for register, OPTIONS, MESSAGE, and raw INFO DTMF flows.
-
-Runnable example files:
-
-```bash
-uv run --package sipx-scenarios python apps/scenarios/examples/sip/sip_cli_flow.py
-
-export SIPX_LOCAL_HOST=<your-local-ip>
-export SIPX_TARGET=sip:<target>@demo.mizu-voip.com:37075
-uv run python -m sipx.examples.register
-SIPX_DEBUG=1 uv run python -m sipx.examples.invite
-```
-
-LLM scenario files are run directly for now:
-
-```bash
-uv run --package sipx-llm python apps/llm/examples/semantic_smoke.py
-uv run --package sipx-llm python apps/llm/examples/sip_flow_audit.py
-uv run --package sipx-llm python apps/llm/examples/sip_flow_audit.py --trace-file /path/to/sip-trace.txt
-```
-
-Direct SIP example scripts live under `sipx.examples` and use the `AsyncClient` API. They default to the public Mizu demo account, but use generic SIP env vars so the same code can target another SIP provider:
+Runnable example scripts live under `sipx.examples` and use only the base `sipx`
+package (the `AsyncClient` API) — no app packages required. Run them with
+`uv run` from the repository root so the local package is importable. They
+default to the public Mizu demo account but read generic `SIPX_*` env vars, so
+the same code can target any SIP provider:
 
 ```bash
 export SIPX_LOCAL_HOST=<your-local-ip>
@@ -410,46 +393,29 @@ uv run python -m sipx.examples.message
 uv run python -m sipx.examples.subscribe
 uv run python -m sipx.examples.invite
 uv run python -m sipx.examples.call
+uv run python -m sipx.examples.cancel
 uv run python -m sipx.examples.info_dtmf
 uv run python -m sipx.examples.hooks_history
 uv run python -m sipx.examples.server
 ```
 
-The `register`, `options`, `message`, `subscribe`, `invite`, `call`,
-`info_dtmf`, and `hooks_history` examples talk to a live SIP peer (default: the
-public Mizu demo account). `server` is offline: it registers UAS handlers and
-feeds them synthetic requests via `handle_request` to show response shaping.
+Set `SIPX_DEBUG=1` to print the SIP request/response wire to stderr, for example
+`SIPX_DEBUG=1 uv run python -m sipx.examples.invite`.
 
-LLM examples use a generic OpenAI-compatible `/chat/completions` provider and read provider settings only from runtime environment variables:
+The `register`, `unregister`, `options`, `message`, `subscribe`, `invite`,
+`call`, `cancel`, `info_dtmf`, and `hooks_history` examples talk to a live SIP
+peer (default: the public Mizu demo account). `cancel` starts an INVITE and
+aborts it from a second task (RFC 3261 §9). `server` is offline: it registers
+UAS handlers and feeds them synthetic requests via `handle_request` to show
+response shaping.
 
-```bash
-export SIPX_LLM_API_KEY=...
-export SIPX_LLM_BASE_URL=https://api.openai.com/v1
-export SIPX_LLM_MODEL=gpt-4o-mini
-uv run --package sipx-llm python apps/llm/examples/sip_flow_audit.py --trace-file /path/to/sip-trace.txt
-```
+Extra per-example env vars: `SIPX_EXPIRES` (register), `SIPX_MESSAGE` /
+`SIPX_CONTENT_TYPE` (message), `SIPX_EVENT` / `SIPX_ACCEPT` (subscribe),
+`SIPX_CODECS` / `SIPX_RTP_PORT` (call), and `SIPX_CANCEL_AFTER` (cancel).
 
-`semantic_smoke.py` is the quick smoke test. `sip_flow_audit.py` is the richer example: it extracts deterministic SIP signals, asks the LLM for structured JSON, returns summary, behavior, risk score, protocol findings, media assessment, and next actions.
-
-### FastAPI REST service
-
-The `apps/fastapi` workspace package exposes `AsyncClient` over HTTP with a
-lifespan-managed shared client. See `apps/fastapi/README.md` for endpoint
-details.
-
-```bash
-export SIPX_AOR=sip:1001@example.com
-export SIPX_REGISTRAR=sip:pbx.example.com:5060
-export SIPX_USERNAME=1001
-export SIPX_PASSWORD=...
-uv run --package sipx-fastapi sipx-fastapi
-curl -s http://127.0.0.1:8000/health | jq .
-curl -s -X POST http://127.0.0.1:8000/sip/options \
-  -H 'Content-Type: application/json' \
-  -d '{"target":"sip:pbx.example.com"}' | jq .
-```
-
-Templates live under `apps/llm/examples`, `apps/asterisk/examples`, and `apps/scenarios/examples`. The live LLM smoke test is skipped unless `SIPX_LLM_API_KEY` is set.
+Apps built on top of `sipx` (CLI, FastAPI, Asterisk, LLM, scenarios) live under
+`apps/*` and ship their own READMEs and examples; those are intentionally out of
+scope for this section.
 
 GitHub automation lives under `.github/workflows`:
 
